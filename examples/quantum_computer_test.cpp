@@ -3,18 +3,6 @@
 
 #include <iostream>
 
-void print_it(iqs::it_t const &iter) {
-	for (auto gid = 0; gid < iter.num_object; ++gid) {
-		auto begin = iter.objects.begin() + iter.object_begin[gid];
-		auto end = iter.objects.begin() + iter.object_begin[gid + 1];
-
-		std::cout << "\t" << iter.real[gid] << (iter.imag[gid] < 0 ? " - " : " + ") << std::abs(iter.imag[gid]) << "i  ";
-		for (auto it = begin; it != end; ++it)
-			std::cout << (*it ? '1' : '0');
-		std::cout << "\n";
-	}
-}
-
 int main(int argc, char* argv[]) {
 	iqs::rule_t *H1 = new iqs::rules::quantum_computer::hadamard(1);
 	iqs::rule_t *H2 = new iqs::rules::quantum_computer::hadamard(2);
@@ -30,25 +18,25 @@ int main(int argc, char* argv[]) {
 	char starting_state_2[] = {false, true, true, false, true};
 	state.append(starting_state_1, starting_state_1 + 4, 1/std::sqrt(2), 0);
 	state.append(starting_state_2, starting_state_2 + 5, 0, 1/std::sqrt(2));
-	std::cout << "initial_state:\n"; print_it(state);
+	std::cout << "initial_state:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, H1, buffer, sy_it);
-	std::cout << "\nhadamard on second qubit:\n"; print_it(state);
+	std::cout << "\nhadamard on second qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, H2, buffer, sy_it);
-	std::cout << "\nhadamard on third qubit:\n"; print_it(state);
+	std::cout << "\nhadamard on third qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, CNOT, buffer, sy_it);
-	std::cout << "\ncnot on fourth qubit controled by second qubit:\n"; print_it(state);
+	std::cout << "\ncnot on fourth qubit controled by second qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, X2, buffer, sy_it);
-	std::cout << "\nX on third qubit:\n"; print_it(state);
+	std::cout << "\nX on third qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, Y0, buffer, sy_it);
-	std::cout << "\nY on first qubit:\n"; print_it(state);
+	std::cout << "\nY on first qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, Z3, buffer, sy_it);
-	std::cout << "\nZ on fourth qubit:\n"; print_it(state);
+	std::cout << "\nZ on fourth qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, Z3, buffer, sy_it);
 	iqs::simulate(state, Y0, buffer, sy_it);
@@ -56,5 +44,5 @@ int main(int argc, char* argv[]) {
 	iqs::simulate(state, CNOT, buffer, sy_it);
 	iqs::simulate(state, H2, buffer, sy_it);
 	iqs::simulate(state, H1, buffer, sy_it);
-	std::cout << "\napplied all previous gates in reverse order:\n";  print_it(state);
+	std::cout << "\napplied all previous gates in reverse order:\n";  iqs::rules::quantum_computer::utils::print(state);
 }

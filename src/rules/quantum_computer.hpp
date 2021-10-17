@@ -1,6 +1,22 @@
+#include <iostream>
+
 #include "../lib/iqs.hpp"
 
 namespace iqs::rules::quantum_computer {
+	namespace utils {
+		void print(iqs::it_t const &iter) {
+			for (auto gid = 0; gid < iter.num_object; ++gid) {
+				auto begin = iter.objects.begin() + iter.object_begin[gid];
+				auto end = iter.objects.begin() + iter.object_begin[gid + 1];
+
+				std::cout << "\t" << iter.real[gid] << (iter.imag[gid] < 0 ? " - " : " + ") << std::abs(iter.imag[gid]) << "i  ";
+				for (auto it = begin; it != end; ++it)
+					std::cout << (*it ? '1' : '0');
+				std::cout << "\n";
+			}
+		}
+	}
+
 	class cnot : public iqs::rule {
 		size_t control_bit, bit;
 

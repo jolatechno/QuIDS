@@ -16,12 +16,6 @@
 #ifndef SAFETY_MARGIN
 	#define SAFETY_MARGIN 0.2
 #endif
-#ifndef ITEARTION_DISCRIMINATION_FACTOR
-	#define ITEARTION_DISCRIMINATION_FACTOR 1.35
-#endif
-#ifndef MEMORY_DISCRIMINATION_FACTOR
-	#define MEMORY_DISCRIMINATION_FACTOR 0.65
-#endif
 #ifndef COLLISION_TEST_PROPORTION
 	#define COLLISION_TEST_PROPORTION 0.1
 #endif
@@ -44,10 +38,12 @@ defining openmp function's return values if openmp isn't installed or loaded
 #endif
 
 namespace iqs {
-	#include "utils/load_balancing.hpp"
-	#include "utils/memory.hpp"
-	#include "utils/random.hpp"
-	#include "utils/vector.hpp"
+	namespace utils {
+		#include "utils/load_balancing.hpp"
+		#include "utils/memory.hpp"
+		#include "utils/random.hpp"
+		#include "utils/vector.hpp"
+	}
 
 	#include "utils/libs/boost_hash.hpp"
 	
@@ -56,8 +52,6 @@ namespace iqs {
 	*/
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
-	float iteartion_discrimination_factor = ITEARTION_DISCRIMINATION_FACTOR;
-	float memory_discrimination_factor = MEMORY_DISCRIMINATION_FACTOR;
 	float collision_test_proportion = COLLISION_TEST_PROPORTION;
 	float collision_tolerance = COLLISION_TOLERANCE;
 	float collision_probability_tolerance = COLLISION_PROBABILITY_TOLERANCE;
@@ -104,12 +98,12 @@ namespace iqs {
 		size_t num_object = 0;
 		PROBA_TYPE total_proba = 1;
 
-		numa_vector<PROBA_TYPE> real, imag;
-		numa_vector<char> objects;
-		numa_vector<size_t> object_begin;
+		utils::numa_vector<PROBA_TYPE> real, imag;
+		utils::numa_vector<char> objects;
+		utils::numa_vector<size_t> object_begin;
 
 	private:
-		mutable numa_vector<uint16_t> num_childs;
+		mutable utils::numa_vector<uint16_t> num_childs;
 
 		void inline resize(size_t num_object) const {
 			real.resize(num_object);
@@ -162,14 +156,14 @@ namespace iqs {
 		tbb::concurrent_hash_map<size_t, size_t> elimination_map;
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 
-		numa_vector<PROBA_TYPE> real, imag;
-		numa_vector<size_t> next_gid;
-		numa_vector<size_t> size;
-		numa_vector<size_t> hash;
-		numa_vector<size_t> parent_gid;
-		numa_vector<uint16_t> child_id;
-		numa_vector<bool> is_unique;
-		numa_vector<double> random_selector;
+		utils::numa_vector<PROBA_TYPE> real, imag;
+		utils::numa_vector<size_t> next_gid;
+		utils::numa_vector<size_t> size;
+		utils::numa_vector<size_t> hash;
+		utils::numa_vector<size_t> parent_gid;
+		utils::numa_vector<uint16_t> child_id;
+		utils::numa_vector<bool> is_unique;
+		utils::numa_vector<double> random_selector;
 
 		void inline resize(size_t num_object) {
 			size.zero_resize(num_object);
@@ -200,8 +194,23 @@ namespace iqs {
 	/*
 	for memory managment
 	*/
-	size_t inline get_additional_max_num_object(it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
-		return 100000;
+	long long int inline get_additional_max_num_object(it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
+		// get the free memory and the total amount of memory...
+		auto [total_memory, free_mem] = utils::get_mem_usage_and_free_mem();
+
+		// and according to the "safety_margin" (a proportion of total memory) compute the total delta between the amount free memory and the target
+		long int mem_difference = free_mem - total_memory*safety_margin;
+
+		static long long int iteration_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint16_t);
+		static long long int symbolic_iteration_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint16_t) + sizeof(double);
+
+		/* compute average object size */
+		long long int iteration_size_per_object = last_iteration.object_begin[last_iteration.num_object]; // size for all object buffer
+		iteration_size_per_object += symbolic_iteration.num_object*symbolic_iteration_size; // size for symbolic iteration
+		iteration_size_per_object /= last_iteration.num_object; // divide to get size per object
+		iteration_size_per_object += iteration_size; // add constant size per object
+
+		return mem_difference / iteration_size_per_object;
 	}
 
 	/*
@@ -272,8 +281,9 @@ namespace iqs {
 		num_object_after_interferences = num_object;
 
 		bool fast = false;
-		bool skip_test = num_object < min_vector_size || last_iteration.total_proba - 1 > collision_probability_tolerance;
-		size_t max_num_object, test_size = skip_test ? 0 : num_object*collision_test_proportion;
+		bool skip_test = num_object < utils::min_vector_size || last_iteration.total_proba - 1 > collision_probability_tolerance;
+		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
+		long long int max_num_object;
 
 		/*
 		function for partition
@@ -393,8 +403,9 @@ namespace iqs {
 				max_num_object = (last_iteration.num_object + 
 					next_iteration.num_object +
 					get_additional_max_num_object(last_iteration, *this)) / 2;
+				max_num_object = std::max(max_num_object, (long long int)utils::min_vector_size);
 
-				if (max_num_object > 0 && num_object_after_interferences > max_num_object) {
+				if (num_object_after_interferences > max_num_object) {
 
 					/* generate random selectors */
 					#pragma omp parallel for schedule(static)
@@ -402,7 +413,7 @@ namespace iqs {
 						PROBA_TYPE r = real[*gid_it];
 						PROBA_TYPE i = imag[*gid_it];
 
-						double random_number = unfiorm_from_hash(hash[*gid_it]); //random_generator();
+						double random_number = utils::unfiorm_from_hash(hash[*gid_it]); //random_generator();
 						random_selector[*gid_it] = std::log( -std::log(1 - random_number) / (r*r + i*i));
 					}
 
