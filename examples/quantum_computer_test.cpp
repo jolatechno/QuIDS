@@ -6,10 +6,10 @@
 int main(int argc, char* argv[]) {
 	iqs::rule_t *H1 = new iqs::rules::quantum_computer::hadamard(1);
 	iqs::rule_t *H2 = new iqs::rules::quantum_computer::hadamard(2);
-	iqs::rule_t *CNOT = new iqs::rules::quantum_computer::cnot(1, 3);
-	iqs::rule_t *X2 = new iqs::rules::quantum_computer::Xgate(2);
-	iqs::rule_t *Y0 = new iqs::rules::quantum_computer::Ygate(0);
-	iqs::rule_t *Z3 = new iqs::rules::quantum_computer::Zgate(3);
+	iqs::modifier_t CNOT = iqs::rules::quantum_computer::cnot(1, 3);
+	iqs::modifier_t X2 = iqs::rules::quantum_computer::Xgate(2);
+	iqs::modifier_t Y0 = iqs::rules::quantum_computer::Ygate(0);
+	iqs::modifier_t Z3 = iqs::rules::quantum_computer::Zgate(3);
 	iqs::sy_it_t sy_it; iqs::it_t buffer;
 
 	/* constructing a starting state with different size state */
@@ -26,22 +26,22 @@ int main(int argc, char* argv[]) {
 	iqs::simulate(state, H2, buffer, sy_it);
 	std::cout << "\nhadamard on third qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
-	iqs::simulate(state, CNOT, buffer, sy_it);
+	iqs::simulate(state, CNOT);
 	std::cout << "\ncnot on fourth qubit controled by second qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
-	iqs::simulate(state, X2, buffer, sy_it);
+	iqs::simulate(state, X2);
 	std::cout << "\nX on third qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
-	iqs::simulate(state, Y0, buffer, sy_it);
+	iqs::simulate(state, Y0);
 	std::cout << "\nY on first qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
-	iqs::simulate(state, Z3, buffer, sy_it);
+	iqs::simulate(state, Z3);
 	std::cout << "\nZ on fourth qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
-	iqs::simulate(state, Z3, buffer, sy_it);
-	iqs::simulate(state, Y0, buffer, sy_it);
-	iqs::simulate(state, X2, buffer, sy_it);
-	iqs::simulate(state, CNOT, buffer, sy_it);
+	iqs::simulate(state, Z3);
+	iqs::simulate(state, Y0);
+	iqs::simulate(state, X2);
+	iqs::simulate(state, CNOT);
 	iqs::simulate(state, H2, buffer, sy_it);
 	iqs::simulate(state, H1, buffer, sy_it);
 	std::cout << "\napplied all previous gates in reverse order:\n";  iqs::rules::quantum_computer::utils::print(state);

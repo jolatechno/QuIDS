@@ -17,36 +17,22 @@ namespace iqs::rules::quantum_computer {
 		}
 	}
 
-	class cnot : public iqs::rule {
-		size_t control_bit, bit;
-
-	public:
-		cnot(size_t cbit, size_t bit_) : control_bit(cbit), bit(bit_) {}
-		inline void get_num_child(char* object_begin, char* object_end, uint16_t &num_child, size_t &max_child_size) const override {
-			num_child = 1;
-			max_child_size = std::distance(object_begin, object_end);
-		}
-		inline char* populate_child(char* parent_begin, char* parent_end, uint16_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
-			size_t n_bit = std::distance(parent_begin, parent_end);
-			for (auto i = 0; i < n_bit; ++i)
-				child_begin[i] = parent_begin[i];
-
-			child_begin[bit] ^= child_begin[control_bit];
-
-			return child_begin + n_bit;
-		}
-	};
+	modifier_t inline cnot(uint32_t control_bit, uint32_t bit) {
+		return [=](char* begin, char* end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+			begin[bit] ^= begin[control_bit];
+		};
+	}
 
 	class hadamard : public iqs::rule {
 		size_t bit;
 
 	public:
 		hadamard(size_t bit_) : bit(bit_) {}
-		inline void get_num_child(char* object_begin, char* object_end, uint16_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const override {
 			num_child = 2;
-			max_child_size = std::distance(object_begin, object_end);
+			max_child_size = std::distance(parent_begin, parent_end);
 		}
-		inline char* populate_child(char* parent_begin, char* parent_end, uint16_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+		inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
 			static const PROBA_TYPE sqrt2 = 1/std::sqrt(2);
 			PROBA_TYPE multiplier = parent_begin[bit] && child_id ? -sqrt2 : sqrt2;
 			real *= multiplier; imag *= multiplier;
@@ -61,75 +47,35 @@ namespace iqs::rules::quantum_computer {
 		}
 	};
 
-	class Xgate : public iqs::rule {
-		size_t n_bit, bit;
+	modifier_t inline Xgate(size_t bit) {
+		return [=](char* begin, char* end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+			begin[bit] = !begin[bit];
+		};
+	}
 
-	public:
-		Xgate(size_t bit_) : bit(bit_) {}
-		inline void get_num_child(char* object_begin, char* object_end, uint16_t &num_child, size_t &max_child_size) const override {
-			num_child = 1;
-			max_child_size = std::distance(object_begin, object_end);
-		}
-		inline char* populate_child(char* parent_begin, char* parent_end, uint16_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
-			size_t n_bit = std::distance(parent_begin, parent_end);
-			for (auto i = 0; i < n_bit; ++i)
-				child_begin[i] = parent_begin[i];
-
-			child_begin[bit] = !child_begin[bit];
-
-			return child_begin + n_bit;
-		}
-	};
-
-	class Ygate : public iqs::rule {
-		size_t bit;
-
-	public:
-		Ygate(size_t bit_) : bit(bit_) {}
-		inline void get_num_child(char* object_begin, char* object_end, uint16_t &num_child, size_t &max_child_size) const override {
-			num_child = 1;
-			max_child_size = std::distance(object_begin, object_end);
-		}
-		inline char* populate_child(char* parent_begin, char* parent_end, uint16_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+	modifier_t inline Ygate(size_t bit) {
+		return [=](char* begin, char* end, PROBA_TYPE &real, PROBA_TYPE &imag) {
 			PROBA_TYPE r = -imag;
 			imag = real;
 			real = r;
 
-			if (parent_begin[bit]) {
-				real = -real;
-				imag = -imag;
-			}
-			
-			size_t n_bit = std::distance(parent_begin, parent_end);
-			for (auto i = 0; i < n_bit; ++i)
-				child_begin[i] = parent_begin[i];
-
-			child_begin[bit] = !child_begin[bit];
-
-			return child_begin + n_bit;
-		}
-	};
-
-	class Zgate : public iqs::rule {
-		size_t bit;
-
-	public:
-		Zgate(size_t bit_) : bit(bit_) {}
-		inline void get_num_child(char* object_begin, char* object_end, uint16_t &num_child, size_t &max_child_size) const override {
-			num_child = 1;
-			max_child_size = std::distance(object_begin, object_end);
-		}
-		inline char* populate_child(char* parent_begin, char* parent_end, uint16_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
-			if (parent_begin[bit]) {
+			if (begin[bit]) {
 				real = -real;
 				imag = -imag;
 			}
 
-			size_t n_bit = std::distance(parent_begin, parent_end);
-			for (auto i = 0; i < n_bit; ++i)
-				child_begin[i] = parent_begin[i];
+			begin[bit] = !begin[bit];
+		};
+	}
 
-			return child_begin + n_bit;
-		}
-	};
+	modifier_t inline Zgate(size_t bit) {
+		return [=](char* begin, char* end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+			if (begin[bit]) {
+				real = -real;
+				imag = -imag;
+			}
+
+			begin[bit] = !begin[bit];
+		};
+	}
 }

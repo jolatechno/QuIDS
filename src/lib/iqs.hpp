@@ -39,6 +39,7 @@ defining openmp function's return values if openmp isn't installed or loaded
 
 namespace iqs {
 	namespace utils {
+		#include "utils/complex.hpp"
 		#include "utils/load_balancing.hpp"
 		#include "utils/memory.hpp"
 		#include "utils/random.hpp"
@@ -76,6 +77,7 @@ namespace iqs {
 	typedef class iteration it_t;
 	typedef class symbolic_iteration sy_it_t;
 	typedef class rule rule_t;
+	typedef std::function<void(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag)> modifier_t;
 
 	/* 
 	rule virtual class
@@ -83,8 +85,8 @@ namespace iqs {
 	class rule {
 	public:
 		rule() {};
-		virtual inline void get_num_child(char* object_begin, char* object_end, uint16_t &num_child, size_t &max_child_size) const = 0;
-		virtual inline char* populate_child(char* parent_begin, char* parent_end, uint16_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const = 0;
+		virtual inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const = 0;
+		virtual inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const = 0;
 	};
 
 	/*
@@ -103,7 +105,7 @@ namespace iqs {
 		utils::numa_vector<size_t> object_begin;
 
 	private:
-		mutable utils::numa_vector<uint16_t> num_childs;
+		mutable utils::numa_vector<uint32_t> num_childs;
 
 		void inline resize(size_t num_object) const {
 			real.resize(num_object);
@@ -138,7 +140,8 @@ namespace iqs {
 			real[num_object - 1] = real_; imag[num_object - 1] = imag_;
 			object_begin[num_object] = offset + size;
 		}
-		void inline generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration) const;
+		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration) const;
+		void apply_modifier(modifier_t const rule);
 	};
 
 	/*
@@ -161,7 +164,7 @@ namespace iqs {
 		utils::numa_vector<size_t> size;
 		utils::numa_vector<size_t> hash;
 		utils::numa_vector<size_t> parent_gid;
-		utils::numa_vector<uint16_t> child_id;
+		utils::numa_vector<uint32_t> child_id;
 		utils::numa_vector<bool> is_unique;
 		utils::numa_vector<double> random_selector;
 
@@ -188,7 +191,7 @@ namespace iqs {
 
 	public:
 		symbolic_iteration() {}
-		void inline finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration);
+		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration);
 	};
 
 	/*
@@ -201,8 +204,8 @@ namespace iqs {
 		// and according to the "safety_margin" (a proportion of total memory) compute the total delta between the amount free memory and the target
 		long int mem_difference = free_mem - total_memory*safety_margin;
 
-		static long long int iteration_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint16_t);
-		static long long int symbolic_iteration_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint16_t) + sizeof(double);
+		static long long int iteration_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
+		static long long int symbolic_iteration_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 
 		/* compute average object size */
 		long long int iteration_size_per_object = last_iteration.object_begin[last_iteration.num_object]; // size for all object buffer
@@ -216,16 +219,31 @@ namespace iqs {
 	/*
 	simulation function
 	*/
-	void simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration) {
+	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration) {
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration);
 		symbolic_iteration.finalize(rule, iteration, iteration_buffer);
 		std::swap(iteration_buffer, iteration);
+	}
+	void inline simulate(it_t &iteration, modifier_t const rule) {
+		iteration.apply_modifier(rule);
+	}
+
+	/*
+	apply modifier
+	*/
+	void iteration::apply_modifier(modifier_t const rule) {
+		#pragma omp parallel for schedule(static)
+		for (auto gid = 0; gid < num_object; ++gid)
+			/* generate graph */
+			rule(objects.begin() + object_begin[gid],
+				objects.begin() + object_begin[gid + 1],
+				real[gid], imag[gid]);
 	}
 
 	/*
 	generate symbolic iteration
 	*/
-	void inline iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration) const {
+	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration) const {
 		size_t max_size = 0;
 		#pragma omp parallel
 		{
@@ -274,7 +292,7 @@ namespace iqs {
 	/*
 	finalize iteration
 	*/
-	void inline symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration) {
+	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration) {
 		double &total_proba = next_iteration.total_proba;
 		total_proba = 0;
 
