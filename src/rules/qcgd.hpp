@@ -178,4 +178,56 @@ namespace iqs::rules::qcgd {
 			return child_end;
 		}
 	};
+
+	class coin : public iqs::rule {
+		PROBA_TYPE do_real = 1;
+		PROBA_TYPE do_imag = 0;
+		PROBA_TYPE do_not_real = 0;
+		PROBA_TYPE do_not_imag = 0;
+
+	public:
+		coin(PROBA_TYPE theta, PROBA_TYPE phi = 0, PROBA_TYPE xi = 0) {
+			do_real = std::sin(theta) * std::cos(phi);
+			do_imag = std::sin(theta) * std::sin(phi);
+			do_not_real = std::cos(theta) * std::cos(xi);
+			do_not_imag = std::cos(theta) * std::sin(xi);
+		}
+		inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const override {
+			max_child_size = std::distance(parent_begin, parent_end);
+
+			uint32_t num_nodes = graphs::num_nodes(parent_begin, parent_end);
+
+			num_child = 1;
+			for (int i = 0; i < num_nodes; ++i) {
+				bool Xor = graphs::left(parent_begin, parent_end, i) ^ graphs::right(parent_begin, parent_end, i);
+				if (Xor /* == 1 */)
+					num_child *= 2;
+			}
+		}
+		inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+			size_t n_bit = std::distance(parent_begin, parent_end);
+			char* child_end = child_begin + n_bit;
+			for (auto i = 0; i < n_bit; ++i)
+				child_begin[i] = parent_begin[i];
+
+			uint32_t num_nodes = graphs::num_nodes(parent_begin, parent_end);
+			for (int i = 0; i < num_nodes; ++i) {
+				bool &left = graphs::left(child_begin, child_end, i);
+				bool &right = graphs::right(child_begin, child_end, i);
+
+				if (left ^ right /* == 1 */) {
+					PROBA_TYPE sign = 1 - 2*left;
+					if (child_id & 1) {
+						iqs::utils::time_equal(real, imag, do_real, sign*do_imag);
+						left = !left;
+						right = !right;
+					} else
+						iqs::utils::time_equal(real, imag, sign*do_not_real, do_not_imag);
+					child_id >>= 1;
+				}
+			}
+
+			return child_end;
+		}
+	};
 }
