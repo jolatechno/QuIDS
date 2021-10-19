@@ -199,7 +199,8 @@ namespace iqs {
 	*/
 	long long int inline get_additional_max_num_object(it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
 		// get the free memory and the total amount of memory...
-		auto [total_memory, free_mem] = utils::get_mem_usage_and_free_mem();
+		long long int total_memory, free_mem;
+		utils::get_mem_usage_and_free_mem(total_memory, free_mem);
 
 		// and according to the "safety_margin" (a proportion of total memory) compute the total delta between the amount free memory and the target
 		long int mem_difference = free_mem - total_memory*safety_margin;

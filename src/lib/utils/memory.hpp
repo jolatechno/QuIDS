@@ -1,13 +1,10 @@
 #include <sys/sysinfo.h>
-#include <utility>
 
-std::pair<long long int, long long int> get_mem_usage_and_free_mem() {
+void inline get_mem_usage_and_free_mem(long long int &total_ram, long long int &free_ram) {
 	struct sysinfo info;
 	if (sysinfo(&info) < 0)
 		throw;
 
-    return {
-        info.totalram * info.mem_unit,
-        info.freeram * info.mem_unit
-    };
+    total_ram = info.totalram * info.mem_unit;
+    free_ram = info.freeram * info.mem_unit;
 }

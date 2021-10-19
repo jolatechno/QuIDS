@@ -13,10 +13,10 @@ int main(int argc, char* argv[]) {
 	char *begin, *end;
 	iqs::it_t state;
 
-	iqs::rules::qcgd::utils::make_graph(begin, end, 5);
+	iqs::rules::qcgd::utils::make_graph(begin, end, 9);
 	state.append(begin, end, 1/std::sqrt(2), 0);
 
-	iqs::rules::qcgd::utils::make_graph(begin, end, 3);
+	iqs::rules::qcgd::utils::make_graph(begin, end, 8);
 	state.append(begin, end, 0, -1/std::sqrt(2));
 
 	std::cout << "initial state:\n"; iqs::rules::qcgd::utils::print(state);
@@ -28,13 +28,13 @@ int main(int argc, char* argv[]) {
 	std::cout << "\nafter step:\n"; iqs::rules::qcgd::utils::print(state);
 
 	iqs::simulate(state, erase_create, buffer, sy_it);
-	std::cout << "\nafter erase_create:\n"; iqs::rules::qcgd::utils::print(state);
+	std::cout << "\nafter erase_create (P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 
 	iqs::simulate(state, coin, buffer, sy_it);
-	std::cout << "\nafter coin:\n"; iqs::rules::qcgd::utils::print(state);
+	std::cout << "\nafter coin (P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 
 	iqs::simulate(state, coin, buffer, sy_it);
 	iqs::simulate(state, erase_create, buffer, sy_it);
 	iqs::simulate(state, iqs::rules::qcgd::reversed_step);
-	std::cout << "\napplied all previous gates in reverse order:\n";  iqs::rules::qcgd::utils::print(state);
+	std::cout << "\napplied all previous gates in reverse order (P=" << state.total_proba << "):\n";  iqs::rules::qcgd::utils::print(state);
 }
