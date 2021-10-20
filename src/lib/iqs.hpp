@@ -38,6 +38,8 @@ defining openmp function's return values if openmp isn't installed or loaded
 #endif
 
 namespace iqs {
+	#include "utils/libs/boost_hash.hpp"
+
 	namespace utils {
 		#include "utils/complex.hpp"
 		#include "utils/load_balancing.hpp"
@@ -45,8 +47,6 @@ namespace iqs {
 		#include "utils/random.hpp"
 		#include "utils/vector.hpp"
 	}
-
-	#include "utils/libs/boost_hash.hpp"
 	
 	/*
 	global variable definition
@@ -78,6 +78,15 @@ namespace iqs {
 	typedef class symbolic_iteration sy_it_t;
 	typedef class rule rule_t;
 	typedef std::function<void(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag)> modifier_t;
+	typedef std::function<void(char* parent_begin, char* parent_end, size_t &hash)> hasher_t;
+
+	namespace utils {
+		void default_hasher(char* parent_begin, char* parent_end, size_t &hash) {
+			hash = 0;
+			for (char* it = parent_begin; it != parent_end; ++it)
+				boost::hash_combine(hash, *it);
+		}
+	}
 
 	/* 
 	rule virtual class
@@ -191,7 +200,7 @@ namespace iqs {
 
 	public:
 		symbolic_iteration() {}
-		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration);
+		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, hasher_t hasher);
 	};
 
 	/*
@@ -220,9 +229,9 @@ namespace iqs {
 	/*
 	simulation function
 	*/
-	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration) {
+	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, hasher_t hasher=utils::default_hasher) {
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration);
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer);
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, hasher);
 		std::swap(iteration_buffer, iteration);
 	}
 	void inline simulate(it_t &iteration, modifier_t const rule) {
@@ -293,7 +302,7 @@ namespace iqs {
 	/*
 	finalize iteration
 	*/
-	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration) {
+	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, hasher_t hasher=utils::default_hasher) {
 		double &total_proba = next_iteration.total_proba;
 		total_proba = 0;
 
@@ -368,9 +377,7 @@ namespace iqs {
 				size[gid] = std::distance(placeholder[thread_id], end);
 
 				/* compute hash */
-				hash[gid] = 0;
-				for (char* it = placeholder[thread_id]; it != end; ++it)
-					boost::hash_combine(hash[gid], *it);
+				hasher(placeholder[thread_id], end, hash[gid]);
 			}
 
 			/* !!!!!!!!!!!!!!!!
@@ -404,7 +411,7 @@ namespace iqs {
 				#pragma omp for schedule(static)
 				for (auto gid = test_size; gid < num_object; ++gid) //size_t gid = gid[i];
 					interferencer(gid);
-
+				
 			#pragma omp single
 			{
 				elimination_map.clear();
