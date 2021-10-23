@@ -79,6 +79,7 @@ namespace iqs {
 	typedef class rule rule_t;
 	typedef std::function<void(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag)> modifier_t;
 	typedef std::function<void(char* parent_begin, char* parent_end, size_t &hash)> hasher_t;
+	typedef std::function<void(int step)> debug_t;
 
 	namespace utils {
 		void default_hasher(char* parent_begin, char* parent_end, size_t &hash) {
@@ -143,14 +144,15 @@ namespace iqs {
 			resize(++num_object);
 			allocate(offset + size);
 
-			for (auto i = 0; i < size; ++i)
+			for (size_t i = 0; i < size; ++i)
 				objects[offset + i] = object_begin_[i];
 
 			real[num_object - 1] = real_; imag[num_object - 1] = imag_;
 			object_begin[num_object] = offset + size;
 		}
-		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration) const;
+		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const;
 		void apply_modifier(modifier_t const rule);
+		void normalize();
 	};
 
 	/*
@@ -194,13 +196,13 @@ namespace iqs {
 				if (buffer == NULL)
 					free(buffer);
 				buffer = new char[max_size];
-				for (auto i = 0; i < max_size; ++i) buffer[i] = 0; // touch
+				for (size_t i = 0; i < max_size; ++i) buffer[i] = 0; // touch
 			}
 		}
 
 	public:
 		symbolic_iteration() {}
-		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, hasher_t hasher);
+		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, hasher_t hasher, debug_t mid_step_function);
 	};
 
 	/*
@@ -229,9 +231,9 @@ namespace iqs {
 	/*
 	simulation function
 	*/
-	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, hasher_t hasher=utils::default_hasher) {
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration);
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, hasher);
+	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, hasher_t hasher=utils::default_hasher, debug_t mid_step_function=[](int){}) {
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, hasher, mid_step_function);
 		std::swap(iteration_buffer, iteration);
 	}
 	void inline simulate(it_t &iteration, modifier_t const rule) {
@@ -243,7 +245,7 @@ namespace iqs {
 	*/
 	void iteration::apply_modifier(modifier_t const rule) {
 		#pragma omp parallel for schedule(static)
-		for (auto gid = 0; gid < num_object; ++gid)
+		for (size_t gid = 0; gid < num_object; ++gid)
 			/* generate graph */
 			rule(objects.begin() + object_begin[gid],
 				objects.begin() + object_begin[gid + 1],
@@ -251,10 +253,36 @@ namespace iqs {
 	}
 
 	/*
+	normalize
+	*/
+	void iteration::normalize() {
+		total_proba = 0;
+
+		#pragma omp parallel for reduction(+:total_proba)
+		for (size_t gid = 0; gid < num_object; ++gid) {
+			PROBA_TYPE r = real[gid];
+			PROBA_TYPE i = imag[gid];
+
+			total_proba += r*r + i*i;
+		}
+
+		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
+
+		#pragma omp parallel for
+		for (size_t gid = 0; gid < num_object; ++gid) {
+			real[gid] /= normalization_factor;
+			imag[gid] /= normalization_factor;
+		}
+	}
+
+	/*
 	generate symbolic iteration
 	*/
-	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration) const {
+	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) const {
 		size_t max_size = 0;
+
+		mid_step_function(0);
+
 		#pragma omp parallel
 		{
 			auto thread_id = omp_get_thread_num();
@@ -264,13 +292,16 @@ namespace iqs {
 			 !!!!!!!!!!!!!!!! */
 
 			#pragma omp for schedule(static) reduction(max:max_size)
-			for (auto gid = 0; gid < num_object; ++gid) {
+			for (size_t gid = 0; gid < num_object; ++gid) {
 				size_t size;
 				rule->get_num_child(objects.begin() + object_begin[gid],
 					objects.begin() + object_begin[gid + 1],
 					num_childs[gid + 1], size);
 				max_size = std::max(max_size, size);
 			}
+
+			#pragma omp single
+			mid_step_function(1);
 
 			/* !!!!!!!!!!!!!!!!
 			step (2)
@@ -287,7 +318,7 @@ namespace iqs {
 			}
 
 			#pragma omp for schedule(static)
-			for (auto gid = 0; gid < num_object; ++gid) {
+			for (size_t gid = 0; gid < num_object; ++gid) {
 				/* assign parent ids and child ids for each child */
 				std::fill(symbolic_iteration.parent_gid.begin() + num_childs[gid],
 					symbolic_iteration.parent_gid.begin() + num_childs[gid + 1],
@@ -297,15 +328,14 @@ namespace iqs {
 					0);
 			}
 		}
+
+		mid_step_function(2);
 	}
 
 	/*
 	finalize iteration
 	*/
-	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, hasher_t hasher=utils::default_hasher) {
-		double &total_proba = next_iteration.total_proba;
-		total_proba = 0;
-
+	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, hasher_t hasher=utils::default_hasher, debug_t mid_step_function=[](int){}) {
 		num_object_after_interferences = num_object;
 
 		bool fast = false;
@@ -354,6 +384,9 @@ namespace iqs {
 		/*
 		actual code
 		*/
+
+		mid_step_function(2);
+
 		#pragma omp parallel
 		{
 			auto thread_id = omp_get_thread_num();
@@ -363,7 +396,7 @@ namespace iqs {
 			 !!!!!!!!!!!!!!!! */
 
 			#pragma omp for schedule(static)
-			for (auto gid = 0; gid < num_object; ++gid) {
+			for (size_t gid = 0; gid < num_object; ++gid) {
 				auto id = parent_gid[gid];
 
 				/* generate graph */
@@ -380,13 +413,16 @@ namespace iqs {
 				hasher(placeholder[thread_id], end, hash[gid]);
 			}
 
+			#pragma omp single
+			mid_step_function(3);
+
 			/* !!!!!!!!!!!!!!!!
 			step (4)
 			 !!!!!!!!!!!!!!!! */
 
 			if (!skip_test) {
 				#pragma omp for schedule(static)
-				for (auto gid = 0; gid < test_size; ++gid) //size_t gid = gid[i];
+				for (size_t gid = 0; gid < test_size; ++gid) //size_t gid = gid[i];
 					interferencer(gid);
 
 				#pragma omp barrier
@@ -409,7 +445,7 @@ namespace iqs {
 
 			if (!fast)
 				#pragma omp for schedule(static)
-				for (auto gid = test_size; gid < num_object; ++gid) //size_t gid = gid[i];
+				for (size_t gid = test_size; gid < num_object; ++gid) //size_t gid = gid[i];
 					interferencer(gid);
 				
 			#pragma omp single
@@ -421,6 +457,8 @@ namespace iqs {
 					/* get all unique graphs with a non zero probability */
 					partitioned_it = __gnu_parallel::partition(next_gid.begin(), partitioned_it, partitioner);
 				num_object_after_interferences = std::distance(next_gid.begin(), partitioned_it);
+
+				mid_step_function(4);
 
 				/* !!!!!!!!!!!!!!!!
 				step (5)
@@ -453,6 +491,8 @@ namespace iqs {
 				} else
 					next_iteration.num_object = num_object_after_interferences;
 
+				mid_step_function(5);
+
 				/* !!!!!!!!!!!!!!!!
 				step (6)
 				 !!!!!!!!!!!!!!!! */
@@ -483,6 +523,8 @@ namespace iqs {
 					next_iteration.object_begin.begin() + 1);
 
 				next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
+
+				mid_step_function(6);
 			}
 
 			/* !!!!!!!!!!!!!!!!
@@ -492,7 +534,7 @@ namespace iqs {
 			PROBA_TYPE real_, imag_;
 
 			#pragma omp for schedule(static)
-			for (auto gid = 0; gid < next_iteration.num_object; ++gid) {
+			for (size_t gid = 0; gid < next_iteration.num_object; ++gid) {
 				auto id = next_gid[gid];
 				auto this_parent_gid = parent_gid[id];
 
@@ -503,28 +545,16 @@ namespace iqs {
 					next_iteration.objects.begin() + next_iteration.object_begin[gid]);
 			}
 
-			/* !!!!!!!!!!!!!!!!
-			step (8)
-			 !!!!!!!!!!!!!!!! */
-
-			#pragma omp for reduction(+:total_proba)
-			for (auto gid = 0; gid < next_iteration.num_object; ++gid) {
-				PROBA_TYPE r = next_iteration.real[gid];
-				PROBA_TYPE i = next_iteration.imag[gid];
-
-				total_proba += r*r + i*i;
-			}
-
-			#pragma omp single
-			total_proba = std::sqrt(total_proba);
-
-			#pragma omp for
-			for (auto gid = 0; gid < next_iteration.num_object; ++gid) {
-				next_iteration.real[gid] /= total_proba;
-				next_iteration.imag[gid] /= total_proba;
-			}
 		}
+		
+		mid_step_function(7);
 
-		total_proba *= total_proba;
+		/* !!!!!!!!!!!!!!!!
+		step (8)
+		 !!!!!!!!!!!!!!!! */
+
+		next_iteration.normalize();
+
+		mid_step_function(8);
 	}
 }

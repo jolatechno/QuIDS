@@ -1,4 +1,6 @@
 #include <iostream>
+#include <string>
+#include <ctime>
 
 #include "../lib/iqs.hpp"
 
@@ -190,6 +192,8 @@ namespace iqs::rules::qcgd {
 	}
 
 	namespace utils {
+		size_t max_print_num_graphs = -1;
+
 		void inline make_graph(char* &object_begin, char* &object_end, uint32_t size) {
 			static auto per_node_size = 2 + 2*sizeof(uint32_t);
 			auto object_size = 8 + per_node_size*size;
@@ -217,7 +221,22 @@ namespace iqs::rules::qcgd {
 		}
 
 		void print(iqs::it_t const &iter) {
-			for (auto gid = 0; gid < iter.num_object; ++gid) {
+			size_t *gids = new size_t[iter.num_object];
+			std::iota(gids, gids + iter.num_object, 0);
+			__gnu_parallel::sort(gids, gids + iter.num_object, [&](size_t gid1, size_t gid2) {
+				PROBA_TYPE r1 = iter.real[gid1];
+				PROBA_TYPE i1 = iter.imag[gid1];
+
+				PROBA_TYPE r2 = iter.real[gid2];
+				PROBA_TYPE i2 = iter.imag[gid2];
+
+				return r1*r1 + i1*i1 > r2*r2 + i2*i2;
+			});
+
+			size_t num_prints = std::min(iter.num_object, max_print_num_graphs);
+			for (auto i = 0; i < num_prints; ++i) {
+				size_t gid = gids[i];
+
 				auto begin = iter.objects.begin() + iter.object_begin[gid];
 				auto end = iter.objects.begin() + iter.object_begin[gid + 1];
 
@@ -625,4 +644,159 @@ namespace iqs::rules::qcgd {
 			return (char*)(child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes));
 		}
 	};
+
+	namespace flags {
+		typedef std::function<void(iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it)> simulator_t;
+
+		namespace {
+			std::string strip(std::string &input, std::string const separator) {
+				std::string result;
+
+				size_t end = input.find(separator);
+
+				if (end == std::string::npos) {
+					result = input;
+					input = "";
+				} else {
+					result = input.substr(0, end);
+					input.erase(0, end + separator.length());
+				}
+
+				return result;
+			}
+
+			std::string parse(std::string const input, std::string const key, std::string const separator) {
+				size_t begin = input.find(key);
+				if (begin == std::string::npos)
+					return "";
+
+				size_t end = input.find(separator);
+				end = end == std::string::npos ? input.size() : end;
+
+				return input.substr(begin + key.length(), end - begin);
+			}
+
+			int parse_int_with_default(std::string const input, std::string const key, std::string const separator, int Default) {
+				std::string string_value = parse(input, key, separator);
+				if (string_value == "")
+					return Default;
+
+				return std::atoi(string_value.c_str());
+			}
+
+			float parse_float_with_default(std::string const input, std::string const key, std::string const separator, float Default) {
+				std::string string_value = parse(input, key, separator);
+				if (string_value == "")
+					return Default;
+
+				return std::atof(string_value.c_str());
+			}
+		}
+
+		uint read_n_iter(const char* argv) {
+			std::string string_arg = argv;
+			
+			int n_iters = std::atoi(strip(string_arg, ",").c_str());
+
+			std::string string_seed = parse(string_arg, "seed=", ",");
+			if (string_seed != "") {
+				std::srand(std::atoi(string_seed.c_str()));
+			} else
+				std::srand(std::time(0));
+			
+			return n_iters;
+		}
+
+		iqs::it_t read_state(const char* argv) {
+			std::string string_args = argv;
+
+			iqs::it_t state;
+
+			std::string string_arg;
+			while ((string_arg = strip(string_args, ";")) != "") {
+				int n_node = std::atoi(strip(string_arg, ",").c_str());
+				int n_graphs = parse_int_with_default(string_arg, "n_graphs=", ",", 1);
+				float real = parse_float_with_default(string_arg, "real=", ",", 1);
+				float imag = parse_float_with_default(string_arg, "imag=", ",", 0);
+
+				for (auto i = 0; i < n_graphs; ++i) {
+					char *begin, *end;
+					utils::make_graph(begin, end, n_node);
+					state.append(begin, end, real, imag);
+				}
+			}
+
+			utils::randomize(state);
+			state.normalize();
+
+			return state;
+		}
+
+		simulator_t read_rule(const char* argv, hasher_t hasher=iqs::utils::default_hasher, debug_t mid_step_function=[](int){}) {
+			std::string string_args = argv;
+
+			simulator_t result = [](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it){};
+
+			std::string string_arg;
+			while ((string_arg = strip(string_args, ";")) != "") {
+				std::string rule_name = strip(string_arg, ",");
+				float theta = M_PI*parse_float_with_default(string_arg, "theta=", ",", 0.25);
+				float phi = M_PI*parse_float_with_default(string_arg, "phi=", ",", 0);
+				float xi = M_PI*parse_float_with_default(string_arg, "xi=", ",", 0);
+				int n_iter = parse_int_with_default(string_arg, "n_iter=", ",", 1);
+
+				if (rule_name == "split_merge") {
+					simulator_t previous_result = result;
+					split_merge rule(theta, phi, xi);
+					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						previous_result(it, buffer, sy_it);
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, hasher, mid_step_function);
+					};
+				} else if (rule_name == "erase_create") {
+					simulator_t previous_result = result;
+					erase_create rule(theta, phi, xi);
+					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						previous_result(it, buffer, sy_it);
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, hasher, mid_step_function);
+					};
+				} else if (rule_name == "erase_create") {
+					simulator_t previous_result = result;
+					coin rule(theta, phi, xi);
+					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						previous_result(it, buffer, sy_it);
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, hasher, mid_step_function);
+					};
+				} else if (rule_name == "step") {
+					simulator_t previous_result = result;
+					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						previous_result(it, buffer, sy_it);
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, step);
+					};
+				} else if (rule_name == "reversed_step") {
+					simulator_t previous_result = result;
+					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						previous_result(it, buffer, sy_it);
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, reversed_step);
+					};
+				}
+			}
+			
+			return result;
+		}
+
+		std::tuple<int, it_t, simulator_t> parse_simulation(const char* argv, hasher_t hasher=iqs::utils::default_hasher, debug_t mid_step_function=[](int){}) {
+			std::string string_args = argv;
+
+			int n_iter = read_n_iter(strip(string_args, "|").c_str());
+			it_t state = read_state(strip(string_args, "|").c_str());
+			simulator_t rule = read_rule(string_args.c_str(), hasher, mid_step_function);
+
+			return {n_iter, state, rule};
+		}
+	}
 }
