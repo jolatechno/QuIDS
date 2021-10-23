@@ -281,8 +281,6 @@ namespace iqs {
 	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) const {
 		size_t max_size = 0;
 
-		mid_step_function(0);
-
 		#pragma omp parallel
 		{
 			auto thread_id = omp_get_thread_num();
@@ -384,8 +382,6 @@ namespace iqs {
 		/*
 		actual code
 		*/
-
-		mid_step_function(2);
 
 		#pragma omp parallel
 		{
