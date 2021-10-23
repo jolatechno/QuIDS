@@ -180,13 +180,14 @@ namespace iqs {
 		utils::numa_vector<double> random_selector;
 
 		void inline resize(size_t num_object) {
-			size.zero_resize(num_object);
-			hash.zero_resize(num_object);
 			real.resize(num_object);
 			imag.resize(num_object);
 			next_gid.iota_resize(num_object);
+			size.zero_resize(num_object);
+			hash.zero_resize(num_object);
 			parent_gid.resize(num_object);
 			child_id.resize(num_object);
+			is_unique.resize(num_object);
 			random_selector.zero_resize(num_object);
 		}
 		void inline reserve(size_t max_size) {
