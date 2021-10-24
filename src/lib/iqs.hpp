@@ -84,8 +84,16 @@ namespace iqs {
 	namespace utils {
 		void default_hasher(char* parent_begin, char* parent_end, size_t &hash) {
 			hash = 0;
-			for (char* it = parent_begin; it != parent_end; ++it)
-				boost::hash_combine(hash, *it);
+
+			size_t *parent_64 = (size_t*)parent_begin;
+			size_t size = std::distance(parent_begin, parent_end);
+			size_t size_64 = size / 8;
+			size_t size_8 = size&7; // size % 8
+
+			for (size_t i = 0; i < size_64; ++i)
+				boost::hash_combine(hash, parent_64[i]);
+			for (size_t i = size - size_8; i < size; ++i)
+				boost::hash_combine(hash, parent_begin[i]);
 		}
 	}
 
