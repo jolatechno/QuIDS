@@ -7,6 +7,8 @@
 #define PI 3.14159265359
 
 int main(int argc, char* argv[]) {
+	iqs::set_tolerance(1e-8);
+
 	iqs::rules::qcgd::flags::read_n_iter("1");
 	iqs::it_t state = iqs::rules::qcgd::flags::read_state("6");//;3,imag=1,real=0");
 

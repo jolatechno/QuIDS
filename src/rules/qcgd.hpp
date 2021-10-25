@@ -242,7 +242,10 @@ namespace iqs::rules::qcgd {
 
 				uint16_t num_nodes = graphs::num_nodes(begin);
 
-				std::cout << "\t" << iter.real[gid] << (iter.imag[gid] < 0 ? " - " : " + ") << std::abs(iter.imag[gid]) << "i  ";
+				PROBA_TYPE real = std::abs(iter.real[gid]) < iqs::tolerance ? 0 : iter.real[gid];
+				PROBA_TYPE imag = std::abs(iter.imag[gid]) < iqs::tolerance ? 0 : iter.imag[gid];
+
+				std::cout << "\t" << real << (imag < 0 ? " - " : " + ") << std::abs(imag) << "i  ";
 
 				for (auto i = 0; i < num_nodes; ++i) {
 					auto name_begin = graphs::node_name_begin(begin, i);

@@ -38,8 +38,6 @@ defining openmp function's return values if openmp isn't installed or loaded
 #endif
 
 namespace iqs {
-	#include "utils/libs/boost_hash.hpp"
-
 	namespace utils {
 		#include "utils/complex.hpp"
 		#include "utils/load_balancing.hpp"
@@ -48,14 +46,26 @@ namespace iqs {
 		#include "utils/vector.hpp"
 	}
 	
+
 	/*
 	global variable definition
 	*/
-	PROBA_TYPE tolerance = TOLERANCE;
-	float safety_margin = SAFETY_MARGIN;
-	float collision_test_proportion = COLLISION_TEST_PROPORTION;
-	float collision_tolerance = COLLISION_TOLERANCE;
-	float collision_probability_tolerance = COLLISION_PROBABILITY_TOLERANCE;
+	namespace {
+		PROBA_TYPE tolerance = TOLERANCE;
+		float safety_margin = SAFETY_MARGIN;
+		float collision_test_proportion = COLLISION_TEST_PROPORTION;
+		float collision_tolerance = COLLISION_TOLERANCE;
+		float collision_probability_tolerance = COLLISION_PROBABILITY_TOLERANCE;
+	}
+	
+	/*
+	global variable setters
+	*/
+	void set_tolerance(PROBA_TYPE val) { tolerance = val; }
+	void set_safety_margin(float val) { safety_margin = val; }
+	void set_collision_test_proportion(float val) { collision_test_proportion = val; }
+	void set_collision_tolerance(float val) { collision_tolerance = val; }
+	void set_collision_probability_tolerance(float val) { collision_probability_tolerance = val; }
 
 	/*
 	number of threads
@@ -83,17 +93,8 @@ namespace iqs {
 
 	namespace utils {
 		void default_hasher(char* parent_begin, char* parent_end, size_t &hash) {
-			hash = 0;
-
-			size_t *parent_64 = (size_t*)parent_begin;
-			size_t size = std::distance(parent_begin, parent_end);
-			size_t size_64 = size / 8;
-			size_t size_8 = size&7; // size % 8
-
-			for (size_t i = 0; i < size_64; ++i)
-				boost::hash_combine(hash, parent_64[i]);
-			for (size_t i = size - size_8; i < size; ++i)
-				boost::hash_combine(hash, parent_begin[i]);
+			static auto hasher = std::hash<std::string_view>();
+			hash = hasher(std::string_view(parent_begin, parent_end));
 		}
 	}
 
