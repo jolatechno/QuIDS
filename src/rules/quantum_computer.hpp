@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "../lib/iqs.hpp"
+#include "../iqs.hpp"
 
 namespace iqs::rules::quantum_computer {
 	namespace utils {

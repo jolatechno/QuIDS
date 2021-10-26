@@ -1,4 +1,4 @@
-#include "../src/lib/iqs.hpp"
+#include "../src/iqs.hpp"
 #include "../src/rules/qcgd.hpp"
 
 #include <iostream>

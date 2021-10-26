@@ -1,4 +1,4 @@
-#include "../src/lib/iqs.hpp"
+#include "../src/iqs.hpp"
 #include "../src/rules/quantum_computer.hpp"
 
 #include <iostream>

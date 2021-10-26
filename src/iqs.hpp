@@ -88,15 +88,7 @@ namespace iqs {
 	typedef class symbolic_iteration sy_it_t;
 	typedef class rule rule_t;
 	typedef std::function<void(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag)> modifier_t;
-	typedef std::function<void(char* parent_begin, char* parent_end, size_t &hash)> hasher_t;
 	typedef std::function<void(int step)> debug_t;
-
-	namespace utils {
-		void default_hasher(char* parent_begin, char* parent_end, size_t &hash) {
-			static auto hasher = std::hash<std::string_view>();
-			hash = hasher(std::string_view(parent_begin, parent_end));
-		}
-	}
 
 	/* 
 	rule virtual class
@@ -106,6 +98,9 @@ namespace iqs {
 		rule() {};
 		virtual inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const = 0;
 		virtual inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const = 0;
+		virtual inline size_t hasher(char* parent_begin, char* parent_end) const { //can be overwritten
+			return std::hash<std::string_view>()(std::string_view(parent_begin, parent_end));
+		}
 	};
 
 	/*
@@ -212,7 +207,7 @@ namespace iqs {
 
 	public:
 		symbolic_iteration() {}
-		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, hasher_t hasher, debug_t mid_step_function);
+		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function);
 	};
 
 	/*
@@ -241,9 +236,9 @@ namespace iqs {
 	/*
 	simulation function
 	*/
-	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, hasher_t hasher=utils::default_hasher, debug_t mid_step_function=[](int){}) {
+	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) {
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, hasher, mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, mid_step_function);
 		std::swap(iteration_buffer, iteration);
 	}
 	void inline simulate(it_t &iteration, modifier_t const rule) {
@@ -343,7 +338,7 @@ namespace iqs {
 	/*
 	finalize iteration
 	*/
-	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, hasher_t hasher=utils::default_hasher, debug_t mid_step_function=[](int){}) {
+	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](int){}) {
 		num_object_after_interferences = num_object;
 
 		bool fast = false;
@@ -416,7 +411,7 @@ namespace iqs {
 				size[gid] = std::distance(placeholder[thread_id], end);
 
 				/* compute hash */
-				hasher(placeholder[thread_id], end, hash[gid]);
+				hash[gid] = rule->hasher(placeholder[thread_id], end);
 			}
 
 			#pragma omp single

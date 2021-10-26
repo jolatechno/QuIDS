@@ -2,46 +2,88 @@
 #include <string>
 #include <ctime>
 
-#include "../lib/iqs.hpp"
+#include "../iqs.hpp"
 
 namespace iqs::rules::qcgd {
-	const int name_offset = 3;
-	const uint16_t name_bitmap = (1 << name_offset) - 1;
-	enum {
-		scalar_node_name = 0,
-		most_left_zero,
-		vee_with_paranthesis,
-		open_paranthesis,
-		close_paranthesis,
-		dot_l,
-		dot_r
-	};
+	namespace utils {
+		inline void hash_combine(std::size_t& seed, size_t const value_64) {
+		    static size_t magic_number = 0xc6a4a7935bd1e995;
+		    static auto shift = 47;
+
+		    seed *= magic_number;
+		    seed ^= value_64 >> shift;
+		    seed *= magic_number;
+
+		    seed ^= value_64;
+		    seed *= magic_number;
+
+		    // Completely arbitrary number, to prevent 0's
+		    // from hashing to 0.
+		    seed += 0xe6546b64;
+	    }
+	}
 
 	namespace graphs {
+		enum {
+			dot_l_t = -3,
+			dot_r_t,
+			element_t,
+			pair_t
+		};
+		struct sub_node {
+			int16_t hmlz_and_element;
+			int16_t right_or_type;
+			size_t hash;
+
+			sub_node(int16_t element) : right_or_type(element_t), hash(element) {
+				hmlz_and_element = element == 0 ? -1 : element + 1;
+			}
+			sub_node(sub_node &node, int16_t type) : right_or_type(type) {
+				if (type == dot_l_t && node.hmlz_and_element < 0) {
+					hmlz_and_element = -1;
+				} else
+					hmlz_and_element = 1;
+
+				hash = node.hash;
+				utils::hash_combine(hash, type);
+			}
+			sub_node(sub_node &left, sub_node &right, int16_t right_offset) : right_or_type(right_offset) {
+				if (left.hmlz_and_element < 0 || right.hmlz_and_element < 0) {
+					hmlz_and_element = -1;
+				} else
+					hmlz_and_element = 1;
+
+				hash = left.hash;
+				utils::hash_combine(hash, right.hash);
+			}
+		};
+
 		uint16_t inline &num_nodes(char* object_begin) {
 			return *((uint16_t*)object_begin);
 		}
 
-		uint16_t inline &node_name_begin(char *object_begin, int node) {
+		uint16_t inline *node_name_begin(char *object_begin) {
 			uint16_t num_nodes_ = num_nodes(object_begin);
 			auto offset = sizeof(uint16_t) + 2*num_nodes_;
-			return *((uint16_t*)(object_begin + offset + node*sizeof(uint16_t)));
+			return (uint16_t*)(object_begin + offset);
 		}
+		uint16_t inline &node_name_begin(char *object_begin, int node) { return node_name_begin(object_begin)[node]; }
 
-		uint16_t inline &node_name(char *object_begin, int node) {
+		sub_node inline *node_name(char *object_begin) {
 			uint16_t num_nodes_ = num_nodes(object_begin);
 			auto offset = 2*sizeof(uint16_t) + (2 + sizeof(uint16_t))*num_nodes_;
-			return *((uint16_t*)(object_begin + offset + node*sizeof(uint16_t)));
-		}
+			return (sub_node*)(object_begin + offset);
+		} 
+		sub_node inline &node_name(char *object_begin, int node) { return node_name(object_begin)[node]; }
 
-		bool inline &left(char *object_begin, int node) {
-			return (bool&)object_begin[sizeof(uint16_t) + node];
-		}
+		bool inline *left(char *object_begin) { return (bool*)(object_begin + sizeof(uint16_t)); }
+		bool inline &left(char *object_begin, int node) { return left(object_begin)[node]; }
 
-		bool inline &right(char *object_begin, int node) {
+		bool inline *right(char *object_begin) {
 			uint16_t num_nodes_ = num_nodes(object_begin);
-			return (bool&)object_begin[sizeof(uint16_t) + num_nodes_ + node];
+			return (bool*)(object_begin + sizeof(uint16_t) + num_nodes_);
 		}
+		bool inline &right(char *object_begin, int node) { return right(object_begin)[node]; }
 
 		void inline randomize(char *object_begin) {
 			uint16_t num_nodes_ = num_nodes(object_begin);
@@ -49,6 +91,32 @@ namespace iqs::rules::qcgd {
 				left(object_begin, i) = rand() & 1;
 				right(object_begin, i) = rand() & 1;
 			}
+		}
+
+		size_t inline hash_graph(char *object_begin) {
+			size_t left_hash = 0;
+			size_t right_hash = 0;
+			size_t name_hash = 0;
+
+			bool *left_ = left(object_begin);
+			bool *right_ = right(object_begin);
+			auto *node_begin = node_name_begin(object_begin);
+			auto *node_name_ = node_name(object_begin);
+
+			uint16_t num_nodes_ = num_nodes(object_begin);
+			for (auto i = 0; i < num_nodes_; ++i) {
+				if (left_[i])
+					utils::hash_combine(left_hash, i);
+
+				if (right_[i])
+					utils::hash_combine(right_hash, i);
+
+				utils::hash_combine(name_hash, node_name_[node_begin[i]].hash);
+			}
+
+			utils::hash_combine(name_hash, left_hash);
+			utils::hash_combine(name_hash, right_hash);
+			return name_hash;
 		}
 	}
 
@@ -66,19 +134,6 @@ namespace iqs::rules::qcgd {
 			return true;
 		}
 
-		bool inline node_equal(uint16_t* begin_1, uint16_t* end_1, uint16_t* begin_2, uint16_t* end_2) {
-			size_t n_bit = std::distance(begin_1, end_1);
-			if (n_bit != std::distance(begin_2, end_2))
-				return false;
-
-			for (auto i = 0; i < n_bit; ++i)
-				if(begin_1[i] != begin_2[i])
-					if (!((begin_1[i] == most_left_zero && begin_2[i] == 0) || (begin_1[i] == 0 && begin_2[i] == most_left_zero)))
-						return false;
-
-			return true;
-		}
-
 		template<class T>
 		T inline *copy(T *parent_begin, T* parent_end, T* child_begin) {
 			for (auto it = parent_begin; it != parent_end; ++it)
@@ -86,53 +141,8 @@ namespace iqs::rules::qcgd {
 			return child_begin;
 		}
 
-		uint16_t inline *copy_without_most_left_zero(uint16_t *parent_begin, uint16_t *parent_end, uint16_t *child_begin) {
-			for (auto it = parent_begin; it != parent_end; ++it)
-				*(child_begin++) = *it == most_left_zero ? 0 : *it; 
-			return child_begin;
-		}
-
-		uint16_t inline *find_midle(uint16_t *parent_begin, uint16_t *parent_end) {
-			if (parent_begin[0] != open_paranthesis)
-				return 0;
-			
-			int parenthesis_depth = 1;
-			for (auto it = parent_begin + 1; it != parent_end; ++it) {
-				if (parenthesis_depth == 1 && *it == vee_with_paranthesis)
-					return it;
-				parenthesis_depth += (*it == open_paranthesis) - (*it == close_paranthesis);
-			}
-			return parent_end;
-		}
-
-		uint16_t inline *find_midle_and_has_most_left_zero(uint16_t *parent_begin, uint16_t *parent_end, bool &has_most_left_zero) {
-			if (parent_begin[0] != open_paranthesis)
-				return 0;
-
-			has_most_left_zero = false;
-			
-			int parenthesis_depth = 1;
-			for (auto it = parent_begin + 1; it != parent_end; ++it) {
-				/* check if we're at the middle vee */
-				if (parenthesis_depth == 1 && *it == vee_with_paranthesis)
-					return it;
-
-				/* check if it has most left zero */
-				if (*it == most_left_zero) {
-					has_most_left_zero = true;
-				} else
-					/* increment parenthesis depth */
-					parenthesis_depth += (*it == open_paranthesis) - (*it == close_paranthesis);
-			}
-			return parent_end;
-		}
-
-		bool inline has_most_left_zero(uint16_t *object_begin, uint16_t *object_end) {
-			for (auto *it = object_begin; it != object_end; ++it)
-				if (*it = most_left_zero)
-					return true;
-
-			return false;
+		bool inline has_most_left_zero(graphs::sub_node *object_begin) {
+			return object_begin->hmlz_and_element < 0;
 		}
 
 		void inline get_operations(char *parent_begin, uint16_t node, bool &split, bool &merge) {
@@ -142,52 +152,33 @@ namespace iqs::rules::qcgd {
 				merge = graphs::left(parent_begin, node) && graphs::right(parent_begin, node + 1) && !graphs::left(parent_begin, node + 1);
 		}
 
-		uint16_t inline *merge(uint16_t *left_begin, uint16_t *left_end, uint16_t* right_begin, uint16_t *right_end, uint16_t *child_begin) {
-			if (*(left_end - 1) == dot_l && *(right_end - 1) == dot_r)
-				if (node_equal(left_begin, left_end - 1, right_begin, right_end - 1))
-					return copy(left_begin, left_end - 1, child_begin);
+		graphs::sub_node inline *merge(graphs::sub_node *left_begin, graphs::sub_node *left_end,
+			graphs::sub_node* right_begin, graphs::sub_node *right_end,
+			graphs::sub_node *child_begin) {
+
+			if (left_begin->right_or_type == graphs::dot_l_t && right_begin->right_or_type == graphs::dot_r_t)
+				if ((left_begin + 1)->hash == (right_begin + 1)->hash)
+					return copy(left_begin + 1, left_end, child_begin);
 			
-			*(child_begin++) = open_paranthesis;
+			*(child_begin++) = graphs::sub_node(*left_begin, *right_begin, std::distance(left_begin, left_end) + 1);
 			child_begin = copy(left_begin, left_end, child_begin);
-			*(child_begin++) = vee_with_paranthesis;
-			child_begin = copy(right_begin, right_end, child_begin);
-			*(child_begin++) = close_paranthesis;
-			
-			return child_begin;
+			return copy(right_begin, right_end, child_begin);
 		}
 
-		uint16_t inline *left(uint16_t *parent_begin, uint16_t *parent_end, uint16_t *child_begin, uint16_t *&middle) {
-			if (parent_begin[0] == open_paranthesis) {
-				if (middle == 0)
-					middle = find_midle(parent_begin, parent_end);
+		graphs::sub_node inline *left(graphs::sub_node *parent_begin, graphs::sub_node *parent_end, graphs::sub_node *child_begin) {
+			if (parent_begin->right_or_type >= 0) 
+				return copy(parent_begin + 1, parent_begin + parent_begin->right_or_type, child_begin);
 
-				child_begin = copy(parent_begin + 1, middle, child_begin);
-			} else {
-				child_begin = copy(parent_begin, parent_end, child_begin);
-				*(child_begin++) = dot_l;
-			}
-			return child_begin;
-		}
-		uint16_t inline *left(uint16_t *parent_begin, uint16_t *parent_end, uint16_t *child_begin) {
-			uint16_t *middle = 0;
-			return left(parent_begin, parent_end, child_begin, middle);
+			*(child_begin++) = graphs::sub_node(*parent_begin, graphs::dot_l_t);
+			return copy(parent_begin, parent_end, child_begin);
 		}
 
-		uint16_t inline *right(uint16_t *parent_begin, uint16_t *parent_end, uint16_t *child_begin, uint16_t *&middle) {
-			if (parent_begin[0] == open_paranthesis) {
-				if (middle == 0)
-					middle = find_midle(parent_begin, parent_end);
+		graphs::sub_node inline *right(graphs::sub_node *parent_begin, graphs::sub_node *parent_end, graphs::sub_node *child_begin) {
+			if (parent_begin->right_or_type >= 0)
+				return copy(parent_begin + parent_begin->right_or_type, parent_end, child_begin);
 
-				child_begin = copy(middle + 1, parent_end - 1, child_begin);
-			} else {
-				child_begin = copy_without_most_left_zero(parent_begin, parent_end, child_begin);
-				*(child_begin++) = dot_r;
-			}
-			return child_begin;
-		}
-		uint16_t inline *right(uint16_t *parent_begin, uint16_t *parent_end, uint16_t *child_begin) {
-			uint16_t *middle = 0;
-			return right(parent_begin, parent_end, child_begin, middle);
+			*(child_begin++) = graphs::sub_node(*parent_begin, graphs::dot_r_t);
+			return copy(parent_begin, parent_end, child_begin);
 		}
 	}
 
@@ -195,7 +186,7 @@ namespace iqs::rules::qcgd {
 		size_t max_print_num_graphs = -1;
 
 		void inline make_graph(char* &object_begin, char* &object_end, uint16_t size) {
-			static auto per_node_size = 2 + 2*sizeof(uint16_t);
+			static auto per_node_size = 2 + sizeof(uint16_t) + sizeof(graphs::sub_node);
 			auto object_size = 2*sizeof(uint16_t) + per_node_size*size;
 
 			object_begin = new char[object_size];
@@ -208,9 +199,8 @@ namespace iqs::rules::qcgd {
 				graphs::left(object_begin, i) = 0;
 				graphs::right(object_begin, i) = 0;
 				graphs::node_name_begin(object_begin, i + 1) = i + 1;
-				graphs::node_name(object_begin, i) = i << name_offset;
+				graphs::node_name(object_begin, i) = graphs::sub_node(i);
 			}
-			graphs::node_name(object_begin, 0) = most_left_zero;
 		}
 
 		void randomize(iqs::it_t &iter) {
@@ -221,6 +211,29 @@ namespace iqs::rules::qcgd {
 		}
 
 		void print(iqs::it_t const &iter) {
+			static std::function<void(graphs::sub_node*)> print_node_name = [](graphs::sub_node *sub_node) {
+				if (sub_node->right_or_type == graphs::element_t) {
+					std::cout << std::abs(sub_node->hmlz_and_element) - 1;
+
+				} else if (sub_node->right_or_type == graphs::dot_l_t) {
+					std::cout << "(";
+					print_node_name(sub_node + 1);
+					std::cout << ").l";
+
+				} else if (sub_node->right_or_type == graphs::dot_r_t) {
+					std::cout << "(";
+					print_node_name(sub_node + 1);
+					std::cout << ").r";
+
+				} else {
+					std::cout << "(";
+					print_node_name(sub_node + 1);
+					std::cout << ")∨(";
+					print_node_name(sub_node + sub_node->right_or_type);
+					std::cout << ")";
+				}
+			};
+
 			size_t *gids = new size_t[iter.num_object];
 			std::iota(gids, gids + iter.num_object, 0);
 			__gnu_parallel::sort(gids, gids + iter.num_object, [&](size_t gid1, size_t gid2) {
@@ -249,33 +262,9 @@ namespace iqs::rules::qcgd {
 
 				for (auto i = 0; i < num_nodes; ++i) {
 					auto name_begin = graphs::node_name_begin(begin, i);
-					auto name_end = graphs::node_name_begin(begin, i + 1);
 
 					std::cout << "-|" << (graphs::left(begin, i) ? "<" : " ") << "|";
-					for (auto j = name_begin; j < name_end; ++j)
-						switch (graphs::node_name(begin, j) & name_bitmap) {
-							case scalar_node_name:
-								std::cout << (graphs::node_name(begin, j) >> name_offset);
-								break;
-							case most_left_zero:
-								std::cout << "0*";
-								break;
-							case vee_with_paranthesis:
-								std::cout << ")∨(";
-								break;
-							case open_paranthesis:
-								std::cout << "(";
-								break;
-							case close_paranthesis:
-								std::cout << ")";
-								break;
-							case dot_l:
-								std::cout << ".l";
-								break;
-							case dot_r:
-								std::cout << ".r";
-								break;
-						}
+					print_node_name(graphs::node_name(begin) + name_begin);
 					std::cout << "|" << (graphs::right(begin, i) ? ">" : " ") << "|-";
 				}
 				std::cout << "\n";
@@ -313,6 +302,9 @@ namespace iqs::rules::qcgd {
 			do_imag = std::sin(theta) * std::sin(phi);
 			do_not_real = std::cos(theta) * std::cos(xi);
 			do_not_imag = std::cos(theta) * std::sin(xi);
+		}
+		inline size_t hasher(char* parent_begin, char* parent_end) const override {
+			return graphs::hash_graph(parent_begin);
 		}
 		inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const override {
 			max_child_size = std::distance(parent_begin, parent_end);
@@ -364,6 +356,9 @@ namespace iqs::rules::qcgd {
 			do_not_real = std::cos(theta) * std::cos(xi);
 			do_not_imag = std::cos(theta) * std::sin(xi);
 		}
+		inline size_t hasher(char* parent_begin, char* parent_end) const override {
+			return graphs::hash_graph(parent_begin);
+		}
 		inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const override {
 			max_child_size = std::distance(parent_begin, parent_end);
 
@@ -413,8 +408,11 @@ namespace iqs::rules::qcgd {
 			do_not_real = std::cos(theta) * std::cos(xi);
 			do_not_imag = std::cos(theta) * std::sin(xi);
 		}
+		inline size_t hasher(char* parent_begin, char* parent_end) const override {
+			return graphs::hash_graph(parent_begin);
+		}
 		inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const override {
-			max_child_size = 3*std::distance(parent_begin, parent_end);
+			max_child_size = 4*std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 
@@ -492,17 +490,17 @@ namespace iqs::rules::qcgd {
 			}
 
 			/* util variable */
-			auto parent_node_name_begin = &graphs::node_name(parent_begin, 0);
-			auto child_node_name_begin = &graphs::node_name(child_begin, 0);
+			auto parent_node_name_begin = graphs::node_name(parent_begin);
+			auto child_node_name_begin = graphs::node_name(child_begin);
 			graphs::node_name_begin(child_begin, 0) = 0;
 
 			/* do first split */
 			uint16_t *first_split_middle;
 			if (first_split) {
 				bool has_most_left_zero = true;
-				first_split_middle = operations::find_midle_and_has_most_left_zero(parent_node_name_begin,
-					parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
-					has_most_left_zero);
+				if (parent_node_name_begin->right_or_type >= 0)
+					if ((parent_node_name_begin + 1)->hmlz_and_element > 0)
+						has_most_left_zero = false;
 
 				if (has_most_left_zero) {
 					/* set particules position */
@@ -514,15 +512,13 @@ namespace iqs::rules::qcgd {
 					/* split first node */
 					auto node_name_end = operations::left(parent_node_name_begin,
 						parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
-						child_node_name_begin,
-						first_split_middle);
+						child_node_name_begin);
 
 					graphs::node_name_begin(child_begin, 1) = std::distance(child_node_name_begin, node_name_end);
 
 					node_name_end = operations::right(parent_node_name_begin,
 						parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
-						node_name_end,
-						first_split_middle);
+						node_name_end);
 
 					graphs::node_name_begin(child_begin, 2) = std::distance(child_node_name_begin, node_name_end);
 				} else {
@@ -537,8 +533,7 @@ namespace iqs::rules::qcgd {
 					/* split first node */
 					auto node_name_end = operations::right(parent_node_name_begin,
 						parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
-						child_node_name_begin,
-						first_split_middle);
+						child_node_name_begin);
 
 					graphs::node_name_begin(child_begin, 1) = std::distance(child_node_name_begin, node_name_end);
 				}
@@ -580,19 +575,16 @@ namespace iqs::rules::qcgd {
 							graphs::right(child_begin, i + offset + 1) = true;
 
 							/* split left node */
-							uint16_t *middle = 0;
 							auto node_name_end = operations::left(parent_node_name_begin + graphs::node_name_begin(parent_begin, i),
 								parent_node_name_begin + graphs::node_name_begin(parent_begin, i + 1),
-								child_node_name_begin + graphs::node_name_begin(child_begin, i + offset),
-								middle);
+								child_node_name_begin + graphs::node_name_begin(child_begin, i + offset));
 
 							graphs::node_name_begin(child_begin, i + 1 + offset) = std::distance(child_node_name_begin, node_name_end);
 
 							/* split right node */
 							node_name_end = operations::right(parent_node_name_begin + graphs::node_name_begin(parent_begin, i),
 								parent_node_name_begin + graphs::node_name_begin(parent_begin, i + 1),
-								child_node_name_begin + graphs::node_name_begin(child_begin, i + offset + 1),
-								middle);
+								child_node_name_begin + graphs::node_name_begin(child_begin, i + offset + 1));
 
 							graphs::node_name_begin(child_begin, i + 1 + offset + 1) = std::distance(child_node_name_begin, node_name_end);
 						} else {
@@ -638,13 +630,12 @@ namespace iqs::rules::qcgd {
 				/* split first node */
 				auto node_name_end = operations::left(parent_node_name_begin,
 					parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
-					child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes - 1),
-					first_split_middle);
+					child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes - 1));
 
 				graphs::node_name_begin(child_begin, child_num_nodes) = std::distance(child_node_name_begin, node_name_end);
 			}
 
-			return (char*)(child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes));
+			return (char*)(child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes)) + sizeof(graphs::sub_node) - 1;
 		}
 	};
 
@@ -735,7 +726,7 @@ namespace iqs::rules::qcgd {
 			return state;
 		}
 
-		simulator_t read_rule(const char* argv, hasher_t hasher=iqs::utils::default_hasher, debug_t mid_step_function=[](int){}) {
+		simulator_t read_rule(const char* argv, debug_t mid_step_function=[](int){}) {
 			std::string string_args = argv;
 
 			simulator_t result = [](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it){};
@@ -754,7 +745,7 @@ namespace iqs::rules::qcgd {
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						previous_result(it, buffer, sy_it);
 						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, hasher, mid_step_function);
+							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, mid_step_function);
 					};
 				} else if (rule_name == "erase_create") {
 					simulator_t previous_result = result;
@@ -762,7 +753,7 @@ namespace iqs::rules::qcgd {
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						previous_result(it, buffer, sy_it);
 						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, hasher, mid_step_function);
+							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, mid_step_function);
 					};
 				} else if (rule_name == "erase_create") {
 					simulator_t previous_result = result;
@@ -770,7 +761,7 @@ namespace iqs::rules::qcgd {
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						previous_result(it, buffer, sy_it);
 						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, hasher, mid_step_function);
+							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, mid_step_function);
 					};
 				} else if (rule_name == "step") {
 					simulator_t previous_result = result;
@@ -792,12 +783,12 @@ namespace iqs::rules::qcgd {
 			return result;
 		}
 
-		std::tuple<int, it_t, simulator_t> parse_simulation(const char* argv, hasher_t hasher=iqs::utils::default_hasher, debug_t mid_step_function=[](int){}) {
+		std::tuple<int, it_t, simulator_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
 			std::string string_args = argv;
 
 			int n_iter = read_n_iter(strip(string_args, "|").c_str());
 			it_t state = read_state(strip(string_args, "|").c_str());
-			simulator_t rule = read_rule(string_args.c_str(), hasher, mid_step_function);
+			simulator_t rule = read_rule(string_args.c_str(), mid_step_function);
 
 			return {n_iter, state, rule};
 		}
