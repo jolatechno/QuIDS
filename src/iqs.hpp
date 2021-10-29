@@ -22,9 +22,6 @@
 #ifndef COLLISION_TOLERANCE
 	#define COLLISION_TOLERANCE 0.05
 #endif
-#ifndef COLLISION_PROBABILITY_TOLERANCE
-	#define COLLISION_PROBABILITY_TOLERANCE 0.15
-#endif
 
 /*
 defining openmp function's return values if openmp isn't installed or loaded
@@ -55,7 +52,6 @@ namespace iqs {
 		float safety_margin = SAFETY_MARGIN;
 		float collision_test_proportion = COLLISION_TEST_PROPORTION;
 		float collision_tolerance = COLLISION_TOLERANCE;
-		float collision_probability_tolerance = COLLISION_PROBABILITY_TOLERANCE;
 	}
 	
 	/*
@@ -65,7 +61,6 @@ namespace iqs {
 	void set_safety_margin(float val) { safety_margin = val; }
 	void set_collision_test_proportion(float val) { collision_test_proportion = val; }
 	void set_collision_tolerance(float val) { collision_tolerance = val; }
-	void set_collision_probability_tolerance(float val) { collision_probability_tolerance = val; }
 
 	/*
 	number of threads
@@ -207,6 +202,7 @@ namespace iqs {
 
 	public:
 		symbolic_iteration() {}
+		void compute_collisions();
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function);
 	};
 
@@ -238,7 +234,12 @@ namespace iqs {
 	*/
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) {
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
+		symbolic_iteration.compute_collisions();
 		symbolic_iteration.finalize(rule, iteration, iteration_buffer, mid_step_function);
+		iteration_buffer.normalize();
+
+		mid_step_function(8);
+		
 		std::swap(iteration_buffer, iteration);
 	}
 	void inline simulate(it_t &iteration, modifier_t const rule) {
@@ -258,33 +259,12 @@ namespace iqs {
 	}
 
 	/*
-	normalize
-	*/
-	void iteration::normalize() {
-		total_proba = 0;
-
-		#pragma omp parallel for reduction(+:total_proba)
-		for (size_t gid = 0; gid < num_object; ++gid) {
-			PROBA_TYPE r = real[gid];
-			PROBA_TYPE i = imag[gid];
-
-			total_proba += r*r + i*i;
-		}
-
-		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
-
-		#pragma omp parallel for
-		for (size_t gid = 0; gid < num_object; ++gid) {
-			real[gid] /= normalization_factor;
-			imag[gid] /= normalization_factor;
-		}
-	}
-
-	/*
 	generate symbolic iteration
 	*/
 	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) const {
 		size_t max_size = 0;
+
+		mid_step_function(0);
 
 		#pragma omp parallel
 		{
@@ -330,21 +310,44 @@ namespace iqs {
 					symbolic_iteration.child_id.begin() + num_childs[gid + 1],
 					0);
 			}
+
+			#pragma omp single
+			mid_step_function(2);
+
+			/* !!!!!!!!!!!!!!!!
+			step (3)
+			 !!!!!!!!!!!!!!!! */
+
+			#pragma omp for schedule(static)
+			for (size_t gid = 0; gid < symbolic_iteration.num_object; ++gid) {
+				auto id = symbolic_iteration.parent_gid[gid];
+
+				/* generate graph */
+				symbolic_iteration.real[gid] = real[id];
+				symbolic_iteration.imag[gid] = imag[id];
+				char* end = rule->populate_child(objects.begin() + object_begin[id],
+					objects.begin() + object_begin[id + 1],
+					symbolic_iteration.child_id[gid],
+					symbolic_iteration.real[gid], symbolic_iteration.imag[gid], symbolic_iteration.placeholder[thread_id]);
+
+				symbolic_iteration.size[gid] = std::distance(symbolic_iteration.placeholder[thread_id], end);
+
+				/* compute hash */
+				symbolic_iteration.hash[gid] = rule->hasher(symbolic_iteration.placeholder[thread_id], end);
+			}
 		}
 
-		mid_step_function(2);
+		mid_step_function(3);
 	}
 
 	/*
-	finalize iteration
+	compute interferences
 	*/
-	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](int){}) {
+	void symbolic_iteration::compute_collisions() {
 		num_object_after_interferences = num_object;
-
 		bool fast = false;
-		bool skip_test = num_object < utils::min_vector_size || last_iteration.total_proba - 1 > collision_probability_tolerance;
+		bool skip_test = num_object < utils::min_vector_size;
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
-		long long int max_num_object;
 
 		/*
 		function for partition
@@ -384,126 +387,96 @@ namespace iqs {
 			it.release();
 		};
 
-		/*
-		actual code
-		*/
+		/* !!!!!!!!!!!!!!!!
+		step (4)
+		 !!!!!!!!!!!!!!!! */
+
+		if (!skip_test) {
+			#pragma omp parallel for schedule(static)
+			for (size_t gid = 0; gid < test_size; ++gid) //size_t gid = gid[i];
+				interferencer(gid);
+
+			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
+
+			/* check if we should continue */
+			if (fast) {
+				/* get all unique graphs with a non zero probability */
+				auto partitioned_it = __gnu_parallel::partition(next_gid.begin(), next_gid.begin() + test_size, partitioner);
+				partitioned_it = std::rotate(partitioned_it, next_gid.begin() + test_size, next_gid.begin() + num_object);
+				num_object_after_interferences = std::distance(next_gid.begin(), partitioned_it);
+			}
+		}
+
+		if (!fast)
+			#pragma omp parallel for schedule(static)
+			for (size_t gid = test_size; gid < num_object; ++gid) //size_t gid = gid[i];
+				interferencer(gid);
+				
+		elimination_map.clear();
+
+		auto partitioned_it = next_gid.begin() + num_object_after_interferences;
+		if (!fast)
+			/* get all unique graphs with a non zero probability */
+			partitioned_it = __gnu_parallel::partition(next_gid.begin(), partitioned_it, partitioner);
+		num_object_after_interferences = std::distance(next_gid.begin(), partitioned_it);
+	}
+
+	/*
+	finalize iteration
+	*/
+	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](int){}) {
+		long long int max_num_object;
+
+		mid_step_function(4);
+
+		/* !!!!!!!!!!!!!!!!
+		step (5)
+		 !!!!!!!!!!!!!!!! */
+
+		max_num_object = (last_iteration.num_object + 
+			next_iteration.num_object +
+			get_additional_max_num_object(last_iteration, *this)) / 2;
+		max_num_object = std::max(max_num_object, (long long int)utils::min_vector_size);
+
+		if (num_object_after_interferences > max_num_object) {
+
+			/* generate random selectors */
+			#pragma omp parallel for schedule(static)
+			for (size_t i = 0; i < num_object_after_interferences; ++i)  {
+				size_t gid = next_gid[i];
+
+				PROBA_TYPE r = real[gid];
+				PROBA_TYPE i = imag[gid];
+
+				double random_number = utils::unfiorm_from_hash(hash[gid]); //random_generator();
+				random_selector[gid] = std::log( -std::log(1 - random_number) / (r*r + i*i));
+			}
+
+			/* select graphs according to random selectors */
+			__gnu_parallel::nth_element(next_gid.begin(), next_gid.begin() + max_num_object, next_gid.begin() + num_object_after_interferences,
+			[&](size_t const &gid1, size_t const &gid2) {
+				return random_selector[gid1] < random_selector[gid2];
+			});
+
+			next_iteration.num_object = max_num_object;
+		} else
+			next_iteration.num_object = num_object_after_interferences;
+
+		mid_step_function(5);
+
+		/* !!!!!!!!!!!!!!!!
+		step (6)
+		 !!!!!!!!!!!!!!!! */
+
+		/* sort to make memory access more continuous */
+		__gnu_parallel::sort(next_gid.begin(), next_gid.begin() + next_iteration.num_object);
+
+		/* resize new step variables */
+		next_iteration.resize(next_iteration.num_object);
 
 		#pragma omp parallel
 		{
 			auto thread_id = omp_get_thread_num();
-
-			/* !!!!!!!!!!!!!!!!
-			step (3)
-			 !!!!!!!!!!!!!!!! */
-
-			#pragma omp for schedule(static)
-			for (size_t gid = 0; gid < num_object; ++gid) {
-				auto id = parent_gid[gid];
-
-				/* generate graph */
-				real[gid] = last_iteration.real[id];
-				imag[gid] = last_iteration.imag[id];
-				char* end = rule->populate_child(last_iteration.objects.begin() + last_iteration.object_begin[id],
-					last_iteration.objects.begin() + last_iteration.object_begin[id + 1],
-					child_id[gid],
-					real[gid], imag[gid], placeholder[thread_id]);
-
-				size[gid] = std::distance(placeholder[thread_id], end);
-
-				/* compute hash */
-				hash[gid] = rule->hasher(placeholder[thread_id], end);
-			}
-
-			#pragma omp single
-			mid_step_function(3);
-
-			/* !!!!!!!!!!!!!!!!
-			step (4)
-			 !!!!!!!!!!!!!!!! */
-
-			if (!skip_test) {
-				#pragma omp for schedule(static)
-				for (size_t gid = 0; gid < test_size; ++gid) //size_t gid = gid[i];
-					interferencer(gid);
-
-				#pragma omp barrier
-
-				#pragma omp single
-				{
-					fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
-
-					/* check if we should continue */
-					if (fast) {
-						/* get all unique graphs with a non zero probability */
-						auto partitioned_it = __gnu_parallel::partition(next_gid.begin(), next_gid.begin() + test_size, partitioner);
-						partitioned_it = std::rotate(partitioned_it, next_gid.begin() + test_size, next_gid.begin() + num_object);
-						num_object_after_interferences = std::distance(next_gid.begin(), partitioned_it);
-					}
-				}
-			}
-
-			#pragma omp barrier
-
-			if (!fast)
-				#pragma omp for schedule(static)
-				for (size_t gid = test_size; gid < num_object; ++gid) //size_t gid = gid[i];
-					interferencer(gid);
-				
-			#pragma omp single
-			{
-				elimination_map.clear();
-
-				auto partitioned_it = next_gid.begin() + num_object_after_interferences;
-				if (!fast)
-					/* get all unique graphs with a non zero probability */
-					partitioned_it = __gnu_parallel::partition(next_gid.begin(), partitioned_it, partitioner);
-				num_object_after_interferences = std::distance(next_gid.begin(), partitioned_it);
-
-				mid_step_function(4);
-
-				/* !!!!!!!!!!!!!!!!
-				step (5)
-				 !!!!!!!!!!!!!!!! */
-
-				max_num_object = (last_iteration.num_object + 
-					next_iteration.num_object +
-					get_additional_max_num_object(last_iteration, *this)) / 2;
-				max_num_object = std::max(max_num_object, (long long int)utils::min_vector_size);
-
-				if (num_object_after_interferences > max_num_object) {
-
-					/* generate random selectors */
-					#pragma omp parallel for schedule(static)
-					for (auto gid_it = next_gid.begin(); gid_it != partitioned_it; ++gid_it)  {
-						PROBA_TYPE r = real[*gid_it];
-						PROBA_TYPE i = imag[*gid_it];
-
-						double random_number = utils::unfiorm_from_hash(hash[*gid_it]); //random_generator();
-						random_selector[*gid_it] = std::log( -std::log(1 - random_number) / (r*r + i*i));
-					}
-
-					/* select graphs according to random selectors */
-					__gnu_parallel::nth_element(next_gid.begin(), next_gid.begin() + max_num_object, partitioned_it,
-					[&](size_t const &gid1, size_t const &gid2) {
-						return random_selector[gid1] < random_selector[gid2];
-					});
-
-					next_iteration.num_object = max_num_object;
-				} else
-					next_iteration.num_object = num_object_after_interferences;
-
-				mid_step_function(5);
-
-				/* !!!!!!!!!!!!!!!!
-				step (6)
-				 !!!!!!!!!!!!!!!! */
-
-				/* sort to make memory access more continuous */
-				__gnu_parallel::sort(next_gid.begin(), next_gid.begin() + next_iteration.num_object);
-
-				/* resize new step variables */
-				next_iteration.resize(next_iteration.num_object);
-			}
 				
 			/* prepare for partial sum */
 			#pragma omp for schedule(static)
@@ -549,13 +522,32 @@ namespace iqs {
 		}
 		
 		mid_step_function(7);
+	}
 
+	/*
+	normalize
+	*/
+	void iteration::normalize() {
 		/* !!!!!!!!!!!!!!!!
 		step (8)
 		 !!!!!!!!!!!!!!!! */
 
-		next_iteration.normalize();
+		total_proba = 0;
 
-		mid_step_function(8);
+		#pragma omp parallel for reduction(+:total_proba)
+		for (size_t gid = 0; gid < num_object; ++gid) {
+			PROBA_TYPE r = real[gid];
+			PROBA_TYPE i = imag[gid];
+
+			total_proba += r*r + i*i;
+		}
+
+		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
+
+		#pragma omp parallel for
+		for (size_t gid = 0; gid < num_object; ++gid) {
+			real[gid] /= normalization_factor;
+			imag[gid] /= normalization_factor;
+		}
 	}
 }
