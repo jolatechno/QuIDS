@@ -729,10 +729,11 @@ namespace iqs::rules::qcgd {
 			return state;
 		}
 
-		simulator_t read_rule(const char* argv, debug_t mid_step_function=[](int){}) {
+		std::tuple<simulator_t, simulator_t> read_rule(const char* argv, debug_t mid_step_function=[](int){}) {
 			std::string string_args = argv;
 
 			simulator_t result = [](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it){};
+			simulator_t reversed_result = [](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it){};
 
 			std::string string_arg;
 			while ((string_arg = strip(string_args, ";")) != "") {
@@ -750,22 +751,49 @@ namespace iqs::rules::qcgd {
 						for (auto i = 0; i < n_iter; ++i)
 							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, mid_step_function);
 					};
+
+					split_merge reversed_rule(theta, phi, -xi);
+					simulator_t previous_reversed_result = reversed_result;
+					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, mid_step_function);
+						previous_reversed_result(it, buffer, sy_it);
+					};
+
 				} else if (rule_name == "erase_create") {
-					simulator_t previous_result = result;
 					erase_create rule(theta, phi, xi);
+					simulator_t previous_result = reversed_result;
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						previous_result(it, buffer, sy_it);
 						for (auto i = 0; i < n_iter; ++i)
 							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, mid_step_function);
 					};
+
+					erase_create reversed_rule(theta, phi, -xi);
+					simulator_t previous_reversed_result = reversed_result;
+					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, mid_step_function);
+						previous_reversed_result(it, buffer, sy_it);
+					};
+
 				} else if (rule_name == "erase_create") {
-					simulator_t previous_result = result;
 					coin rule(theta, phi, xi);
+					simulator_t previous_result = result;
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						previous_result(it, buffer, sy_it);
 						for (auto i = 0; i < n_iter; ++i)
 							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, mid_step_function);
 					};
+
+					coin reversed_rule(theta, phi, -xi);
+					simulator_t previous_reversed_result = reversed_result;
+					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, mid_step_function);
+						previous_reversed_result(it, buffer, sy_it);
+					};
+
 				} else if (rule_name == "step") {
 					simulator_t previous_result = result;
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
@@ -773,6 +801,14 @@ namespace iqs::rules::qcgd {
 						for (auto i = 0; i < n_iter; ++i)
 							iqs::simulate(it, step);
 					};
+
+					simulator_t previous_reversed_result = reversed_result;
+					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, reversed_step);
+						previous_reversed_result(it, buffer, sy_it);
+					};
+
 				} else if (rule_name == "reversed_step") {
 					simulator_t previous_result = result;
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
@@ -780,20 +816,27 @@ namespace iqs::rules::qcgd {
 						for (auto i = 0; i < n_iter; ++i)
 							iqs::simulate(it, reversed_step);
 					};
+
+					simulator_t previous_reversed_result = reversed_result;
+					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
+						for (auto i = 0; i < n_iter; ++i)
+							iqs::simulate(it, step);
+						previous_reversed_result(it, buffer, sy_it);
+					};
 				}
 			}
 			
-			return result;
+			return {result, reversed_result};
 		}
 
-		std::tuple<int, it_t, simulator_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
+		std::tuple<int, it_t, simulator_t, simulator_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
 			std::string string_args = argv;
 
 			int n_iter = read_n_iter(strip(string_args, "|").c_str());
 			it_t state = read_state(strip(string_args, "|").c_str());
-			simulator_t rule = read_rule(string_args.c_str(), mid_step_function);
+			auto [rule, reversed_rule] = read_rule(string_args.c_str(), mid_step_function);
 
-			return {n_iter, state, rule};
+			return {n_iter, state, rule, reversed_rule};
 		}
 	}
 }
