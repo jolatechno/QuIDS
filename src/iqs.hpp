@@ -94,7 +94,7 @@ namespace iqs {
 		virtual inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const = 0;
 		virtual inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const = 0;
 		virtual inline size_t hasher(char* parent_begin, char* parent_end) const { //can be overwritten
-			return std::hash<std::string_view>()(std::string_view(parent_begin, parent_end));
+			return std::hash<std::string_view>()(std::string_view(parent_begin, std::distance(parent_begin, parent_end)));
 		}
 	};
 
@@ -266,39 +266,35 @@ namespace iqs {
 
 		mid_step_function(0);
 
+		/* !!!!!!!!!!!!!!!!
+		step (1)
+		 !!!!!!!!!!!!!!!! */
+
+		#pragma omp parallel for schedule(static) reduction(max:max_size)
+		for (size_t gid = 0; gid < num_object; ++gid) {
+			size_t size;
+			rule->get_num_child(objects.begin() + object_begin[gid],
+				objects.begin() + object_begin[gid + 1],
+				num_childs[gid + 1], size);
+			max_size = std::max(max_size, size);
+		}
+
+		mid_step_function(1);
+
+		/* !!!!!!!!!!!!!!!!
+		step (2)
+		 !!!!!!!!!!!!!!!! */
+
+		__gnu_parallel::partial_sum(num_childs.begin() + 1, num_childs.begin() + num_object + 1, num_childs.begin() + 1);
+		symbolic_iteration.num_object = num_childs[num_object];
+
+		/* resize symbolic iteration */
+		symbolic_iteration.resize(symbolic_iteration.num_object);
+		symbolic_iteration.reserve(max_size);
+		
 		#pragma omp parallel
 		{
 			auto thread_id = omp_get_thread_num();
-
-			/* !!!!!!!!!!!!!!!!
-			step (1)
-			 !!!!!!!!!!!!!!!! */
-
-			#pragma omp for schedule(static) reduction(max:max_size)
-			for (size_t gid = 0; gid < num_object; ++gid) {
-				size_t size;
-				rule->get_num_child(objects.begin() + object_begin[gid],
-					objects.begin() + object_begin[gid + 1],
-					num_childs[gid + 1], size);
-				max_size = std::max(max_size, size);
-			}
-
-			#pragma omp single
-			mid_step_function(1);
-
-			/* !!!!!!!!!!!!!!!!
-			step (2)
-			 !!!!!!!!!!!!!!!! */
-
-			#pragma omp single
-			{
-				__gnu_parallel::partial_sum(num_childs.begin() + 1, num_childs.begin() + num_object + 1, num_childs.begin() + 1);
-				symbolic_iteration.num_object = num_childs[num_object];
-
-				/* resize symbolic iteration */
-				symbolic_iteration.resize(symbolic_iteration.num_object);
-				symbolic_iteration.reserve(max_size);
-			}
 
 			#pragma omp for schedule(static)
 			for (size_t gid = 0; gid < num_object; ++gid) {
@@ -473,52 +469,47 @@ namespace iqs {
 
 		/* resize new step variables */
 		next_iteration.resize(next_iteration.num_object);
+				
+		/* prepare for partial sum */
+		#pragma omp parallel for schedule(static)
+		for (size_t gid = 0; gid < next_iteration.num_object; ++gid) {
+			size_t id = next_gid[gid];
+
+			next_iteration.object_begin[gid + 1] = size[id];
+
+			/* assign magnitude */
+			next_iteration.real[gid] = real[id];
+			next_iteration.imag[gid] = imag[id];
+		}
+
+		__gnu_parallel::partial_sum(next_iteration.object_begin.begin() + 1,
+			next_iteration.object_begin.begin() + next_iteration.num_object + 1,
+			next_iteration.object_begin.begin() + 1);
+
+		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
+
+		mid_step_function(6);
+
+		/* !!!!!!!!!!!!!!!!
+		step (7)
+		 !!!!!!!!!!!!!!!! */
 
 		#pragma omp parallel
 		{
 			auto thread_id = omp_get_thread_num();
-				
-			/* prepare for partial sum */
-			#pragma omp for schedule(static)
-			for (size_t gid = 0; gid < next_iteration.num_object; ++gid) {
-				size_t id = next_gid[gid];
-
-				next_iteration.object_begin[gid + 1] = size[id];
-
-				/* assign magnitude */
-				next_iteration.real[gid] = real[id];
-				next_iteration.imag[gid] = imag[id];
-			}
-
-			#pragma omp single
-			{
-				__gnu_parallel::partial_sum(next_iteration.object_begin.begin() + 1,
-					next_iteration.object_begin.begin() + next_iteration.num_object + 1,
-					next_iteration.object_begin.begin() + 1);
-
-				next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
-
-				mid_step_function(6);
-			}
-
-			/* !!!!!!!!!!!!!!!!
-			step (7)
-			 !!!!!!!!!!!!!!!! */
-
 			PROBA_TYPE real_, imag_;
 
 			#pragma omp for schedule(static)
 			for (size_t gid = 0; gid < next_iteration.num_object; ++gid) {
 				auto id = next_gid[gid];
 				auto this_parent_gid = parent_gid[id];
-
+				
 				rule->populate_child(last_iteration.objects.begin() + last_iteration.object_begin[this_parent_gid],
 					last_iteration.objects.begin() + last_iteration.object_begin[this_parent_gid + 1],
 					child_id[id],
 					real_, imag_,
 					next_iteration.objects.begin() + next_iteration.object_begin[gid]);
 			}
-
 		}
 		
 		mid_step_function(7);
