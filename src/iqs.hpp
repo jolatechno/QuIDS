@@ -216,10 +216,10 @@ namespace iqs {
 		utils::get_mem_usage_and_free_mem(total_memory, free_mem);
 
 		// and according to the "safety_margin" (a proportion of total memory) compute the total delta between the amount free memory and the target
-		long int mem_difference = free_mem - total_memory*safety_margin;
+		long long int mem_difference = free_mem - total_memory*safety_margin;
 
 		// get the total memory
-		long int total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
+		long long int total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
 			(last_iteration.real.size() + next_iteration.real.size())*iteration_size + // size of properties
 			symbolic_iteration.real.size()*symbolic_iteration_size + // size of symbolic properties
 			mem_difference; // free memory
