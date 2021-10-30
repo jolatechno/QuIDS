@@ -353,7 +353,6 @@ namespace iqs {
 	compute interferences
 	*/
 	void symbolic_iteration::compute_collisions() {
-		num_object_after_interferences = num_object;
 		bool fast = false;
 		bool skip_test = num_object < utils::min_vector_size;
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
@@ -373,37 +372,26 @@ namespace iqs {
 			return r*r + i*i > tolerance;
 		};
 
-		/*
-		function for interferences
-		*/
-		auto static interferencer = [&](size_t const gid) {
-			/* accessing key */
-			tbb::concurrent_hash_map<size_t, size_t>::accessor it;
-			if (elimination_map.insert(it, hash[gid])) {
-				/* if it doesn't exist add it */
-				it->second = gid;
-
-				/* keep this graph */
-				is_unique[gid] = true;
-			} else {
-				/* if it exist add the probabilities */
-				real[it->second] += real[gid];
-				imag[it->second] += imag[gid];
-
-				/* discard this graph */
-				is_unique[gid] = false;
-			}
-			it.release();
-		};
-
 		/* !!!!!!!!!!!!!!!!
 		step (4)
 		 !!!!!!!!!!!!!!!! */
 
 		if (!skip_test) {
-			#pragma omp parallel for schedule(static)
-			for (size_t gid = 0; gid < test_size; ++gid) //size_t gid = gid[i];
-				interferencer(gid);
+			//#pragma omp parallel for schedule(static)
+			for (size_t gid = 0; gid < test_size; ++gid) {//size_t gid = gid[i];
+				/* accessing key */
+				tbb::concurrent_hash_map<size_t, size_t>::accessor it;
+				if (elimination_map.insert(it, {hash[gid], gid})) {
+					is_unique[gid] = true; /* keep this graph */
+				} else {
+					/* if it exist add the probabilities */
+					real[it->second] += real[gid];
+					imag[it->second] += imag[gid];
+
+					/* discard this graph */
+					is_unique[gid] = false;
+				}
+			}
 
 			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
 
@@ -416,33 +404,42 @@ namespace iqs {
 			}
 		}
 
-		if (!fast)
-			#pragma omp parallel for schedule(static)
-			for (size_t gid = test_size; gid < num_object; ++gid) //size_t gid = gid[i];
-				interferencer(gid);
+		if (!fast) {
+			//#pragma omp parallel for schedule(static)
+			for (size_t gid = test_size; gid < num_object; ++gid) { //size_t gid = gid[i];
+				/* accessing key */
+				tbb::concurrent_hash_map<size_t, size_t>::accessor it;
+				if (elimination_map.insert(it, {hash[gid], gid})) {
+					is_unique[gid] = true; /* keep this graph */
+				} else {
+					/* if it exist add the probabilities */
+					real[it->second] += real[gid];
+					imag[it->second] += imag[gid];
+
+					/* discard this graph */
+					is_unique[gid] = false;
+				}
+			}
+
+			/* get all unique graphs with a non zero probability */
+			auto partitioned_it = __gnu_parallel::partition(next_gid.begin(), next_gid.begin() + num_object, partitioner);
+			num_object_after_interferences = std::distance(next_gid.begin(), partitioned_it);
+		}
 				
 		elimination_map.clear();
-
-		auto partitioned_it = next_gid.begin() + num_object_after_interferences;
-		if (!fast)
-			/* get all unique graphs with a non zero probability */
-			partitioned_it = __gnu_parallel::partition(next_gid.begin(), partitioned_it, partitioner);
-		num_object_after_interferences = std::distance(next_gid.begin(), partitioned_it);
 	}
 
 	/*
 	finalize iteration
 	*/
 	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](int){}) {
-		long long int max_num_object;
-
 		mid_step_function(4);
 
 		/* !!!!!!!!!!!!!!!!
 		step (5)
 		 !!!!!!!!!!!!!!!! */
 
-		max_num_object = get_max_num_object(next_iteration, last_iteration, *this) / 2;
+		long long int max_num_object = get_max_num_object(next_iteration, last_iteration, *this) / 2;
 		max_num_object = std::max(max_num_object, (long long int)utils::min_vector_size);
 
 		if (num_object_after_interferences > max_num_object) {

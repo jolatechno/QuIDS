@@ -274,20 +274,18 @@ namespace iqs::rules::qcgd {
 
 	void step(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
 		uint16_t num_nodes = graphs::num_nodes(parent_begin);
-		for (auto i = 0; i < num_nodes - 1; ++i) {
-			auto i_ = num_nodes - 1 - i;
-			std::swap(graphs::left(parent_begin, i), graphs::left(parent_begin, i + 1));
-			std::swap(graphs::right(parent_begin, i_), graphs::right(parent_begin, i_ - 1));
-		}
+		auto left_ = graphs::left(parent_begin);
+		auto right_ = graphs::right(parent_begin);
+		std::rotate(left_, left_ + 1, left_ + num_nodes);
+		std::rotate(right_, right_ + num_nodes - 1, right_ + num_nodes);
 	}
 
 	void reversed_step(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
 		uint16_t num_nodes = graphs::num_nodes(parent_begin);
-		for (auto i = 0; i < num_nodes - 1; ++i) {
-			auto i_ = num_nodes - 1 - i;
-			std::swap(graphs::right(parent_begin, i), graphs::right(parent_begin, i + 1));
-			std::swap(graphs::left(parent_begin, i_), graphs::left(parent_begin, i_ - 1));
-		}
+		auto left_ = graphs::left(parent_begin);
+		auto right_ = graphs::right(parent_begin);
+		std::rotate(right_, right_ + 1, right_ + num_nodes);
+		std::rotate(left_, left_ + num_nodes - 1, left_ + num_nodes);
 	}
 
 	class erase_create : public iqs::rule {
