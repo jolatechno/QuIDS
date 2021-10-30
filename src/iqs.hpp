@@ -208,6 +208,9 @@ namespace iqs {
 	for memory managment
 	*/
 	long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
+		static long long int iteration_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
+		static long long int symbolic_iteration_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+
 		// get the free memory and the total amount of memory...
 		long long int total_memory, free_mem;
 		utils::get_mem_usage_and_free_mem(total_memory, free_mem);
@@ -216,10 +219,10 @@ namespace iqs {
 		long int mem_difference = free_mem - total_memory*safety_margin;
 
 		// get the total memory
-		long int total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + mem_difference;
-
-		static long long int iteration_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-		static long long int symbolic_iteration_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+		long int total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
+			(last_iteration.real.size() + next_iteration.real.size())*iteration_size + // size of properties
+			symbolic_iteration.real.size()*symbolic_iteration_size + // size of symbolic properties
+			mem_difference; // free memory
 
 		// compute average object size
 		long long int iteration_size_per_object = 0;
@@ -231,7 +234,7 @@ namespace iqs {
 		iteration_size_per_object /= symbolic_iteration.num_object_after_interferences;
 
 		// add the cost of the symbolic iteration in itself
-		iteration_size_per_object += symbolic_iteration_size*symbolic_iteration.num_object/last_iteration.num_object; // size for symbolic iteration
+		iteration_size_per_object += symbolic_iteration_size*symbolic_iteration.num_object/last_iteration.num_object/2; // size for symbolic iteration
 		
 		// and the constant size per object
 		iteration_size_per_object += iteration_size;
