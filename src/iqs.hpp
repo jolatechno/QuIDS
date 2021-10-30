@@ -66,9 +66,6 @@ namespace iqs {
 	number of threads
 	*/
 	const size_t num_threads = []() {
-		/* allow nested parallism for __gnu_parallel inside omp single */
-		omp_set_nested(3);
-
 		/* get num thread */
 		int num_threads;
 		#pragma omp parallel
@@ -159,6 +156,7 @@ namespace iqs {
 	*/
 	class symbolic_iteration {
 		friend iteration;
+		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 
 	//protected:
 	public:
@@ -209,7 +207,7 @@ namespace iqs {
 	/*
 	for memory managment
 	*/
-	long long int inline get_additional_max_num_object(it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
+	long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
 		// get the free memory and the total amount of memory...
 		long long int total_memory, free_mem;
 		utils::get_mem_usage_and_free_mem(total_memory, free_mem);
@@ -217,16 +215,28 @@ namespace iqs {
 		// and according to the "safety_margin" (a proportion of total memory) compute the total delta between the amount free memory and the target
 		long int mem_difference = free_mem - total_memory*safety_margin;
 
+		// get the total memory
+		long int total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + mem_difference;
+
 		static long long int iteration_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
 		static long long int symbolic_iteration_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 
-		/* compute average object size */
-		long long int iteration_size_per_object = last_iteration.object_begin[last_iteration.num_object]; // size for all object buffer
-		iteration_size_per_object += symbolic_iteration.num_object*symbolic_iteration_size; // size for symbolic iteration
-		iteration_size_per_object /= last_iteration.num_object; // divide to get size per object
-		iteration_size_per_object += iteration_size; // add constant size per object
+		// compute average object size
+		long long int iteration_size_per_object = 0;
 
-		return mem_difference / iteration_size_per_object;
+		// compute the average size of an object for the next iteration:
+		#pragma omp parallel for reduction(+:iteration_size_per_object)
+		for (size_t gid = 0; gid < symbolic_iteration.num_object_after_interferences; ++gid)
+			iteration_size_per_object += symbolic_iteration.size[gid];
+		iteration_size_per_object /= symbolic_iteration.num_object_after_interferences;
+
+		// add the cost of the symbolic iteration in itself
+		iteration_size_per_object += symbolic_iteration_size*symbolic_iteration.num_object/last_iteration.num_object; // size for symbolic iteration
+		
+		// and the constant size per object
+		iteration_size_per_object += iteration_size;
+
+		return total_useable_memory / iteration_size_per_object;
 	}
 
 	/*
@@ -429,9 +439,7 @@ namespace iqs {
 		step (5)
 		 !!!!!!!!!!!!!!!! */
 
-		max_num_object = (last_iteration.num_object + 
-			next_iteration.num_object +
-			get_additional_max_num_object(last_iteration, *this)) / 2;
+		max_num_object = get_max_num_object(next_iteration, last_iteration, *this) / 2;
 		max_num_object = std::max(max_num_object, (long long int)utils::min_vector_size);
 
 		if (num_object_after_interferences > max_num_object) {

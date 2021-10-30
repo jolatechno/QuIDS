@@ -697,6 +697,9 @@ namespace iqs::rules::qcgd {
 				std::srand(std::atoi(string_seed.c_str()));
 			} else
 				std::srand(std::time(0));
+
+			float safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", SAFETY_MARGIN);
+			iqs::set_safety_margin(safety_margin);
 			
 			return n_iters;
 		}
