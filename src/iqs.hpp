@@ -42,7 +42,6 @@ namespace iqs {
 		#include "utils/random.hpp"
 		#include "utils/vector.hpp"
 	}
-	
 
 	/*
 	global variable definition
@@ -377,8 +376,8 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 
 		if (!skip_test) {
-			//#pragma omp parallel for schedule(static)
-			for (size_t gid = 0; gid < test_size; ++gid) {//size_t gid = gid[i];
+			#pragma omp parallel for schedule(static)
+			for (size_t gid = 0; gid < test_size; ++gid) { //size_t gid = gid[i];
 				/* accessing key */
 				tbb::concurrent_hash_map<size_t, size_t>::accessor it;
 				if (elimination_map.insert(it, {hash[gid], gid})) {
@@ -405,7 +404,7 @@ namespace iqs {
 		}
 
 		if (!fast) {
-			//#pragma omp parallel for schedule(static)
+			#pragma omp parallel for schedule(static)
 			for (size_t gid = test_size; gid < num_object; ++gid) { //size_t gid = gid[i];
 				/* accessing key */
 				tbb::concurrent_hash_map<size_t, size_t>::accessor it;

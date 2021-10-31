@@ -183,7 +183,11 @@ namespace iqs::rules::qcgd {
 	}
 
 	namespace utils {
-		size_t max_print_num_graphs = -1;
+		namespace {
+			size_t max_print_num_graphs = -1;
+		}
+
+		void set_max_print_num_graphs(size_t val) { max_print_num_graphs = val; }
 
 		void inline make_graph(char* &object_begin, char* &object_end, uint16_t size) {
 			static auto per_node_size = 2 + sizeof(uint16_t) + sizeof(graphs::sub_node);
@@ -269,6 +273,9 @@ namespace iqs::rules::qcgd {
 				}
 				std::cout << "\n";
 			}
+
+			if (num_prints < iter.num_object)
+				std::cout << "\t...and " << iter.num_object - num_prints << " other graphs\n";
 		}
 	}
 
@@ -493,7 +500,6 @@ namespace iqs::rules::qcgd {
 			graphs::node_name_begin(child_begin, 0) = 0;
 
 			/* do first split */
-			uint16_t *first_split_middle;
 			if (first_split) {
 				bool has_most_left_zero = true;
 				if (parent_node_name_begin->right_or_type >= 0)
@@ -633,7 +639,7 @@ namespace iqs::rules::qcgd {
 				graphs::node_name_begin(child_begin, child_num_nodes) = std::distance(child_node_name_begin, node_name_end);
 			}
 
-			return (char*)(child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes)) + sizeof(graphs::sub_node) - 1;
+			return (char*)(child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes));
 		}
 	};
 
@@ -685,7 +691,7 @@ namespace iqs::rules::qcgd {
 			}
 		}
 
-		uint read_n_iter(const char* argv) {
+		std::tuple<uint, uint> read_n_iter(const char* argv) {
 			std::string string_arg = argv;
 			
 			int n_iters = std::atoi(strip(string_arg, ",").c_str());
@@ -696,10 +702,24 @@ namespace iqs::rules::qcgd {
 			} else
 				std::srand(std::time(0));
 
+			int reversed_n_iters = parse_int_with_default(string_arg, "reversed_n_iter=", ",", n_iters);
+
+			int max_print_num_graphs = parse_int_with_default(string_arg, "max_print_num_graphs=", ",", -1);
+			utils::set_max_print_num_graphs(max_print_num_graphs);
+
+			float tolerance = parse_float_with_default(string_arg, "tolerance=", ",", TOLERANCE);
+			iqs::set_tolerance(tolerance);
+
 			float safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", SAFETY_MARGIN);
 			iqs::set_safety_margin(safety_margin);
+
+			float collision_test_proportion = parse_float_with_default(string_arg, "collision_test_proportion=", ",", COLLISION_TEST_PROPORTION);
+			iqs::set_collision_test_proportion(collision_test_proportion);
+
+			float collision_tolerance = parse_float_with_default(string_arg, "collision_tolerance=", ",", COLLISION_TOLERANCE);
+			iqs::set_collision_tolerance(collision_tolerance);
 			
-			return n_iters;
+			return {n_iters, reversed_n_iters};
 		}
 
 		iqs::it_t read_state(const char* argv) {
@@ -827,14 +847,14 @@ namespace iqs::rules::qcgd {
 			return {result, reversed_result};
 		}
 
-		std::tuple<int, it_t, simulator_t, simulator_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
+		std::tuple<uint, uint, it_t, simulator_t, simulator_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
 			std::string string_args = argv;
 
-			int n_iter = read_n_iter(strip(string_args, "|").c_str());
+			auto [n_iter, reversed_n_iters] = read_n_iter(strip(string_args, "|").c_str());
 			it_t state = read_state(strip(string_args, "|").c_str());
 			auto [rule, reversed_rule] = read_rule(string_args.c_str(), mid_step_function);
 
-			return {n_iter, state, rule, reversed_rule};
+			return {n_iter, reversed_n_iters, state, rule, reversed_rule};
 		}
 	}
 }

@@ -38,6 +38,8 @@ int main(int argc, char* argv[]) {
 	split_merge(state, buffer, sy_it);
 	std::cout << "\nafter step + split_merge(P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 
+	iqs::rules::qcgd::utils::set_max_print_num_graphs(10);
+
 	reversed_split_merge(state, buffer, sy_it);
 	reversed_step(state, buffer, sy_it);
 	reversed_split_merge(state, buffer, sy_it);
