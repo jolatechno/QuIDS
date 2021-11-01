@@ -25,7 +25,7 @@ size_t min_vector_size = MIN_VECTOR_SIZE;
 template <typename value_type>
 class numa_vector {
 private:
-    mutable value_type* ptr = 0;
+    mutable value_type* ptr = NULL;
     mutable size_t size_ = 0;
  
 public:
@@ -72,26 +72,18 @@ public:
 	"min_state_size" is the minimum size of a vector, to avoid small vectors which are bound to be resized frequently.
 	*/
     void resize(size_t n) const {
-    	static value_type zero;
-
     	n = std::max(min_vector_size, n); // never resize under min_vector_size
 
     	if (size_ < n || // resize if we absolutely have to because the state won't fit
     		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
 
-    		n *= upsize_policy; // resize with a margin so we don't resize too often
+    		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
 
-    		value_type* new_ptr = (value_type*)(new char[n*sizeof(value_type)]);
+    		ptr = (value_type*)realloc(ptr, size_*sizeof(value_type));
 
 			#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < n; ++i)
-				new_ptr[i] = i < size_ ? ptr[i] : zero;
-
-			if (ptr != 0)
-				free(ptr);
-
-			ptr = new_ptr;
-			size_ = n;
+			for (size_t i = 0; i < size_; ++i)
+				((value_type volatile *)ptr)[i] = ptr[i]; // touch memory
     	}
     }
 
@@ -101,19 +93,16 @@ public:
     	if (size_ < n || // resize if we absolutely have to because the state won't fit
     		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
 
-    		n *= upsize_policy; // resize with a margin so we don't resize too often
-
-    		value_type* new_ptr = (value_type*)(new char[n*sizeof(value_type)]);
-
-			#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < n; ++i)
-				new_ptr[i] = i;
-
-			if (ptr != 0)
+    		if (ptr != NULL)
 				free(ptr);
 
-			ptr = new_ptr;
-			size_ = n;
+    		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
+
+    		ptr = (value_type *)malloc(size_*sizeof(value_type));
+
+			#pragma omp parallel for schedule(static)
+			for (size_t i = 0; i < size_; ++i)
+				ptr[i] = i;
     	} else
     		// iota anyway
     		#pragma omp parallel for schedule(static)
@@ -129,19 +118,16 @@ public:
     	if (size_ < n || // resize if we absolutely have to because the state won't fit
     		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
 
-    		n *= upsize_policy; // resize with a margin so we don't resize too often
-
-    		value_type* new_ptr = (value_type*)(new char[n*sizeof(value_type)]);
-
-			#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < n; ++i)
-				new_ptr[i] = zero;
-
-			if (ptr != 0)
+    		if (ptr != NULL)
 				free(ptr);
 
-			ptr = new_ptr;
-			size_ = n;
+    		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
+
+    		ptr = (value_type *)malloc(size_*sizeof(value_type));
+
+			#pragma omp parallel for schedule(static)
+			for (size_t i = 0; i < size_; ++i)
+				ptr[i] = 0;
     	} else
     		// iota anyway
     		#pragma omp parallel for schedule(static)
