@@ -177,10 +177,10 @@ namespace iqs {
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 
 		utils::numa_vector<PROBA_TYPE> real, imag;
-		utils::numa_vector<size_t> next_gid;
+		utils::numa_vector<size_t> next_oid;
 		utils::numa_vector<size_t> size;
 		utils::numa_vector<size_t> hash;
-		utils::numa_vector<size_t> parent_gid;
+		utils::numa_vector<size_t> parent_oid;
 		utils::numa_vector<uint32_t> child_id;
 		utils::numa_vector<bool> is_unique;
 		utils::numa_vector<double> random_selector;
@@ -188,10 +188,10 @@ namespace iqs {
 		void inline resize(size_t num_object) {
 			real.resize(num_object);
 			imag.resize(num_object);
-			next_gid.iota_resize(num_object);
+			next_oid.iota_resize(num_object);
 			size.zero_resize(num_object);
 			hash.zero_resize(num_object);
-			parent_gid.resize(num_object);
+			parent_oid.resize(num_object);
 			child_id.resize(num_object);
 			is_unique.resize(num_object);
 			random_selector.zero_resize(num_object);
@@ -238,8 +238,8 @@ namespace iqs {
 
 		// compute the average size of an object for the next iteration:
 		#pragma omp parallel for reduction(+:iteration_size_per_object)
-		for (size_t gid = 0; gid < symbolic_iteration.num_object_after_interferences; ++gid)
-			iteration_size_per_object += symbolic_iteration.size[gid];
+		for (size_t oid = 0; oid < symbolic_iteration.num_object_after_interferences; ++oid)
+			iteration_size_per_object += symbolic_iteration.size[oid];
 		iteration_size_per_object /= symbolic_iteration.num_object_after_interferences;
 
 		// add the cost of the symbolic iteration in itself
@@ -247,6 +247,9 @@ namespace iqs {
 		
 		// and the constant size per object
 		iteration_size_per_object += iteration_size;
+
+		// and the cost of unused space
+		iteration_size_per_object *= utils::upsize_policy;
 
 		return total_useable_memory / iteration_size_per_object;
 	}
@@ -273,11 +276,11 @@ namespace iqs {
 	*/
 	void iteration::apply_modifier(modifier_t const rule) {
 		#pragma omp parallel for schedule(static)
-		for (size_t gid = 0; gid < num_object; ++gid)
+		for (size_t oid = 0; oid < num_object; ++oid)
 			/* generate graph */
-			rule(objects.begin() + object_begin[gid],
-				objects.begin() + object_begin[gid + 1],
-				real[gid], imag[gid]);
+			rule(objects.begin() + object_begin[oid],
+				objects.begin() + object_begin[oid + 1],
+				real[oid], imag[oid]);
 	}
 
 	/*
@@ -293,11 +296,11 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 
 		#pragma omp parallel for schedule(static) reduction(max:max_size)
-		for (size_t gid = 0; gid < num_object; ++gid) {
+		for (size_t oid = 0; oid < num_object; ++oid) {
 			size_t size;
-			rule->get_num_child(objects.begin() + object_begin[gid],
-				objects.begin() + object_begin[gid + 1],
-				num_childs[gid + 1], size);
+			rule->get_num_child(objects.begin() + object_begin[oid],
+				objects.begin() + object_begin[oid + 1],
+				num_childs[oid + 1], size);
 			max_size = std::max(max_size, size);
 		}
 
@@ -319,13 +322,13 @@ namespace iqs {
 			auto thread_id = omp_get_thread_num();
 
 			#pragma omp for schedule(static)
-			for (size_t gid = 0; gid < num_object; ++gid) {
+			for (size_t oid = 0; oid < num_object; ++oid) {
 				/* assign parent ids and child ids for each child */
-				std::fill(symbolic_iteration.parent_gid.begin() + num_childs[gid],
-					symbolic_iteration.parent_gid.begin() + num_childs[gid + 1],
-					gid);
-				std::iota(symbolic_iteration.child_id.begin() + num_childs[gid],
-					symbolic_iteration.child_id.begin() + num_childs[gid + 1],
+				std::fill(symbolic_iteration.parent_oid.begin() + num_childs[oid],
+					symbolic_iteration.parent_oid.begin() + num_childs[oid + 1],
+					oid);
+				std::iota(symbolic_iteration.child_id.begin() + num_childs[oid],
+					symbolic_iteration.child_id.begin() + num_childs[oid + 1],
 					0);
 			}
 
@@ -337,21 +340,21 @@ namespace iqs {
 			 !!!!!!!!!!!!!!!! */
 
 			#pragma omp for schedule(static)
-			for (size_t gid = 0; gid < symbolic_iteration.num_object; ++gid) {
-				auto id = symbolic_iteration.parent_gid[gid];
+			for (size_t oid = 0; oid < symbolic_iteration.num_object; ++oid) {
+				auto id = symbolic_iteration.parent_oid[oid];
 
 				/* generate graph */
-				symbolic_iteration.real[gid] = real[id];
-				symbolic_iteration.imag[gid] = imag[id];
+				symbolic_iteration.real[oid] = real[id];
+				symbolic_iteration.imag[oid] = imag[id];
 				char* end = rule->populate_child(objects.begin() + object_begin[id],
 					objects.begin() + object_begin[id + 1],
-					symbolic_iteration.child_id[gid],
-					symbolic_iteration.real[gid], symbolic_iteration.imag[gid], symbolic_iteration.placeholder[thread_id]);
+					symbolic_iteration.child_id[oid],
+					symbolic_iteration.real[oid], symbolic_iteration.imag[oid], symbolic_iteration.placeholder[thread_id]);
 
-				symbolic_iteration.size[gid] = std::distance(symbolic_iteration.placeholder[thread_id], end);
+				symbolic_iteration.size[oid] = std::distance(symbolic_iteration.placeholder[thread_id], end);
 
 				/* compute hash */
-				symbolic_iteration.hash[gid] = rule->hasher(symbolic_iteration.placeholder[thread_id], end);
+				symbolic_iteration.hash[oid] = rule->hasher(symbolic_iteration.placeholder[thread_id], end);
 			}
 		}
 
@@ -369,14 +372,14 @@ namespace iqs {
 		/*
 		function for partition
 		*/
-		auto static partitioner = [&](size_t const &gid) {
+		auto static partitioner = [&](size_t const &oid) {
 			/* check if graph is unique */
-			if (!is_unique[gid])
+			if (!is_unique[oid])
 				return false;
 
 			/* check for zero probability */
-			PROBA_TYPE r = real[gid];
-			PROBA_TYPE i = imag[gid];
+			PROBA_TYPE r = real[oid];
+			PROBA_TYPE i = imag[oid];
 
 			return r*r + i*i > tolerance;
 		};
@@ -387,18 +390,18 @@ namespace iqs {
 
 		if (!skip_test) {
 			#pragma omp parallel for schedule(static)
-			for (size_t gid = 0; gid < test_size; ++gid) { //size_t gid = gid[i];
+			for (size_t oid = 0; oid < test_size; ++oid) { //size_t oid = oid[i];
 				/* accessing key */
 				tbb::concurrent_hash_map<size_t, size_t>::accessor it;
-				if (elimination_map.insert(it, {hash[gid], gid})) {
-					is_unique[gid] = true; /* keep this graph */
+				if (elimination_map.insert(it, {hash[oid], oid})) {
+					is_unique[oid] = true; /* keep this graph */
 				} else {
 					/* if it exist add the probabilities */
-					real[it->second] += real[gid];
-					imag[it->second] += imag[gid];
+					real[it->second] += real[oid];
+					imag[it->second] += imag[oid];
 
 					/* discard this graph */
-					is_unique[gid] = false;
+					is_unique[oid] = false;
 				}
 			}
 
@@ -407,32 +410,32 @@ namespace iqs {
 			/* check if we should continue */
 			if (fast) {
 				/* get all unique graphs with a non zero probability */
-				auto partitioned_it = __gnu_parallel::partition(next_gid.begin(), next_gid.begin() + test_size, partitioner);
-				partitioned_it = std::rotate(partitioned_it, next_gid.begin() + test_size, next_gid.begin() + num_object);
-				num_object_after_interferences = std::distance(next_gid.begin(), partitioned_it);
+				auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + test_size, partitioner);
+				partitioned_it = std::rotate(partitioned_it, next_oid.begin() + test_size, next_oid.begin() + num_object);
+				num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 			}
 		}
 
 		if (!fast) {
 			#pragma omp parallel for schedule(static)
-			for (size_t gid = test_size; gid < num_object; ++gid) { //size_t gid = gid[i];
+			for (size_t oid = test_size; oid < num_object; ++oid) { //size_t oid = oid[i];
 				/* accessing key */
 				tbb::concurrent_hash_map<size_t, size_t>::accessor it;
-				if (elimination_map.insert(it, {hash[gid], gid})) {
-					is_unique[gid] = true; /* keep this graph */
+				if (elimination_map.insert(it, {hash[oid], oid})) {
+					is_unique[oid] = true; /* keep this graph */
 				} else {
 					/* if it exist add the probabilities */
-					real[it->second] += real[gid];
-					imag[it->second] += imag[gid];
+					real[it->second] += real[oid];
+					imag[it->second] += imag[oid];
 
 					/* discard this graph */
-					is_unique[gid] = false;
+					is_unique[oid] = false;
 				}
 			}
 
 			/* get all unique graphs with a non zero probability */
-			auto partitioned_it = __gnu_parallel::partition(next_gid.begin(), next_gid.begin() + num_object, partitioner);
-			num_object_after_interferences = std::distance(next_gid.begin(), partitioned_it);
+			auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
+			num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 		}
 				
 		elimination_map.clear();
@@ -456,19 +459,19 @@ namespace iqs {
 			/* generate random selectors */
 			#pragma omp parallel for schedule(static)
 			for (size_t i = 0; i < num_object_after_interferences; ++i)  {
-				size_t gid = next_gid[i];
+				size_t oid = next_oid[i];
 
-				PROBA_TYPE r = real[gid];
-				PROBA_TYPE i = imag[gid];
+				PROBA_TYPE r = real[oid];
+				PROBA_TYPE i = imag[oid];
 
-				double random_number = utils::unfiorm_from_hash(hash[gid]); //random_generator();
-				random_selector[gid] = std::log( -std::log(1 - random_number) / (r*r + i*i));
+				double random_number = utils::unfiorm_from_hash(hash[oid]); //random_generator();
+				random_selector[oid] = std::log( -std::log(1 - random_number) / (r*r + i*i));
 			}
 
 			/* select graphs according to random selectors */
-			__gnu_parallel::nth_element(next_gid.begin(), next_gid.begin() + max_num_object, next_gid.begin() + num_object_after_interferences,
-			[&](size_t const &gid1, size_t const &gid2) {
-				return random_selector[gid1] < random_selector[gid2];
+			__gnu_parallel::nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
+			[&](size_t const &oid1, size_t const &oid2) {
+				return random_selector[oid1] < random_selector[oid2];
 			});
 
 			next_iteration.num_object = max_num_object;
@@ -482,21 +485,21 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 
 		/* sort to make memory access more continuous */
-		__gnu_parallel::sort(next_gid.begin(), next_gid.begin() + next_iteration.num_object);
+		__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
 
 		/* resize new step variables */
 		next_iteration.resize(next_iteration.num_object);
 				
 		/* prepare for partial sum */
 		#pragma omp parallel for schedule(static)
-		for (size_t gid = 0; gid < next_iteration.num_object; ++gid) {
-			size_t id = next_gid[gid];
+		for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
+			size_t id = next_oid[oid];
 
-			next_iteration.object_begin[gid + 1] = size[id];
+			next_iteration.object_begin[oid + 1] = size[id];
 
 			/* assign magnitude */
-			next_iteration.real[gid] = real[id];
-			next_iteration.imag[gid] = imag[id];
+			next_iteration.real[oid] = real[id];
+			next_iteration.imag[oid] = imag[id];
 		}
 
 		__gnu_parallel::partial_sum(next_iteration.object_begin.begin() + 1,
@@ -517,15 +520,15 @@ namespace iqs {
 			PROBA_TYPE real_, imag_;
 
 			#pragma omp for schedule(static)
-			for (size_t gid = 0; gid < next_iteration.num_object; ++gid) {
-				auto id = next_gid[gid];
-				auto this_parent_gid = parent_gid[id];
+			for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
+				auto id = next_oid[oid];
+				auto this_parent_oid = parent_oid[id];
 				
-				rule->populate_child(last_iteration.objects.begin() + last_iteration.object_begin[this_parent_gid],
-					last_iteration.objects.begin() + last_iteration.object_begin[this_parent_gid + 1],
+				rule->populate_child(last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid],
+					last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid + 1],
 					child_id[id],
 					real_, imag_,
-					next_iteration.objects.begin() + next_iteration.object_begin[gid]);
+					next_iteration.objects.begin() + next_iteration.object_begin[oid]);
 			}
 		}
 		
@@ -543,9 +546,9 @@ namespace iqs {
 		total_proba = 0;
 
 		#pragma omp parallel for reduction(+:total_proba)
-		for (size_t gid = 0; gid < num_object; ++gid) {
-			PROBA_TYPE r = real[gid];
-			PROBA_TYPE i = imag[gid];
+		for (size_t oid = 0; oid < num_object; ++oid) {
+			PROBA_TYPE r = real[oid];
+			PROBA_TYPE i = imag[oid];
 
 			total_proba += r*r + i*i;
 		}
@@ -553,9 +556,9 @@ namespace iqs {
 		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
 
 		#pragma omp parallel for
-		for (size_t gid = 0; gid < num_object; ++gid) {
-			real[gid] /= normalization_factor;
-			imag[gid] /= normalization_factor;
+		for (size_t oid = 0; oid < num_object; ++oid) {
+			real[oid] /= normalization_factor;
+			imag[oid] /= normalization_factor;
 		}
 	}
 }

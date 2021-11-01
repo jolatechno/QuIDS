@@ -5,11 +5,11 @@
 namespace iqs::rules::quantum_computer {
 	namespace utils {
 		void print(iqs::it_t const &iter) {
-			for (auto gid = 0; gid < iter.num_object; ++gid) {
+			for (auto oid = 0; oid < iter.num_object; ++oid) {
 				size_t size;
-				auto begin = iter.get_object(gid, size);
+				auto begin = iter.get_object(oid, size);
 
-				std::cout << "\t" << iter.real[gid] << (iter.imag[gid] < 0 ? " - " : " + ") << std::abs(iter.imag[gid]) << "i  ";
+				std::cout << "\t" << iter.real[oid] << (iter.imag[oid] < 0 ? " - " : " + ") << std::abs(iter.imag[oid]) << "i  ";
 				for (auto it = begin; it != begin + size; ++it)
 					std::cout << (*it ? '1' : '0');
 				std::cout << "\n";

@@ -304,8 +304,12 @@ namespace iqs::rules::qcgd {
 		}
 
 		void serialize(iqs::it_t const &iter, iqs::sy_it_t const &sy_it, uint indentation=0) {
-			double interference_ratio = ((double)sy_it.num_object_after_interferences) / ((double)sy_it.num_object);
-			double deletion_ratio = ((double)iter.num_object) / ((double)sy_it.num_object_after_interferences);
+			double interference_ratio = 1;
+			double deletion_ratio = 1; 
+			if (sy_it.num_object > 0) {
+				interference_ratio = ((double)sy_it.num_object_after_interferences) / ((double)sy_it.num_object);
+				deletion_ratio = ((double)iter.num_object) / ((double)sy_it.num_object_after_interferences);
+			}
 
 			double avg_size = 0;
 			double avg_squared_size = 0;
@@ -342,7 +346,9 @@ namespace iqs::rules::qcgd {
 					std::cout << "\t";
 			};
 
-			print_indentation(); std::cout << "{\n";
+			std::cout << "{\n";
+			print_indentation(); std::cout << "\t\"total_proba\" : " << iter.total_proba << ",\n";
+			print_indentation(); std::cout << "\t\"num_graphs\" : " << iter.num_object << ",\n";
 			print_indentation(); std::cout << "\t\"avg_size\" : " << avg_size << ",\n";
 			print_indentation(); std::cout << "\t\"std_dev_size\" : " << std_dev_size << ",\n";
 			print_indentation(); std::cout << "\t\"avg_density\" : " << avg_density << ",\n";
