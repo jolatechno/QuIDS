@@ -529,8 +529,8 @@ namespace iqs::rules::qcgd {
 					first_split_overflow = true;
 
 					/* set particules position */
-					graphs::left(child_begin, num_nodes) = true;
-					graphs::right(child_begin, num_nodes) = false;
+					graphs::left(child_begin, child_num_nodes - 1) = true;
+					graphs::right(child_begin, child_num_nodes - 1) = false;
 					graphs::left(child_begin, 0) = false;
 					graphs::right(child_begin, 0) = true;
 
@@ -780,7 +780,7 @@ namespace iqs::rules::qcgd {
 
 				} else if (rule_name == "erase_create") {
 					erase_create rule(theta, phi, xi);
-					simulator_t previous_result = reversed_result;
+					simulator_t previous_result = result;
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						previous_result(it, buffer, sy_it);
 						for (auto i = 0; i < n_iter; ++i)
@@ -795,7 +795,7 @@ namespace iqs::rules::qcgd {
 						previous_reversed_result(it, buffer, sy_it);
 					};
 
-				} else if (rule_name == "erase_create") {
+				} else if (rule_name == "coin") {
 					coin rule(theta, phi, xi);
 					simulator_t previous_result = result;
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
