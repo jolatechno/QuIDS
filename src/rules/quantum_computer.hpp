@@ -6,11 +6,11 @@ namespace iqs::rules::quantum_computer {
 	namespace utils {
 		void print(iqs::it_t const &iter) {
 			for (auto gid = 0; gid < iter.num_object; ++gid) {
-				auto begin = iter.objects.begin() + iter.object_begin[gid];
-				auto end = iter.objects.begin() + iter.object_begin[gid + 1];
+				size_t size;
+				auto begin = iter.get_object(gid, size);
 
 				std::cout << "\t" << iter.real[gid] << (iter.imag[gid] < 0 ? " - " : " + ") << std::abs(iter.imag[gid]) << "i  ";
-				for (auto it = begin; it != end; ++it)
+				for (auto it = begin; it != begin + size; ++it)
 					std::cout << (*it ? '1' : '0');
 				std::cout << "\n";
 			}
@@ -28,11 +28,11 @@ namespace iqs::rules::quantum_computer {
 
 	public:
 		hadamard(size_t bit_) : bit(bit_) {}
-		inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const override {
 			num_child = 2;
 			max_child_size = std::distance(parent_begin, parent_end);
 		}
-		inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
 			static const PROBA_TYPE sqrt2 = 1/std::sqrt(2);
 			PROBA_TYPE multiplier = parent_begin[bit] && child_id ? -sqrt2 : sqrt2;
 			real *= multiplier; imag *= multiplier;

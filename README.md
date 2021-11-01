@@ -26,7 +26,7 @@ state.append(object_begin, object_end);
 
 /* applying a modifier */
 iqs::simulate(state, my_modifier);
-iqs::simulate(state, [](char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+iqs::simulate(state, [](char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
 		/* using lambda-expressions */
 	});
 
@@ -40,7 +40,7 @@ iqs::simulate(state, rule, buffer, symbolic_iteration);
 A `modifier` is a simple functions that takes a objects, and modify it in place, while keep its size unchanged.
 
 ```cpp
-void my_modifier(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+void my_modifier(char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
 	// modify the object...
 }
 ```
@@ -53,22 +53,22 @@ A `rule` is a simple class, implementing 2 functions (with a third being optiona
 class my_rule : public iqs::rule_t {
 public:
 	my_rule() {};
-	inline void get_num_child(char* parent_begin, char* parent_end, 
+	inline void get_num_child(char const *parent_begin, char const *parent_end, 
 		uint32_t &num_child, size_t &max_child_size) const override;
 
-	inline char* populate_child(char* parent_begin, char* parent_end, 
+	inline char* populate_child(char const *parent_begin, char const *parent_end, 
 		uint32_t child_id, 
 		PROBA_TYPE &real, PROBA_TYPE &imag,
 		char* child_begin) const override;
 
-	inline size_t hasher(char* parent_begin, char* parent_end) const; // optional
+	inline size_t hasher(char const *parent_begin, char const *parent_end) const; // optional
 };
 ```
 
 The first function, `get_num_child(...)`, finds the number of objects created through the unitary transform by a given objects. It also gives an upper-bound to the size of those objects. 
 
 ```cpp
-inline void my_rule::get_num_child(char* parent_begin, char* parent_end,
+inline void my_rule::get_num_child(char const *parent_begin, char const *parent_end,
 	uint32_t &num_child, size_t &max_child_size) const override
 {
 	// do stuff...
@@ -82,7 +82,7 @@ The second function, `populate_child(...)`, simply "populate" (create) an object
 Note that `child_id` is a number from `0` to `num_child`, and simply identify "child" amoung its "siblings" (objects with the same "parent").
 
 ```cpp
-inline char* my_rule::populate_child(char* parent_begin, char* parent_end,
+inline char* my_rule::populate_child(char const *parent_begin, char const *parent_end,
 	uint32_t child_id,
 	PROBA_TYPE &real, PROBA_TYPE &imag,
 	char* child_begin) const override
@@ -96,7 +96,7 @@ inline char* my_rule::populate_child(char* parent_begin, char* parent_end,
 The last function is a hasher for objects. If not specified, the whole memory buffer will simply be hashed. A hasher NEEDS to be provided if objects that are equal can be represented by different objects. The default implementation is:
 
 ```cpp
-inline size_t my_rule::hasher(char* parent_begin, char* parent_end) const override {
+inline size_t my_rule::hasher(char const *parent_begin, char const *parent_end) const override {
 	return std::hash<std::string_view>()(
 		std::string_view(parent_begin, std::distance(parent_begin, parent_end)));
 }

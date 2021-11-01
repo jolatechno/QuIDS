@@ -38,7 +38,7 @@ namespace iqs::rules::qcgd {
 			sub_node(int16_t element) : right_or_type(element_t), hash(element) {
 				hmlz_and_element = element == 0 ? -1 : element + 1;
 			}
-			sub_node(sub_node &node, int16_t type) : right_or_type(type) {
+			sub_node(sub_node const &node, int16_t type) : right_or_type(type) {
 				if (type == dot_l_t && node.hmlz_and_element < 0) {
 					hmlz_and_element = -1;
 				} else
@@ -47,7 +47,7 @@ namespace iqs::rules::qcgd {
 				hash = node.hash;
 				utils::hash_combine(hash, type);
 			}
-			sub_node(sub_node &left, sub_node &right, int16_t right_offset) : right_or_type(right_offset) {
+			sub_node(sub_node const &left, sub_node const &right, int16_t right_offset) : right_or_type(right_offset) {
 				if (left.hmlz_and_element < 0 || right.hmlz_and_element < 0) {
 					hmlz_and_element = -1;
 				} else
@@ -58,7 +58,11 @@ namespace iqs::rules::qcgd {
 			}
 		};
 
-		uint16_t inline &num_nodes(char* object_begin) {
+		uint16_t inline &num_nodes(char *object_begin) {
+			return *((uint16_t*)object_begin);
+		}
+
+		uint16_t inline const num_nodes(char const *object_begin) {
 			return *((uint16_t*)object_begin);
 		}
 
@@ -67,23 +71,43 @@ namespace iqs::rules::qcgd {
 			auto offset = sizeof(uint16_t) + 2*num_nodes_;
 			return (uint16_t*)(object_begin + offset);
 		}
+		uint16_t inline const *node_name_begin(char const *object_begin) {
+			uint16_t num_nodes_ = num_nodes(object_begin);
+			auto offset = sizeof(uint16_t) + 2*num_nodes_;
+			return (const uint16_t*)(object_begin + offset);
+		}
 		uint16_t inline &node_name_begin(char *object_begin, int node) { return node_name_begin(object_begin)[node]; }
+		uint16_t inline const node_name_begin(char const *object_begin, int node) { return node_name_begin(object_begin)[node]; }
+
 
 		sub_node inline *node_name(char *object_begin) {
 			uint16_t num_nodes_ = num_nodes(object_begin);
 			auto offset = 2*sizeof(uint16_t) + (2 + sizeof(uint16_t))*num_nodes_;
 			return (sub_node*)(object_begin + offset);
+		}
+		sub_node inline const *node_name(char const *object_begin) {
+			uint16_t num_nodes_ = num_nodes(object_begin);
+			auto offset = 2*sizeof(uint16_t) + (2 + sizeof(uint16_t))*num_nodes_;
+			return (const sub_node*)(object_begin + offset);
 		} 
 		sub_node inline &node_name(char *object_begin, int node) { return node_name(object_begin)[node]; }
+		sub_node inline const node_name(char const *object_begin, int node) { return node_name(object_begin)[node]; }
 
 		bool inline *left(char *object_begin) { return (bool*)(object_begin + sizeof(uint16_t)); }
+		bool inline const *left(char const *object_begin) { return (const bool*)(object_begin + sizeof(uint16_t)); }
 		bool inline &left(char *object_begin, int node) { return left(object_begin)[node]; }
+		bool inline const left(char const *object_begin, int node) { return left(object_begin)[node]; }
 
 		bool inline *right(char *object_begin) {
 			uint16_t num_nodes_ = num_nodes(object_begin);
 			return (bool*)(object_begin + sizeof(uint16_t) + num_nodes_);
 		}
+		bool inline const *right(char const *object_begin) {
+			uint16_t num_nodes_ = num_nodes(object_begin);
+			return (const bool*)(object_begin + sizeof(uint16_t) + num_nodes_);
+		}
 		bool inline &right(char *object_begin, int node) { return right(object_begin)[node]; }
+		bool inline const right(char const *object_begin, int node) { return right(object_begin)[node]; }
 
 		void inline randomize(char *object_begin) {
 			uint16_t num_nodes_ = num_nodes(object_begin);
@@ -93,17 +117,17 @@ namespace iqs::rules::qcgd {
 			}
 		}
 
-		size_t inline hash_graph(char *object_begin) {
+		size_t inline hash_graph(char const *object_begin) {
 			size_t left_hash = 0;
 			size_t right_hash = 0;
 			size_t name_hash = 0;
 
-			bool *left_ = left(object_begin);
-			bool *right_ = right(object_begin);
-			auto *node_begin = node_name_begin(object_begin);
-			auto *node_name_ = node_name(object_begin);
+			bool const *left_ = left(object_begin);
+			bool const *right_ = right(object_begin);
+			auto const *node_begin = node_name_begin(object_begin);
+			auto const *node_name_ = node_name(object_begin);
 
-			uint16_t num_nodes_ = num_nodes(object_begin);
+			uint16_t const num_nodes_ = num_nodes(object_begin);
 			for (auto i = 0; i < num_nodes_; ++i) {
 				if (left_[i])
 					utils::hash_combine(left_hash, i);
@@ -135,7 +159,7 @@ namespace iqs::rules::qcgd {
 		}
 
 		template<class T>
-		T inline *copy(T *parent_begin, T* parent_end, T* child_begin) {
+		T inline *copy(T const *parent_begin, T const *parent_end, T* child_begin) {
 			for (auto it = parent_begin; it != parent_end; ++it)
 				*(child_begin++) = *it;
 			return child_begin;
@@ -145,15 +169,15 @@ namespace iqs::rules::qcgd {
 			return object_begin->hmlz_and_element < 0;
 		}
 
-		void inline get_operations(char *parent_begin, uint16_t node, bool &split, bool &merge) {
+		void inline get_operations(char const *parent_begin, uint16_t node, bool &split, bool &merge) {
 			merge = false;
 			split = graphs::left(parent_begin, node) && graphs::right(parent_begin, node);
 			if (!split && node + 1 < graphs::num_nodes(parent_begin))
 				merge = graphs::left(parent_begin, node) && graphs::right(parent_begin, node + 1) && !graphs::left(parent_begin, node + 1);
 		}
 
-		graphs::sub_node inline *merge(graphs::sub_node *left_begin, graphs::sub_node *left_end,
-			graphs::sub_node* right_begin, graphs::sub_node *right_end,
+		graphs::sub_node inline *merge(graphs::sub_node const *left_begin, graphs::sub_node const *left_end,
+			graphs::sub_node const *right_begin, graphs::sub_node const *right_end,
 			graphs::sub_node *child_begin) {
 
 			if (left_begin->right_or_type == graphs::dot_l_t && right_begin->right_or_type == graphs::dot_r_t)
@@ -165,7 +189,7 @@ namespace iqs::rules::qcgd {
 			return copy(right_begin, right_end, child_begin);
 		}
 
-		graphs::sub_node inline *left(graphs::sub_node *parent_begin, graphs::sub_node *parent_end, graphs::sub_node *child_begin) {
+		graphs::sub_node inline *left(graphs::sub_node const *parent_begin, graphs::sub_node const *parent_end, graphs::sub_node *child_begin) {
 			if (parent_begin->right_or_type >= 0) 
 				return copy(parent_begin + 1, parent_begin + parent_begin->right_or_type, child_begin);
 
@@ -173,7 +197,7 @@ namespace iqs::rules::qcgd {
 			return copy(parent_begin, parent_end, child_begin);
 		}
 
-		graphs::sub_node inline *right(graphs::sub_node *parent_begin, graphs::sub_node *parent_end, graphs::sub_node *child_begin) {
+		graphs::sub_node inline *right(graphs::sub_node const *parent_begin, graphs::sub_node const *parent_end, graphs::sub_node *child_begin) {
 			if (parent_begin->right_or_type >= 0)
 				return copy(parent_begin + parent_begin->right_or_type, parent_end, child_begin);
 
@@ -189,7 +213,7 @@ namespace iqs::rules::qcgd {
 
 		void set_max_print_num_graphs(size_t val) { max_print_num_graphs = val; }
 
-		void inline make_graph(char* &object_begin, char* &object_end, uint16_t size) {
+		void make_graph(char* &object_begin, char* &object_end, uint16_t size) {
 			static auto per_node_size = 2 + sizeof(uint16_t) + sizeof(graphs::sub_node);
 			auto object_size = 2*sizeof(uint16_t) + per_node_size*size;
 
@@ -208,14 +232,15 @@ namespace iqs::rules::qcgd {
 		}
 
 		void randomize(iqs::it_t &iter) {
+			size_t size;
 			for (auto gid = 0; gid < iter.num_object; ++gid) {
-				auto begin = iter.objects.begin() + iter.object_begin[gid];
+				auto begin = iter.get_object(gid, size);
 				graphs::randomize(begin);
 			}
 		}
 
 		void print(iqs::it_t const &iter) {
-			static std::function<void(graphs::sub_node*)> print_node_name = [](graphs::sub_node *sub_node) {
+			static std::function<void(graphs::sub_node const*)> print_node_name = [](graphs::sub_node const *sub_node) {
 				if (sub_node->right_or_type == graphs::element_t) {
 					std::cout << std::abs(sub_node->hmlz_and_element) - 1;
 
@@ -254,10 +279,10 @@ namespace iqs::rules::qcgd {
 			for (auto i = 0; i < num_prints; ++i) {
 				size_t gid = gids[i];
 
-				auto begin = iter.objects.begin() + iter.object_begin[gid];
-				auto end = iter.objects.begin() + iter.object_begin[gid + 1];
+				size_t size;
+				const char* begin = iter.get_object(gid, size);
 
-				uint16_t num_nodes = graphs::num_nodes(begin);
+				uint16_t const num_nodes = graphs::num_nodes(begin);
 
 				PROBA_TYPE real = std::abs(iter.real[gid]) < iqs::tolerance ? 0 : iter.real[gid];
 				PROBA_TYPE imag = std::abs(iter.imag[gid]) < iqs::tolerance ? 0 : iter.imag[gid];
@@ -277,9 +302,58 @@ namespace iqs::rules::qcgd {
 			if (num_prints < iter.num_object)
 				std::cout << "\t...and " << iter.num_object - num_prints << " other graphs\n";
 		}
+
+		void serialize(iqs::it_t const &iter, iqs::sy_it_t const &sy_it, uint indentation=0) {
+			double interference_ratio = ((double)sy_it.num_object_after_interferences) / ((double)sy_it.num_object);
+			double deletion_ratio = ((double)iter.num_object) / ((double)sy_it.num_object_after_interferences);
+
+			double avg_size = 0;
+			double avg_squared_size = 0;
+			double avg_density = 0;
+			double avg_squared_density = 0;
+
+			for (auto gid = 0; gid < iter.num_object; ++gid) {
+				size_t size;
+				const char* begin = iter.get_object(gid, size);
+
+				uint16_t const num_nodes = graphs::num_nodes(begin);
+				double double_num_nodes = num_nodes;
+
+				PROBA_TYPE r = iter.real[gid];
+				PROBA_TYPE i = iter.imag[gid];
+				double proba = r*r + i*i;
+
+				double density = 0;
+				for (auto i = 0; i < num_nodes; ++i)
+					density += graphs::left(begin, i); + graphs::right(begin, i);
+				density /= 2*double_num_nodes;
+
+				avg_size += proba*double_num_nodes;
+				avg_squared_size += proba*double_num_nodes*double_num_nodes;
+				avg_density += proba*density;
+				avg_squared_density += proba*density*density;
+			}
+
+			double std_dev_size = std::sqrt(avg_squared_size - avg_size*avg_size);
+			double std_dev_density = std::sqrt(avg_squared_density - avg_density*avg_density);
+
+			auto const print_indentation = [=]() {
+				for (auto i = 0; i < indentation; ++i)
+					std::cout << "\t";
+			};
+
+			print_indentation(); std::cout << "{\n";
+			print_indentation(); std::cout << "\t\"avg_size\" : " << avg_size << ",\n";
+			print_indentation(); std::cout << "\t\"std_dev_size\" : " << std_dev_size << ",\n";
+			print_indentation(); std::cout << "\t\"avg_density\" : " << avg_density << ",\n";
+			print_indentation(); std::cout << "\t\"std_dev_density\" : " << std_dev_density << ",\n";
+			print_indentation(); std::cout << "\t\"interference_ratio\" : " << interference_ratio << ",\n";
+			print_indentation(); std::cout << "\t\"deletion_ratio\" : " << deletion_ratio << "\n";
+			print_indentation(); std::cout << "}";
+		}
 	}
 
-	void step(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+	void step(char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
 		uint16_t num_nodes = graphs::num_nodes(parent_begin);
 		auto left_ = graphs::left(parent_begin);
 		auto right_ = graphs::right(parent_begin);
@@ -287,7 +361,7 @@ namespace iqs::rules::qcgd {
 		std::rotate(right_, right_ + num_nodes - 1, right_ + num_nodes);
 	}
 
-	void reversed_step(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+	void reversed_step(char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
 		uint16_t num_nodes = graphs::num_nodes(parent_begin);
 		auto left_ = graphs::left(parent_begin);
 		auto right_ = graphs::right(parent_begin);
@@ -308,10 +382,10 @@ namespace iqs::rules::qcgd {
 			do_not_real = std::cos(theta) * std::cos(xi);
 			do_not_imag = std::cos(theta) * std::sin(xi);
 		}
-		inline size_t hasher(char* parent_begin, char* parent_end) const override {
+		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
 		}
-		inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const override {
 			max_child_size = std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -323,7 +397,7 @@ namespace iqs::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
 			char* child_end = operations::copy(parent_begin, parent_end, child_begin);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -361,10 +435,10 @@ namespace iqs::rules::qcgd {
 			do_not_real = std::cos(theta) * std::cos(xi);
 			do_not_imag = std::cos(theta) * std::sin(xi);
 		}
-		inline size_t hasher(char* parent_begin, char* parent_end) const override {
+		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
 		}
-		inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const override {
 			max_child_size = std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -376,7 +450,7 @@ namespace iqs::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
 			char* child_end = operations::copy(parent_begin, parent_end, child_begin);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -413,10 +487,10 @@ namespace iqs::rules::qcgd {
 			do_not_real = std::cos(theta) * std::cos(xi);
 			do_not_imag = std::cos(theta) * std::sin(xi);
 		}
-		inline size_t hasher(char* parent_begin, char* parent_end) const override {
+		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
 		}
-		inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const override {
 			max_child_size = 4*std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -436,7 +510,7 @@ namespace iqs::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 
 			/* check for first split or last merge */

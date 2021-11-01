@@ -87,9 +87,9 @@ namespace iqs {
 	class rule {
 	public:
 		rule() {};
-		virtual inline void get_num_child(char* parent_begin, char* parent_end, uint32_t &num_child, size_t &max_child_size) const = 0;
-		virtual inline char* populate_child(char* parent_begin, char* parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const = 0;
-		virtual inline size_t hasher(char* parent_begin, char* parent_end) const { //can be overwritten
+		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const = 0;
+		virtual inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const = 0;
+		virtual inline size_t hasher(char const *parent_begin, char const *parent_end) const { //can be overwritten
 			return std::hash<std::string_view>()(std::string_view(parent_begin, std::distance(parent_begin, parent_end)));
 		}
 	};
@@ -99,17 +99,17 @@ namespace iqs {
 	*/
 	class iteration {
 		friend symbolic_iteration;
+		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 
-	//protected:
 	public:
 		size_t num_object = 0;
 		PROBA_TYPE total_proba = 1;
 
 		utils::numa_vector<PROBA_TYPE> real, imag;
-		utils::numa_vector<char> objects;
-		utils::numa_vector<size_t> object_begin;
 
 	private:
+		utils::numa_vector<char> objects;
+		utils::numa_vector<size_t> object_begin;
 		mutable utils::numa_vector<uint32_t> num_childs;
 
 		void inline resize(size_t num_object) const {
@@ -145,6 +145,17 @@ namespace iqs {
 			real[num_object - 1] = real_; imag[num_object - 1] = imag_;
 			object_begin[num_object] = offset + size;
 		}
+		char* get_object(size_t object_id, size_t &object_size) {
+			size_t this_object_begin = object_begin[object_id];
+			object_size = object_begin[object_id + 1] - this_object_begin;
+			return objects.begin() + this_object_begin;
+		}
+		char const* get_object(size_t object_id, size_t &object_size) const {
+			size_t this_object_begin = object_begin[object_id];
+			object_size = object_begin[object_id + 1] - this_object_begin;
+			return objects.begin() + this_object_begin;
+		}
+
 		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const;
 		void apply_modifier(modifier_t const rule);
 		void normalize();
@@ -157,7 +168,6 @@ namespace iqs {
 		friend iteration;
 		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 
-	//protected:
 	public:
 		size_t num_object = 0;
 		size_t num_object_after_interferences = 0;

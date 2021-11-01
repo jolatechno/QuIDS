@@ -14,8 +14,8 @@ int main(int argc, char* argv[]) {
 
 	/* constructing a starting state with different size state */
 	iqs::it_t state;
-	char starting_state_1[] = {true, true, false, false};
-	char starting_state_2[] = {false, true, true, false, true};
+	char starting_state_1[4] = {true, true, false, false};
+	char starting_state_2[5] = {false, true, true, false, true};
 	state.append(starting_state_1, starting_state_1 + 4, 1/std::sqrt(2), 0);
 	state.append(starting_state_2, starting_state_2 + 5, 0, 1/std::sqrt(2));
 	std::cout << "initial_state:\n"; iqs::rules::quantum_computer::utils::print(state);
