@@ -7,9 +7,10 @@ namespace iqs::rules::quantum_computer {
 		void print(iqs::it_t const &iter) {
 			for (auto oid = 0; oid < iter.num_object; ++oid) {
 				size_t size;
-				auto begin = iter.get_object(oid, size);
+				PROBA_TYPE real, imag;
+				auto begin = iter.get_object(oid, size, real, imag);
 
-				std::cout << "\t" << iter.real[oid] << (iter.imag[oid] < 0 ? " - " : " + ") << std::abs(iter.imag[oid]) << "i  ";
+				std::cout << "\t" << real << (imag < 0 ? " - " : " + ") << std::abs(imag) << "i  ";
 				for (auto it = begin; it != begin + size; ++it)
 					std::cout << (*it ? '1' : '0');
 				std::cout << "\n";

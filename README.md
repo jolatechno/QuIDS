@@ -102,7 +102,119 @@ inline size_t my_rule::hasher(char const *parent_begin, char const *parent_end) 
 }
 ```
 
+### Interaction with the different classes
+
+We can see that a quantum state is represented by a specific `iteration` class, and a `symbolic_iteration` is generated when applying a unitary transformation on a state. We interact with those classes (modify or read a state, ect...) through public member functions and variables, which will be shortly documented bellow, as they are vital to building a __usefull__ program using `IQS`.
+
+#### Symbolic iteration
+
+```cpp
+typedef class symbolic_iteration sy_it_t;
+
+class symbolic_iteration {
+public:
+	size_t num_object = 0;
+	size_t num_object_after_interferences = 0;
+
+	symbolic_iteration() {}
+
+private:
+	/*...*/
+};
+```
+
+The `symbolic_iteration` class (or `sy_it_t` type) only has a basic constructor, as it is only ment to be used internaly.
+
+Member variables are:
+- `num_object` : Number of objects generated at symbolic iteration (before interferences and truncation).
+- `num_object_after_interferences` : Number of objects after eliminating duplicates (so called "interferences"), but before truncation.
+
+#### Iteration
+
+```cpp
+typedef class iteration it_t;
+
+class iteration {
+public:
+	size_t num_object = 0;
+	PROBA_TYPE total_proba = 1;
+
+	iteration();
+	iteration(char* object_begin_, char* object_end_);
+
+	void append(char* object_begin_, char* object_end_, PROBA_TYPE real_ = 1, PROBA_TYPE imag_ = 0);
+	char* get_object(size_t object_id, size_t &object_size, PROBA_TYPE *&real_, PROBA_TYPE *&imag_);
+	char const* get_object(size_t object_id, size_t &object_size, PROBA_TYPE &real_, PROBA_TYPE &imag_) const;
+
+private:
+	/*...*/
+};
+```
+
+The `iteration` class (or `it_t` type) has two constructors, a basic one, and one that simply takes a starting object and append it to the state with probability one.
+
+Member functions are:
+- `append(...)` : Append an object to the state, with a give magnitude (default = 1).
+- `get_object(...)` : Allows to read (either as constant or not) an objects and its magnitude, with a given `object_id` between 0 and `num_object`. Note that the non-constant function takes pointers for `real` and `imag`.
+
+Member variables are:
+- `num_object` : Number of object describing this state currently in superposition.
+- `total_proba` : total probability held by this state before normalizing it (so after truncation).
+
+### Global parameters
+
+In addition to classes, some global parameters are used to modify the behaviour of the simulation.
+
+```cpp
+namespace iqs {
+	void set_tolerance(PROBA_TYPE val) { /* ... */ } // default is TOLERANCE
+	void set_safety_margin(float val) { /* ... */ } // default is SAFETY_MARGIN
+	void set_collision_test_proportion(float val) { /* ... */ } // default is COLLISION_TEST_PROPORTION
+	void set_collision_tolerance(float val) { /* ... */ } // default is COLLISION_TOLERANCE
+
+	namespace utils {
+		float upsize_policy = UPSIZE_POLICY;
+		float downsize_policy = DOWNSIZE_POLICY;
+		size_t min_vector_size = MIN_VECTOR_SIZE;
+
+		/* ... */
+	}
+
+	/* ... */
+}
+```
+
+The default value of any of those variable can be altered at compilation, by passing an uppercase flag with the same name as the desired variable.
+
+#### tolerance
+
+`tolerance` (which is only accessible through `set_tolerance()`) represents the minimum probability considered non-zero (default is `1e-18`, to compensate for numerical errors).
+
+#### safety margin
+
+`safety_margin` (which is only accessible through `set_safety_margin()`) represents the target proportion of memory to keep free (default is `0.2` for 20%).
+
+#### collision test proportion and collision tolerance
+
+`collision_test_proportion` (which is only accessible through `set_safety_margin()`) represents the proportion of objects for which with first remove duplicates, we then continue removing duplicates only if the proportion of duplicates is greater than `collision_tolerance` (which is itself only accessible through `set_collision_tolerance()`).
+
+`collision_test_proportion` has a default of  `0.1` and `collision_tolerance` has a default of `0.05`.
+
+#### upsize policy
+
+`utils::upsize_policy` represent the multiplier applied when upsizing a vector (the default is `1.1`). It avoid frequent upsizing by giving a small margin.
+
+#### downsize policy
+
+`utils::downsize_policy` reprensent the threshold multiplier to downsize a vector (the default is `0.85`). A vector won't be downsized until the requested size is smaller than this ultiplier times the capacity of the given vector.
+
+__!! this multiplier should always be smaller than the inverse of upsize_policy to avoid constant upsizing and downsizing !!__
+
+#### min vector size
+
+`utils::min_vector_size` represent the minimum size of any vector (the default is `100000`).
+
 ## TODOS
 
 - implementing (basic) `MPI` support.
-- implementing a third kinf of unitary transform, discribing a transformation that doesn't change the size of an object (removing the need for a symbolic iteration).
+- implementing a third kind of unitary transform, discribing a transformation that doesn't change the size of an object (removing the need for a symbolic iteration).

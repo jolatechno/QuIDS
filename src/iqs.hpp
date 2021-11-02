@@ -100,14 +100,11 @@ namespace iqs {
 	class iteration {
 		friend symbolic_iteration;
 		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
-
-	public:
-		size_t num_object = 0;
-		PROBA_TYPE total_proba = 1;
-
-		utils::numa_vector<PROBA_TYPE> real, imag;
+		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function);  
+		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
 	private:
+		utils::numa_vector<PROBA_TYPE> real, imag;
 		utils::numa_vector<char> objects;
 		utils::numa_vector<size_t> object_begin;
 		mutable utils::numa_vector<uint32_t> num_childs;
@@ -122,7 +119,14 @@ namespace iqs {
 			objects.resize(size);
 		}
 
+		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const;
+		void apply_modifier(modifier_t const rule);
+		void normalize();
+
 	public:
+		size_t num_object = 0;
+		PROBA_TYPE total_proba = 1;
+
 		iteration() {
 			resize(0);
 			allocate(0);
@@ -145,20 +149,18 @@ namespace iqs {
 			real[num_object - 1] = real_; imag[num_object - 1] = imag_;
 			object_begin[num_object] = offset + size;
 		}
-		char* get_object(size_t object_id, size_t &object_size) {
+		char* get_object(size_t object_id, size_t &object_size, PROBA_TYPE *&real_, PROBA_TYPE *&imag_) {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
+			real_ = &real[object_id]; imag_ = &imag[object_id];
 			return objects.begin() + this_object_begin;
 		}
-		char const* get_object(size_t object_id, size_t &object_size) const {
+		char const* get_object(size_t object_id, size_t &object_size, PROBA_TYPE &real_, PROBA_TYPE &imag_) const {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
+			real_ = real[object_id]; imag_ = imag[object_id];
 			return objects.begin() + this_object_begin;
 		}
-
-		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const;
-		void apply_modifier(modifier_t const rule);
-		void normalize();
 	};
 
 	/*
@@ -167,10 +169,7 @@ namespace iqs {
 	class symbolic_iteration {
 		friend iteration;
 		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
-
-	public:
-		size_t num_object = 0;
-		size_t num_object_after_interferences = 0;
+		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function); 
 
 	private:
 		tbb::concurrent_hash_map<size_t, size_t> elimination_map;
@@ -207,10 +206,14 @@ namespace iqs {
 			}
 		}
 
-	public:
-		symbolic_iteration() {}
 		void compute_collisions();
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function);
+
+	public:
+		size_t num_object = 0;
+		size_t num_object_after_interferences = 0;
+
+		symbolic_iteration() {}
 	};
 
 	/*

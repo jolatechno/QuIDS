@@ -233,8 +233,9 @@ namespace iqs::rules::qcgd {
 
 		void randomize(iqs::it_t &iter) {
 			size_t size;
+			PROBA_TYPE *real, *imag;
 			for (auto gid = 0; gid < iter.num_object; ++gid) {
-				auto begin = iter.get_object(gid, size);
+				char *begin = iter.get_object(gid, size, real, imag);
 				graphs::randomize(begin);
 			}
 		}
@@ -266,11 +267,11 @@ namespace iqs::rules::qcgd {
 			size_t *gids = new size_t[iter.num_object];
 			std::iota(gids, gids + iter.num_object, 0);
 			__gnu_parallel::sort(gids, gids + iter.num_object, [&](size_t gid1, size_t gid2) {
-				PROBA_TYPE r1 = iter.real[gid1];
-				PROBA_TYPE i1 = iter.imag[gid1];
+				size_t size;
 
-				PROBA_TYPE r2 = iter.real[gid2];
-				PROBA_TYPE i2 = iter.imag[gid2];
+				PROBA_TYPE r1, r2, i1, i2;
+				iter.get_object(gid1, size, r1, i1);
+				iter.get_object(gid2, size, r2, i2);
 
 				return r1*r1 + i1*i1 > r2*r2 + i2*i2;
 			});
@@ -280,12 +281,13 @@ namespace iqs::rules::qcgd {
 				size_t gid = gids[i];
 
 				size_t size;
-				const char* begin = iter.get_object(gid, size);
+				PROBA_TYPE real, imag;
+				const char* begin = iter.get_object(gid, size, real, imag);
 
 				uint16_t const num_nodes = graphs::num_nodes(begin);
 
-				PROBA_TYPE real = std::abs(iter.real[gid]) < iqs::tolerance ? 0 : iter.real[gid];
-				PROBA_TYPE imag = std::abs(iter.imag[gid]) < iqs::tolerance ? 0 : iter.imag[gid];
+				real = std::abs(real) < iqs::tolerance ? 0 : real;
+				imag = std::abs(imag) < iqs::tolerance ? 0 : imag;
 
 				std::cout << "\t" << real << (imag < 0 ? " - " : " + ") << std::abs(imag) << "i  ";
 
@@ -318,14 +320,13 @@ namespace iqs::rules::qcgd {
 
 			for (auto gid = 0; gid < iter.num_object; ++gid) {
 				size_t size;
-				const char* begin = iter.get_object(gid, size);
+				PROBA_TYPE r, i;
+				const char* begin = iter.get_object(gid, size, r, i);
+
+				double proba = r*r + i*i;
 
 				uint16_t const num_nodes = graphs::num_nodes(begin);
 				double double_num_nodes = num_nodes;
-
-				PROBA_TYPE r = iter.real[gid];
-				PROBA_TYPE i = iter.imag[gid];
-				double proba = r*r + i*i;
 
 				double density = 0;
 				for (auto i = 0; i < num_nodes; ++i)
@@ -811,8 +812,8 @@ namespace iqs::rules::qcgd {
 			while ((string_arg = strip(string_args, ";")) != "") {
 				int n_node = std::atoi(strip(string_arg, ",").c_str());
 				int n_graphs = parse_int_with_default(string_arg, "n_graphs=", ",", 1);
-				float real = parse_float_with_default(string_arg, "real=", ",", 1);
-				float imag = parse_float_with_default(string_arg, "imag=", ",", 0);
+				float real = parse_float_with_default(string_arg, "real=", ",", 1) / std::sqrt((float)n_graphs);
+				float imag = parse_float_with_default(string_arg, "imag=", ",", 0) / std::sqrt((float)n_graphs);
 
 				for (auto i = 0; i < n_graphs; ++i) {
 					char *begin, *end;
@@ -822,7 +823,6 @@ namespace iqs::rules::qcgd {
 			}
 
 			utils::randomize(state);
-			state.normalize();
 
 			return state;
 		}
