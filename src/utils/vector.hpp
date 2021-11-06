@@ -132,7 +132,7 @@ public:
     		// iota anyway
     		#pragma omp parallel for schedule(static)
 			for (size_t i = 0; i < size_; ++i)
-				ptr[i] = i;
+				ptr[i] = 0;
     }
  
     // Begin iterator

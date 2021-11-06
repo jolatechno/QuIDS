@@ -51,7 +51,7 @@ Simulations can also be done across nodes. For that, you'll need to replace `iqs
 int main(int argc, char* argv[]) {
 	/* MPI initialization */
 	int size, rank;
-    MPI_Init(&argc, &argv);
+	MPI_Init(&argc, &argv);
 
 	/* variables*/
 	iqs::mpi::mpi_it_t buffer, state;
