@@ -52,7 +52,6 @@ int main(int argc, char* argv[]) {
 	/* MPI initialization */
 	int size, rank;
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 	/* variables*/
 	iqs::mpi::mpi_it_t buffer, state;
@@ -70,6 +69,8 @@ int main(int argc, char* argv[]) {
 	/* applying a rule */
 	iqs::rule_t *rule = new my_rule(/*...*/);
 	iqs::mpi::simulate(state, rule, buffer, symbolic_iteration, MPI_COMM_WORLD);
+
+	MPI_Finalize();
 }
 ```
 
