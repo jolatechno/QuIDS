@@ -17,22 +17,60 @@ Objects are represented by a simple begin and end pointer. Their exist two kind 
 `modifiers` and `rules` are applied using the `iqs::simulate(...)` function:
 
 ```cpp
-/* variables*/
-iqs::it_t buffer, state;
-iqs::sy_it_t symbolic_iteration;
+#include "src/iqs.hpp"
 
-/* initializing the state */
-state.append(object_begin, object_end);
+int main(int argc, char* argv[]) {
+	/* variables*/
+	iqs::it_t buffer, state;
+	iqs::sy_it_t symbolic_iteration;
 
-/* applying a modifier */
-iqs::simulate(state, my_modifier);
-iqs::simulate(state, [](char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
-		/* using lambda-expressions */
-	});
+	/* initializing the state */
+	state.append(object_begin, object_end);
 
-/* applying a rule */
-iqs::rule_t *rule = new my_rule(/*...*/);
-iqs::simulate(state, rule, buffer, symbolic_iteration);
+	/* applying a modifier */
+	iqs::simulate(state, my_modifier);
+	iqs::simulate(state, [](char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+			/* using lambda-expressions */
+		});
+
+	/* applying a rule */
+	iqs::rule_t *rule = new my_rule(/*...*/);
+	iqs::simulate(state, rule, buffer, symbolic_iteration);
+}
+```
+
+### MPI support
+
+__!!! MPI support is currently being added to this branch, it will be merged with the main branch, and a new release will be created when MPI is fully supported !!!__
+
+Simulations can also be done across nodes. For that, you'll need to replace `iqs::sy_it` and `iqs::it_t` respectivly by `iqs::mpi::mpi_sy_it` and `iqs::mpi::mpi_it_t`. 
+
+```cpp
+#include "src/iqs_mpi.hpp"
+
+int main(int argc, char* argv[]) {
+	/* MPI initialization */
+	int size, rank;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+	/* variables*/
+	iqs::mpi::mpi_it_t buffer, state;
+	iqs::mpi::mpi_sy_it_t symbolic_iteration;
+
+	/* initializing the state */
+	state.append(object_begin, object_end);
+
+	/* applying a modifier */
+	iqs::simulate(state, my_modifier);
+	iqs::simulate(state, [](char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+			/* using lambda-expressions */
+		});
+
+	/* applying a rule */
+	iqs::rule_t *rule = new my_rule(/*...*/);
+	iqs::mpi::simulate(state, rule, buffer, symbolic_iteration, MPI_COMM_WORLD);
+}
 ```
 
 ### Modifiers
@@ -161,6 +199,46 @@ Member variables are:
 - `num_object` : Number of object describing this state currently in superposition.
 - `total_proba` : total probability held by this state before normalizing it (so after truncation).
 
+#### MPI symbolic iteration
+
+```cpp
+typedef class mpi_symbolic_iteration mpi_sy_it_t;
+
+class mpi_symbolic_iteration : public iqs::symbolic_iteration {
+public:
+	mpi_symbolic_iteration() {}
+
+private:
+	/*...*/
+};
+```
+
+The `mpi_symbolic_iteration` class (or `mpi_sy_it_t` type) can be considered as exactly equivalent to the `symbolic_iteration` class (or `sy_it_t` type).
+
+#### MPI iteration
+
+```cpp
+typedef class mpi_iteration mpi_it_t;
+
+class mpi_iteration : public iqs::iteration {
+public:
+	mpi_iteration() {}
+	mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
+
+	void distribute_objects(MPI_Comm comunicator, int node_id);
+	void gather_objects(MPI_Comm comunicator, int node_id);
+
+private:
+	/*...*/
+};
+```
+
+The `mpi_iteration` class (or `mpi_it_t` type) inehrits all the public memeber functions and varibale of the `iteration` class (or `it_t` type), and shares similar constructors.
+
+The additional member functions are:
+- `distribute_objects(..)` : distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes.
+- `gather_objects(...)` : gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined.
+
 ### Global parameters
 
 In addition to classes, some global parameters are used to modify the behaviour of the simulation.
@@ -200,6 +278,10 @@ The default value of any of those variable can be altered at compilation, by pas
 
 `collision_test_proportion` has a default of  `0.1` and `collision_tolerance` has a default of `0.05`.
 
+#### min vector size
+
+`utils::min_vector_size` represent the minimum size of any vector (the default is `100000`).
+
 #### upsize policy
 
 `utils::upsize_policy` represent the multiplier applied when upsizing a vector (the default is `1.1`). It avoid frequent upsizing by giving a small margin.
@@ -208,11 +290,7 @@ The default value of any of those variable can be altered at compilation, by pas
 
 `utils::downsize_policy` reprensent the threshold multiplier to downsize a vector (the default is `0.85`). A vector won't be downsized until the requested size is smaller than this ultiplier times the capacity of the given vector.
 
-__!! this multiplier should always be smaller than the inverse of upsize_policy to avoid constant upsizing and downsizing !!__
-
-#### min vector size
-
-`utils::min_vector_size` represent the minimum size of any vector (the default is `100000`).
+__!! this multiplier should always be smaller than the inverse of upsize_policy to avoid upsizing-downsizing loop !!__
 
 ## TODOS
 

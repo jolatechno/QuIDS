@@ -103,7 +103,7 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function);  
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
-	private:
+	protected:
 		utils::numa_vector<PROBA_TYPE> real, imag;
 		utils::numa_vector<char> objects;
 		utils::numa_vector<size_t> object_begin;
@@ -171,7 +171,7 @@ namespace iqs {
 		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function); 
 
-	private:
+	protected:
 		tbb::concurrent_hash_map<size_t, size_t> elimination_map;
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 
@@ -290,7 +290,12 @@ namespace iqs {
 	generate symbolic iteration
 	*/
 	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) const {
-		size_t max_size = 0;
+		if (num_object == 0) {
+			symbolic_iteration.num_object = 0;
+			return;
+		}
+
+		size_t max_size;
 
 		mid_step_function(0);
 
@@ -368,6 +373,9 @@ namespace iqs {
 	compute interferences
 	*/
 	void symbolic_iteration::compute_collisions() {
+		if (num_object == 0)
+			return;
+
 		bool fast = false;
 		bool skip_test = num_object < utils::min_vector_size;
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
@@ -448,6 +456,11 @@ namespace iqs {
 	finalize iteration
 	*/
 	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](int){}) {
+		if (num_object == 0) {
+			next_iteration.num_object = 0;
+			return;
+		}
+		
 		mid_step_function(4);
 
 		/* !!!!!!!!!!!!!!!!
