@@ -1,4 +1,4 @@
-# Irregular Quantum Simulator
+# Irregular Quantum Simulator 
 
 ## Installation
 
