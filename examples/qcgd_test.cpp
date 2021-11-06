@@ -45,5 +45,5 @@ int main(int argc, char* argv[]) {
 	reversed_split_merge(state, buffer, sy_it);
 	reversed_erase_create(state, buffer, sy_it);
 	reversed_step(state, buffer, sy_it);
-	std::cout << "\napplied all previous gates in reverse order (P=" << state.total_proba << "):\n";  iqs::rules::qcgd::utils::print(state);
+	std::cout << "\napplied all previous gates in reverse order (P=" << state.total_proba << "):\n"; iqs::set_tolerance(1e-8); iqs::rules::qcgd::utils::print(state);
 }

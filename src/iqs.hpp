@@ -123,6 +123,8 @@ namespace iqs {
 		void apply_modifier(modifier_t const rule);
 		void normalize();
 
+		long long int memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
+
 	public:
 		size_t num_object = 0;
 		PROBA_TYPE total_proba = 1;
@@ -209,6 +211,8 @@ namespace iqs {
 		void compute_collisions();
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function);
 
+		long long int memory_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+
 	public:
 		size_t num_object = 0;
 		size_t num_object_after_interferences = 0;
@@ -220,9 +224,6 @@ namespace iqs {
 	for memory managment
 	*/
 	long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
-		static long long int iteration_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-		static long long int symbolic_iteration_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
-
 		// get the free memory and the total amount of memory...
 		long long int total_memory, free_mem;
 		utils::get_mem_usage_and_free_mem(total_memory, free_mem);
@@ -232,8 +233,8 @@ namespace iqs {
 
 		// get the total memory
 		long long int total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
-			(last_iteration.real.size() + next_iteration.real.size())*iteration_size + // size of properties
-			symbolic_iteration.real.size()*symbolic_iteration_size + // size of symbolic properties
+			last_iteration.real.size()*last_iteration.memory_size + next_iteration.real.size()*next_iteration.memory_size + // size of properties
+			symbolic_iteration.real.size()*symbolic_iteration.memory_size + // size of symbolic properties
 			mem_difference; // free memory
 
 		// compute average object size
@@ -246,10 +247,10 @@ namespace iqs {
 		iteration_size_per_object /= symbolic_iteration.num_object_after_interferences;
 
 		// add the cost of the symbolic iteration in itself
-		iteration_size_per_object += symbolic_iteration_size*symbolic_iteration.num_object/last_iteration.num_object/2; // size for symbolic iteration
+		iteration_size_per_object += symbolic_iteration.memory_size*symbolic_iteration.num_object/last_iteration.num_object/2; // size for symbolic iteration
 		
 		// and the constant size per object
-		iteration_size_per_object += iteration_size;
+		iteration_size_per_object += next_iteration.memory_size;
 
 		// and the cost of unused space
 		iteration_size_per_object *= utils::upsize_policy;
@@ -373,8 +374,10 @@ namespace iqs {
 	compute interferences
 	*/
 	void symbolic_iteration::compute_collisions() {
-		if (num_object == 0)
+		if (num_object == 0) {
+			num_object_after_interferences = 0;
 			return;
+		}
 
 		bool fast = false;
 		bool skip_test = num_object < utils::min_vector_size;
@@ -383,7 +386,7 @@ namespace iqs {
 		/*
 		function for partition
 		*/
-		auto static partitioner = [&](size_t const &oid) {
+		auto static const partitioner = [&](size_t const &oid) {
 			/* check if graph is unique */
 			if (!is_unique[oid])
 				return false;
@@ -395,26 +398,32 @@ namespace iqs {
 			return r*r + i*i > tolerance;
 		};
 
+		/*
+		function to add a key
+		*/
+		auto static const insert_key = [&](size_t oid) {
+			/* accessing key */
+			tbb::concurrent_hash_map<size_t, size_t>::accessor it;
+			if (elimination_map.insert(it, {hash[oid], oid})) {
+				is_unique[oid] = true; /* keep this graph */
+			} else {
+				/* if it exist add the probabilities */
+				real[it->second] += real[oid];
+				imag[it->second] += imag[oid];
+
+				/* discard this graph */
+				is_unique[oid] = false;
+			}
+		};
+
 		/* !!!!!!!!!!!!!!!!
 		step (4)
 		 !!!!!!!!!!!!!!!! */
 
 		if (!skip_test) {
 			#pragma omp parallel for schedule(static)
-			for (size_t oid = 0; oid < test_size; ++oid) { //size_t oid = oid[i];
-				/* accessing key */
-				tbb::concurrent_hash_map<size_t, size_t>::accessor it;
-				if (elimination_map.insert(it, {hash[oid], oid})) {
-					is_unique[oid] = true; /* keep this graph */
-				} else {
-					/* if it exist add the probabilities */
-					real[it->second] += real[oid];
-					imag[it->second] += imag[oid];
-
-					/* discard this graph */
-					is_unique[oid] = false;
-				}
-			}
+			for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
+				insert_key(oid);
 
 			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
 
@@ -429,20 +438,8 @@ namespace iqs {
 
 		if (!fast) {
 			#pragma omp parallel for schedule(static)
-			for (size_t oid = test_size; oid < num_object; ++oid) { //size_t oid = oid[i];
-				/* accessing key */
-				tbb::concurrent_hash_map<size_t, size_t>::accessor it;
-				if (elimination_map.insert(it, {hash[oid], oid})) {
-					is_unique[oid] = true; /* keep this graph */
-				} else {
-					/* if it exist add the probabilities */
-					real[it->second] += real[oid];
-					imag[it->second] += imag[oid];
-
-					/* discard this graph */
-					is_unique[oid] = false;
-				}
-			}
+			for (size_t oid = test_size; oid < num_object; ++oid) //size_t oid = oid[i];
+				insert_key(oid);
 
 			/* get all unique graphs with a non zero probability */
 			auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
@@ -456,7 +453,7 @@ namespace iqs {
 	finalize iteration
 	*/
 	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](int){}) {
-		if (num_object == 0) {
+		if (num_object_after_interferences == 0) {
 			next_iteration.num_object = 0;
 			return;
 		}

@@ -9,14 +9,14 @@ void print_all(iqs::mpi::mpi_it_t const &iteration, MPI_Comm comunicator) {
 	for (int i = 0; i < size; ++i) {
 		MPI_Barrier(MPI_COMM_WORLD);
 		if (rank == i) {
-			std::cout << "  node " << rank << "/" << size << ":\n";
+			std::cout << "    node " << rank << "/" << size << ":\n";
 			iqs::rules::quantum_computer::utils::print(iteration);
 		}
 	}
 }
 
 int main(int argc, char* argv[]) {
-	int master_node_id = 0;
+	int master_node_id = 2;
 
 	iqs::set_tolerance(1e-8);
 
@@ -38,29 +38,38 @@ int main(int argc, char* argv[]) {
 		state.append(starting_state_1, starting_state_1 + 4, 1/std::sqrt(2), 0);
 		state.append(starting_state_2, starting_state_2 + 5, 0, 1/std::sqrt(2));
 	}
-	if (rank == master_node_id) std::cout << "initial state:\n"; print_all(state, MPI_COMM_WORLD);
+	if (rank == 0) std::cout << "initial state:\n"; print_all(state, MPI_COMM_WORLD);
 
 	iqs::simulate(state, H1, buffer, sy_it);
 	iqs::simulate(state, H2, buffer, sy_it);
-	iqs::simulate(state, H3, buffer, sy_it);
+	//iqs::simulate(state, H3, buffer, sy_it);
 	iqs::simulate(state, X2);
 
-	if (rank == master_node_id) std::cout << "\napplied some gates:\n"; print_all(state, MPI_COMM_WORLD);
+	if (rank == 0) std::cout << "\napplied some gates:\n"; print_all(state, MPI_COMM_WORLD);
 	
-	state.distribute_objects(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 
-	if (rank == master_node_id) std::cout << "\ndistributed all objects:\n"; print_all(state, MPI_COMM_WORLD);
+	state.distribute_objects(MPI_COMM_WORLD, master_node_id);
+
+	if (rank == 0) std::cout << "\ndistributed all objects:\n"; print_all(state, MPI_COMM_WORLD);
+
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	iqs::simulate(state, X2);
-	iqs::mpi::simulate(state, H3, buffer, sy_it, MPI_COMM_WORLD);
+	//iqs::mpi::simulate(state, H3, buffer, sy_it, MPI_COMM_WORLD);
 	iqs::mpi::simulate(state, H2, buffer, sy_it, MPI_COMM_WORLD);
 	iqs::mpi::simulate(state, H1, buffer, sy_it, MPI_COMM_WORLD);
 
-	if (rank == master_node_id) std::cout << "\napplied all gate in reverse other:\n"; print_all(state, MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 
-	state.gather_objects(MPI_COMM_WORLD);
+	if (rank == 0) std::cout << "\napplied all gate in reverse other:\n"; print_all(state, MPI_COMM_WORLD);
 
-	if (rank == master_node_id) std::cout << "\ngathered all objects:\n"; print_all(state, MPI_COMM_WORLD);
+	state.gather_objects(MPI_COMM_WORLD, master_node_id);
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	if (rank == 0) std::cout << "\ngathered all objects:\n"; print_all(state, MPI_COMM_WORLD);
 
 	MPI_Finalize();
+	return 0;
 }
