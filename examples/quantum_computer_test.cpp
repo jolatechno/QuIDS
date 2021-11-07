@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
 	char starting_state_2[5] = {false, true, true, false, true};
 	state.append(starting_state_1, starting_state_1 + 4, 1/std::sqrt(2), 0);
 	state.append(starting_state_2, starting_state_2 + 5, 0, 1/std::sqrt(2));
-	std::cout << "initial_state:\n"; iqs::rules::quantum_computer::utils::print(state);
+	std::cout << "initial state:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, H1, buffer, sy_it);
 	std::cout << "\nhadamard on second qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
