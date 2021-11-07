@@ -94,6 +94,8 @@ namespace iqs::mpi {
 	distributed interference function
 	*/
 	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator) {
+		int *modulo_begin;
+
 		/*
 		function to add a key
 		*/
@@ -102,8 +104,14 @@ namespace iqs::mpi {
 
 			/* accessing key */
 			tbb::concurrent_hash_map<size_t, std::pair<size_t, int>>::accessor it;
-			if (distributed_elimination_map.insert(it, {hash, {oid, node_id}})) {
-				node_map[node_id].is_unique[oid] = true; /* keep this graph */
+			bool unique = distributed_elimination_map.insert(it, {hash, {oid, node_id}});
+			if (unique) {
+				/* keep this graph */
+				node_map[node_id].is_unique[oid] = true;
+
+				/* increment values */
+				#pragma omp atomic 
+				++node_map[node_id].num_object_after_interferences;
 			} else {
 				auto [other_id, other_node_id] = it->second;
 
@@ -115,6 +123,10 @@ namespace iqs::mpi {
 
 					/* discard this graph */
 					node_map[node_id].is_unique[oid] = false;
+
+					/* increment values */
+					#pragma omp atomic 
+					++node_map[other_node_id].num_object_after_interferences;
 				} else {
 					/* if the size aren't balanced, add the probabilities */
 					node_map[node_id].real[oid] += node_map[other_node_id].real[other_id];
@@ -123,7 +135,76 @@ namespace iqs::mpi {
 					/* discard the other graph */
 					node_map[node_id].is_unique[oid] = true;
 					node_map[other_node_id].is_unique[other_id] = false;
+
+					/* increment values */
+					#pragma omp atomic 
+					++node_map[node_id].num_object_after_interferences;
+					#pragma omp atomic 
+					--node_map[other_node_id].num_object_after_interferences;
 				}
+			}
+		};
+
+		/*
+		function to receive initial data
+		*/
+		static const auto receive_data = [&](int node) {
+			/* receive size */
+			size_t this_size;
+			MPI_Recv(&this_size, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+
+			/* prepare receive */
+			node_map[node].num_object = this_size;
+			node_map[node].num_object_after_interferences = 0;
+			node_map[node].resize(this_size);
+
+			/* receive properties */
+			if (this_size > 0) {
+				MPI_Recv(node_map[node].real.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(node_map[node].imag.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(node_map[node].hash.begin(), this_size, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+			}
+		};
+
+		/*
+		function to send initial data
+		*/
+		static const auto send_data = [&](int node) {
+			/* send size */
+			size_t this_size = modulo_begin[node + 1] - modulo_begin[node];
+			MPI_Send(&this_size, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+
+			/* send properties */
+			if (this_size > 0) {
+				MPI_Send(partitioned_real.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
+				MPI_Send(partitioned_imag.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
+				MPI_Send(partitioned_hash.begin() + modulo_begin[node], this_size, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+			}
+		};
+
+		/*
+		function to receive final result
+		*/
+		static const auto receive_result = [&](int node) {
+			/* receive properties */
+			size_t this_size = modulo_begin[node + 1] - modulo_begin[node];
+			if (this_size > 0) {
+				MPI_Recv(partitioned_real.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_imag.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI_CHAR, node, 0 /* tag */, communicator, &utils::global_status);
+			}
+		};
+
+		/*
+		function to send final result
+		*/
+		static const auto send_result = [&](int node) {
+			/* send properties */
+			size_t this_size = node_map[node].num_object;
+			if (this_size > 0) {
+				MPI_Send(node_map[node].real.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
+				MPI_Send(node_map[node].imag.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
+				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI_CHAR, node, 0 /* tag */, communicator);
 			}
 		};
 
@@ -133,8 +214,6 @@ namespace iqs::mpi {
 		Actual code :
 		 !!!!!!!!!!!!!!!! */
 
-		MPI_Barrier(communicator);
-
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
@@ -142,10 +221,16 @@ namespace iqs::mpi {
 		node_map.resize(size);
 
 		/* partition nodes */
-		int *modulo_begin = (int*)calloc(size + 1, sizeof(int));
+		modulo_begin = (int*)calloc(size + 1, sizeof(int));
 		utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + num_object,
 			hash.begin(), modulo_begin,
-			size);
+			2);
+
+		/* 
+		!!!!!!!!!!!
+		weird way to fix a weird bug (might be broken partitioning, or failed sharing):
+		!!!!!!!!!!! */
+		for (int i = 3; i < size + 1; ++i) modulo_begin[i] = modulo_begin[i - 1];
 
 		/* generate partitioned hash */
 		#pragma omp parallel for schedule(static)
@@ -162,55 +247,33 @@ namespace iqs::mpi {
 		for (int node = 0; node < size; ++node)
 			if (rank == node) {
 				for (int receive_node = 0; receive_node < size; ++receive_node)
-					if (receive_node == rank) {
+					if (receive_node != rank)
+						receive_data(receive_node);
+			} else
+				send_data(node);
 
-						/* resize */
-						size_t this_size = modulo_begin[node + 1] - modulo_begin[node];
-						node_map[receive_node].num_object = this_size;
-						node_map[receive_node].num_object_after_interferences = 0;
-						node_map[receive_node].resize(this_size);
-						
-						/* copy partitioned properties into node map */
-						#pragma omp parallel for schedule(static)
-						for (size_t i = 0; i < this_size; ++i) {
-							size_t id = modulo_begin[receive_node] + i;
+		/* copy local data */
+		{
+			/* resize */
+			size_t this_size = modulo_begin[rank + 1] - modulo_begin[rank];
+			node_map[rank].num_object = this_size;
+			node_map[rank].num_object_after_interferences = 0;
+			node_map[rank].resize(this_size);
+			/* copy partitioned properties into node map */
+			#pragma omp parallel for schedule(static)
+			for (size_t i = 0; i < this_size; ++i) {
+				size_t id = modulo_begin[rank] + i;
 
-							node_map[receive_node].real[i] = partitioned_real[id];
-							node_map[receive_node].imag[i] = partitioned_imag[id];
-							node_map[receive_node].hash[i] = partitioned_hash[id];
-						}
-					} else {
-						/* receive size */
-						size_t this_size;
-						MPI_Recv(&this_size, 1, MPI_UNSIGNED_LONG_LONG, receive_node, 0 /* tag */, communicator, &utils::global_status);
-
-						/* prepare receive */
-						node_map[receive_node].num_object = this_size;
-						node_map[receive_node].num_object_after_interferences = 0;
-						node_map[receive_node].resize(this_size);
-
-						/* receive properties */
-						if (this_size > 0) {
-							MPI_Recv(node_map[receive_node].real.begin(), this_size, MPI_DOUBLE, receive_node, 0 /* tag */, communicator, &utils::global_status);
-							MPI_Recv(node_map[receive_node].imag.begin(), this_size, MPI_DOUBLE, receive_node, 0 /* tag */, communicator, &utils::global_status);
-							MPI_Recv(node_map[receive_node].hash.begin(), this_size, MPI_UNSIGNED_LONG_LONG, receive_node, 0 /* tag */, communicator, &utils::global_status);
-						}
-					}
-			} else {
-				/* send size */
-				size_t this_size = modulo_begin[node + 1] - modulo_begin[node];
-				MPI_Send(&this_size, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
-
-				/* send properties */
-				if (this_size > 0) {
-					MPI_Send(partitioned_real.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
-					MPI_Send(partitioned_imag.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
-					MPI_Send(partitioned_hash.begin() + modulo_begin[node], this_size, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
-				}
+				node_map[rank].real[i] = partitioned_real[id];
+				node_map[rank].imag[i] = partitioned_imag[id];
+				node_map[rank].hash[i] = partitioned_hash[id];
 			}
+		}
 
 		/* generate the interference table */
 		for (int node = 0; node < size; ++node) {
+			//std::cout << node << "=node, " << node_map[node].num_object << "=num_object, " << rank << "=rank\n";
+
 			bool fast = false;
 			bool skip_test = node_map[node].num_object < iqs::utils::min_vector_size;
 			size_t test_size = skip_test ? 0 : node_map[node].num_object*collision_test_proportion;
@@ -223,6 +286,7 @@ namespace iqs::mpi {
 
 				fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
 				if (fast)
+					#pragma omp parallel for schedule(static)
 					for (size_t oid = test_size; oid < node_map[node].num_object; ++oid)
 						node_map[node].is_unique[oid] = true;
 			}
@@ -238,38 +302,23 @@ namespace iqs::mpi {
 		for (int node = 0; node < size; ++node)
 			if (rank == node) {
 				for (int receive_node = 0; receive_node < size; ++receive_node)
-					if (receive_node == rank) {
+					if (receive_node != rank)
+						receive_result(receive_node);
+			} else
+				send_result(node);
 
-						/* copy local data */
-						size_t this_size = modulo_begin[receive_node + 1] - modulo_begin[receive_node];
-						#pragma omp for schedule(static)
-						for (size_t i = 0; i < this_size; ++i) {
-							size_t id = modulo_begin[receive_node] + i;
+		/* copy local data */
+		{
+			size_t this_size = modulo_begin[rank + 1] - modulo_begin[rank];
+			#pragma omp for schedule(static)
+			for (size_t i = 0; i < this_size; ++i) {
+				size_t id = modulo_begin[rank] + i;
 
-							partitioned_real[id] = node_map[receive_node].real[i];
-							partitioned_imag[id] = node_map[receive_node].imag[i];
-							partitioned_is_unique[id] = node_map[receive_node].is_unique[i];
-						}
-					} else {
-
-						/* receive properties */
-						size_t this_size = modulo_begin[receive_node + 1] - modulo_begin[receive_node];
-						if (this_size > 0) {
-							MPI_Recv(partitioned_real.begin() + modulo_begin[receive_node], this_size, MPI_DOUBLE, receive_node, 0 /* tag */, communicator, &utils::global_status);
-							MPI_Recv(partitioned_imag.begin() + modulo_begin[receive_node], this_size, MPI_DOUBLE, receive_node, 0 /* tag */, communicator, &utils::global_status);
-							MPI_Recv(partitioned_is_unique.begin() + modulo_begin[receive_node], this_size, MPI_CHAR, receive_node, 0 /* tag */, communicator, &utils::global_status);
-						}
-					}
-			} else {
-
-				/* send properties */
-				size_t this_size = node_map[node].num_object;
-				if (this_size > 0) {
-					MPI_Send(node_map[node].real.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
-					MPI_Send(node_map[node].imag.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
-					MPI_Send(node_map[node].is_unique.begin(), this_size, MPI_CHAR, node, 0 /* tag */, communicator);
-				}
+				partitioned_real[id] = node_map[rank].real[i];
+				partitioned_imag[id] = node_map[rank].imag[i];
+				partitioned_is_unique[id] = node_map[rank].is_unique[i];
 			}
+		}
 
 		/* regenerate real, imag and is_unique */
 		#pragma omp parallel for schedule(static)
@@ -304,8 +353,6 @@ namespace iqs::mpi {
 	distributed normalization function
 	*/
 	void mpi_iteration::normalize(MPI_Comm communicator) {
-		MPI_Barrier(communicator);
-
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
@@ -346,11 +393,12 @@ namespace iqs::mpi {
 		}
 		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
 
-		#pragma omp parallel for
-		for (size_t oid = 0; oid < num_object; ++oid) {
-			real[oid] /= normalization_factor;
-			imag[oid] /= normalization_factor;
-		}
+		if (normalization_factor != 1)
+			#pragma omp parallel for
+			for (size_t oid = 0; oid < num_object; ++oid) {
+				real[oid] /= normalization_factor;
+				imag[oid] /= normalization_factor;
+			}
 	}
 
 	/*
@@ -426,8 +474,6 @@ namespace iqs::mpi {
 	function to gather object from all nodes
 	*/
 	void mpi_iteration::gather_objects(MPI_Comm communicator, int node_id=0) {
-		MPI_Barrier(communicator);  
-
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
