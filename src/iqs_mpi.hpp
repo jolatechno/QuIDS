@@ -95,6 +95,22 @@ namespace iqs::mpi {
 	*/
 	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator) {
 		int *modulo_begin;
+		int size, rank;
+
+		/*
+		function for partition
+		*/
+		auto static const partitioner = [&](size_t const &oid) {
+			/* check if graph is unique */
+			if (!is_unique[oid])
+				return false;
+
+			/* check for zero probability */
+			PROBA_TYPE r = real[oid];
+			PROBA_TYPE i = imag[oid];
+
+			return r*r + i*i > tolerance;
+		};
 
 		/*
 		function to add a key
@@ -182,6 +198,26 @@ namespace iqs::mpi {
 			}
 		};
 
+		/* 
+		function to copy initial data locally
+		*/
+		static const auto copy_data = [&]() {
+			/* resize */
+			size_t this_size = modulo_begin[rank + 1] - modulo_begin[rank];
+			node_map[rank].num_object = this_size;
+			node_map[rank].num_object_after_interferences = 0;
+			node_map[rank].resize(this_size);
+			/* copy partitioned properties into node map */
+			#pragma omp parallel for schedule(static)
+			for (size_t i = 0; i < this_size; ++i) {
+				size_t id = modulo_begin[rank] + i;
+
+				node_map[rank].real[i] = partitioned_real[id];
+				node_map[rank].imag[i] = partitioned_imag[id];
+				node_map[rank].hash[i] = partitioned_hash[id];
+			}
+		};
+
 		/*
 		function to receive final result
 		*/
@@ -208,13 +244,27 @@ namespace iqs::mpi {
 			}
 		};
 
+		/*
+		function to copy final result locally
+		*/
+		static const auto copy_result = [&]() {
+			size_t this_size = modulo_begin[rank + 1] - modulo_begin[rank];
+			#pragma omp for schedule(static)
+			for (size_t i = 0; i < this_size; ++i) {
+				size_t id = modulo_begin[rank] + i;
+
+				partitioned_real[id] = node_map[rank].real[i];
+				partitioned_imag[id] = node_map[rank].imag[i];
+				partitioned_is_unique[id] = node_map[rank].is_unique[i];
+			}
+		};
+
 		/* !!!!!!!!!!!!!!!!
 		step (4)
 
 		Actual code :
 		 !!!!!!!!!!!!!!!! */
 
-		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 
@@ -222,15 +272,14 @@ namespace iqs::mpi {
 
 		/* partition nodes */
 		modulo_begin = (int*)calloc(size + 1, sizeof(int));
-		utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + num_object,
-			hash.begin(), modulo_begin,
-			2);
-
 		/* 
 		!!!!!!!!!!!
 		weird way to fix a weird bug (might be broken partitioning, or failed sharing):
 		!!!!!!!!!!! */
-		for (int i = 3; i < size + 1; ++i) modulo_begin[i] = modulo_begin[i - 1];
+		utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + num_object,
+			hash.begin(), modulo_begin,
+			2 /*size*/ );
+		for (int i = 3; i < size + 1; ++i) modulo_begin[i] = modulo_begin[i - 1]; // weird fix ?!
 
 		/* generate partitioned hash */
 		#pragma omp parallel for schedule(static)
@@ -253,27 +302,10 @@ namespace iqs::mpi {
 				send_data(node);
 
 		/* copy local data */
-		{
-			/* resize */
-			size_t this_size = modulo_begin[rank + 1] - modulo_begin[rank];
-			node_map[rank].num_object = this_size;
-			node_map[rank].num_object_after_interferences = 0;
-			node_map[rank].resize(this_size);
-			/* copy partitioned properties into node map */
-			#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < this_size; ++i) {
-				size_t id = modulo_begin[rank] + i;
-
-				node_map[rank].real[i] = partitioned_real[id];
-				node_map[rank].imag[i] = partitioned_imag[id];
-				node_map[rank].hash[i] = partitioned_hash[id];
-			}
-		}
+		copy_data();
 
 		/* generate the interference table */
 		for (int node = 0; node < size; ++node) {
-			//std::cout << node << "=node, " << node_map[node].num_object << "=num_object, " << rank << "=rank\n";
-
 			bool fast = false;
 			bool skip_test = node_map[node].num_object < iqs::utils::min_vector_size;
 			size_t test_size = skip_test ? 0 : node_map[node].num_object*collision_test_proportion;
@@ -308,17 +340,7 @@ namespace iqs::mpi {
 				send_result(node);
 
 		/* copy local data */
-		{
-			size_t this_size = modulo_begin[rank + 1] - modulo_begin[rank];
-			#pragma omp for schedule(static)
-			for (size_t i = 0; i < this_size; ++i) {
-				size_t id = modulo_begin[rank] + i;
-
-				partitioned_real[id] = node_map[rank].real[i];
-				partitioned_imag[id] = node_map[rank].imag[i];
-				partitioned_is_unique[id] = node_map[rank].is_unique[i];
-			}
-		}
+		copy_result();
 
 		/* regenerate real, imag and is_unique */
 		#pragma omp parallel for schedule(static)
@@ -331,18 +353,7 @@ namespace iqs::mpi {
 		}
 
 		/* keep only unique objects */
-		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object,
-			[&](size_t const oid) {
-				/* check if graph is unique */
-				if (!is_unique[oid])
-					return false;
-
-				/* check for zero probability */
-				PROBA_TYPE r = real[oid];
-				PROBA_TYPE i = imag[oid];
-
-				return r*r + i*i > iqs::tolerance;
-			});
+		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 
 		/* clear map */

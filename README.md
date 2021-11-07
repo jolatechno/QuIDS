@@ -41,8 +41,6 @@ int main(int argc, char* argv[]) {
 
 ### MPI support
 
-__!!! MPI support is currently being added to this branch, it will be merged with the main branch, and a new release will be created when MPI is fully supported !!!__
-
 Simulations can also be done across nodes. For that, you'll need to replace `iqs::sy_it` and `iqs::it_t` respectivly by `iqs::mpi::mpi_sy_it` and `iqs::mpi::mpi_it_t`. 
 
 ```cpp
@@ -73,6 +71,12 @@ int main(int argc, char* argv[]) {
 	MPI_Finalize();
 }
 ```
+
+#### Current limitations
+
+There exist two big points of optimizations (which will be fixed before a final release):
+- firstly, sending interference data between nodes is currently done one node pair at a time. _I know_ that it is possible, and not that complicated to implement a better sharing algorithme, tho i don't entend to implement any until the second point is fixes.
+- there exist a weird bug, that make the interference step fail unless it is done on no more than 2 node. So _currently_, the interference step is done on the first two node. 
 
 ### Modifiers
 

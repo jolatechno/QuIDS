@@ -39,8 +39,10 @@ int main(int argc, char* argv[]) {
 	if (rank == master_node_id) {
 		char starting_state_1[4] = {true, true, false, false};
 		char starting_state_2[5] = {false, true, true, false, true};
-		state.append(starting_state_1, starting_state_1 + 4, 1/std::sqrt(2), 0);
-		state.append(starting_state_2, starting_state_2 + 5, 0, 1/std::sqrt(2));
+		char starting_state_3[6] = {false, true, true, false, true, false};
+		state.append(starting_state_1, starting_state_1 + 4, 0.5, -0.5);
+		state.append(starting_state_2, starting_state_2 + 5, 0, 0.5);
+		state.append(starting_state_3, starting_state_3 + 6, 0.5, 0);
 	}
 
 	if (rank == 0) std::cout << "initial state:\n"; print_all(state, MPI_COMM_WORLD);
