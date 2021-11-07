@@ -15,3 +15,9 @@ void generalized_modulo_partition(size_t *idx_begin, size_t *idx_end, size_t con
 		offset[i + 1] = std::distance(idx_begin, partitioned_it);
 	}
 }
+
+int clossest_power_of_two(int x) {
+	int y = 1;
+	for (; y < x; y *= 2) {}
+	return y;
+}

@@ -292,14 +292,37 @@ namespace iqs::mpi {
 			original_id[oid] = id;
 		}
 
-		/* share partitions */
-		for (int node = 0; node < size; ++node)
-			if (rank == node) {
-				for (int receive_node = 0; receive_node < size; ++receive_node)
-					if (receive_node != rank)
-						receive_data(receive_node);
-			} else
-				send_data(node);
+		/* share back partitions using a binary tree*/
+		int n_node_virtual = utils::clossest_power_of_two(size);
+		for (int offset = 1; offset <= n_node_virtual / 2; ++offset) {
+			/* compute neighbour nodes */
+			int previous_node = (n_node_virtual + rank - offset) % n_node_virtual;
+			int next_node = (n_node_virtual + rank + offset) % n_node_virtual;
+
+			/* compute receive / send order */
+			bool send_first = rank % (2*offset) < offset;
+
+			/* send and receive data accordingly */
+			if (send_first) {
+				if (previous_node < size) {
+					send_data(previous_node);
+					receive_data(previous_node);
+				}
+				if (next_node < size && next_node != previous_node) {
+					send_data(next_node);
+					receive_data(next_node);
+				}
+			} else {
+				if (next_node < size) {
+					receive_data(next_node);
+					send_data(next_node);
+				}
+				if (previous_node < size && next_node != previous_node) {
+					receive_data(previous_node);
+					send_data(previous_node);
+				}
+			}
+		}
 
 		/* copy local data */
 		copy_data();
@@ -330,14 +353,36 @@ namespace iqs::mpi {
 					insert_key(oid, node);
 		}
 
-		/* share back partitions */
-		for (int node = 0; node < size; ++node)
-			if (rank == node) {
-				for (int receive_node = 0; receive_node < size; ++receive_node)
-					if (receive_node != rank)
-						receive_result(receive_node);
-			} else
-				send_result(node);
+		/* share back partitions also using a binary tree */
+		for (int offset = 1; offset <= n_node_virtual / 2; ++offset) {
+			/* compute neighbour nodes */
+			int previous_node = (n_node_virtual + rank - offset) % n_node_virtual;
+			int next_node = (n_node_virtual + rank + offset) % n_node_virtual;
+
+			/* compute receive / send order */
+			bool send_first = rank % (2*offset) < offset;
+
+			/* send and receive data accordingly */
+			if (send_first) {
+				if (previous_node < size) {
+					send_result(previous_node);
+					receive_result(previous_node);
+				}
+				if (next_node < size && next_node != previous_node) {
+					send_result(next_node);
+					receive_result(next_node);
+				}
+			} else {
+				if (next_node < size) {
+					receive_result(next_node);
+					send_result(next_node);
+				}
+				if (previous_node < size && next_node != previous_node) {
+					receive_result(previous_node);
+					send_result(previous_node);
+				}
+			}
+		}
 
 		/* copy local data */
 		copy_result();

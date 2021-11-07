@@ -74,9 +74,7 @@ int main(int argc, char* argv[]) {
 
 #### Current limitations
 
-There exist two big points of optimizations (which will be fixed before a final release):
-- firstly, sending interference data between nodes is currently done one node pair at a time. _I know_ that it is possible, and not that complicated to implement a better sharing algorithme, tho i don't entend to implement any until the second point is fixes.
-- there exist a weird bug, that make the interference step fail unless it is done on no more than 2 node. So _currently_, the interference step is done on the first two node. 
+There exist a weird bug, that make the interference step fail unless it is done on no more than 2 node. So _currently_, the interference step is done on the first two node. 
 
 ### Modifiers
 
@@ -296,8 +294,3 @@ The default value of any of those variable can be altered at compilation, by pas
 `utils::downsize_policy` reprensent the threshold multiplier to downsize a vector (the default is `0.85`). A vector won't be downsized until the requested size is smaller than this ultiplier times the capacity of the given vector.
 
 __!! this multiplier should always be smaller than the inverse of upsize_policy to avoid upsizing-downsizing loop !!__
-
-## TODOS
-
-- implementing (basic) `MPI` support.
-- implementing a third kind of unitary transform, discribing a transformation that doesn't change the size of an object (removing the need for a symbolic iteration).
