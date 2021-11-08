@@ -139,10 +139,6 @@ namespace iqs::mpi {
 
 					/* discard this graph */
 					node_map[node_id].is_unique[oid] = false;
-
-					/* increment values */
-					#pragma omp atomic 
-					++node_map[other_node_id].num_object_after_interferences;
 				} else {
 					/* if the size aren't balanced, add the probabilities */
 					node_map[node_id].real[oid] += node_map[other_node_id].real[other_id];
@@ -207,6 +203,7 @@ namespace iqs::mpi {
 			node_map[rank].num_object = this_size;
 			node_map[rank].num_object_after_interferences = 0;
 			node_map[rank].resize(this_size);
+
 			/* copy partitioned properties into node map */
 			#pragma omp parallel for schedule(static)
 			for (size_t i = 0; i < this_size; ++i) {
@@ -227,7 +224,7 @@ namespace iqs::mpi {
 			if (this_size > 0) {
 				MPI_Recv(partitioned_real.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
 				MPI_Recv(partitioned_imag.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI_CHAR, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI_CXX_BOOL, node, 0 /* tag */, communicator, &utils::global_status);
 			}
 		};
 
@@ -240,7 +237,7 @@ namespace iqs::mpi {
 			if (this_size > 0) {
 				MPI_Send(node_map[node].real.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
 				MPI_Send(node_map[node].imag.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
-				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI_CHAR, node, 0 /* tag */, communicator);
+				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI_CXX_BOOL, node, 0 /* tag */, communicator);
 			}
 		};
 
@@ -278,8 +275,8 @@ namespace iqs::mpi {
 		!!!!!!!!!!! */
 		utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + num_object,
 			hash.begin(), modulo_begin,
-			2 /*size*/ );
-		for (int i = 3; i < size + 1; ++i) modulo_begin[i] = modulo_begin[i - 1]; // weird fix ?!
+			//size );
+		2); for (int i = 3; i < size + 1; ++i) modulo_begin[i] = modulo_begin[i - 1]; // weird fix ?!
 
 		/* generate partitioned hash */
 		#pragma omp parallel for schedule(static)
@@ -292,32 +289,27 @@ namespace iqs::mpi {
 			original_id[oid] = id;
 		}
 
-		/* share back partitions using a binary tree*/
-		int n_node_virtual = utils::clossest_power_of_two(size);
-		for (int offset = 1; offset <= n_node_virtual / 2; ++offset) {
+		/* share back partitions using cricular permutations */
+		for (int offset = 1; offset <= size / 2; ++offset) {
 			/* compute neighbour nodes */
-			int previous_node = (n_node_virtual + rank - offset) % n_node_virtual;
-			int next_node = (n_node_virtual + rank + offset) % n_node_virtual;
+			int previous_node = (size + rank - offset) % size;
+			int next_node = (size + rank + offset) % size;
 
 			/* compute receive / send order */
 			bool send_first = rank % (2*offset) < offset;
 
 			/* send and receive data accordingly */
 			if (send_first) {
-				if (previous_node < size) {
-					send_data(previous_node);
-					receive_data(previous_node);
-				}
-				if (next_node < size && next_node != previous_node) {
+				send_data(previous_node);
+				receive_data(previous_node);
+				if (next_node != previous_node) {
 					send_data(next_node);
 					receive_data(next_node);
 				}
 			} else {
-				if (next_node < size) {
-					receive_data(next_node);
-					send_data(next_node);
-				}
-				if (previous_node < size && next_node != previous_node) {
+				receive_data(next_node);
+				send_data(next_node);
+				if (next_node != previous_node) {
 					receive_data(previous_node);
 					send_data(previous_node);
 				}
@@ -353,31 +345,36 @@ namespace iqs::mpi {
 					insert_key(oid, node);
 		}
 
-		/* share back partitions also using a binary tree */
-		for (int offset = 1; offset <= n_node_virtual / 2; ++offset) {
+		/*
+		!!!!!!!!!!!!!!!
+		debug code
+		!!!!!!!!!!!!!!!!!! */
+		/*for (int node = 0; node < size; ++node)
+			if (node_map[node].num_object != 0)
+				std::cout << node_map[node].num_object_after_interferences << "/" << node_map[node].num_object << " [" << node << "] for rank = " << rank << "\n";
+		*/
+		
+		/* share back partitions also using cricular permutations */
+		for (int offset = 1; offset <= size / 2; ++offset) {
 			/* compute neighbour nodes */
-			int previous_node = (n_node_virtual + rank - offset) % n_node_virtual;
-			int next_node = (n_node_virtual + rank + offset) % n_node_virtual;
+			int previous_node = (size + rank - offset) % size;
+			int next_node = (size + rank + offset) % size;
 
 			/* compute receive / send order */
 			bool send_first = rank % (2*offset) < offset;
 
 			/* send and receive data accordingly */
 			if (send_first) {
-				if (previous_node < size) {
-					send_result(previous_node);
-					receive_result(previous_node);
-				}
-				if (next_node < size && next_node != previous_node) {
+				send_result(previous_node);
+				receive_result(previous_node);
+				if (next_node != previous_node) {
 					send_result(next_node);
 					receive_result(next_node);
 				}
 			} else {
-				if (next_node < size) {
-					receive_result(next_node);
-					send_result(next_node);
-				}
-				if (previous_node < size && next_node != previous_node) {
+				receive_result(next_node);
+				send_result(next_node);
+				if (next_node != previous_node) {
 					receive_result(previous_node);
 					send_result(previous_node);
 				}
