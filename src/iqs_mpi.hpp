@@ -40,7 +40,6 @@ namespace iqs::mpi {
 
 		iqs::utils::numa_vector<PROBA_TYPE> partitioned_real, partitioned_imag;
 		iqs::utils::numa_vector<size_t> partitioned_hash;
-		iqs::utils::numa_vector<size_t> original_id;
 		iqs::utils::numa_vector<bool> partitioned_is_unique;
 
 		struct node_map_type {
@@ -70,7 +69,7 @@ namespace iqs::mpi {
 			partitioned_is_unique.resize(size);
 		}
 
-		long long int memory_size = (1 + 2) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+		long long int memory_size = (1 + 3) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
 	public:
 		mpi_symbolic_iteration() {}
@@ -131,7 +130,7 @@ namespace iqs::mpi {
 			} else {
 				auto [other_id, other_node_id] = it->second;
 
-				bool is_greater = node_map[node_id].num_object_after_interferences > node_map[other_node_id].num_object_after_interferences;
+				bool is_greater = node_map[node_id].num_object_after_interferences >= node_map[other_node_id].num_object_after_interferences;
 				if (is_greater) {
 					/* if it exist add the probabilities */
 					node_map[other_node_id].real[other_id] += node_map[node_id].real[oid];
@@ -269,14 +268,9 @@ namespace iqs::mpi {
 
 		/* partition nodes */
 		modulo_begin = (int*)calloc(size + 1, sizeof(int));
-		/* 
-		!!!!!!!!!!!
-		weird way to fix a weird bug (might be broken partitioning, or failed sharing):
-		!!!!!!!!!!! */
 		utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + num_object,
 			hash.begin(), modulo_begin,
-			//size );
-		2); for (int i = 3; i < size + 1; ++i) modulo_begin[i] = modulo_begin[i - 1]; // weird fix ?!
+			size);
 
 		/* generate partitioned hash */
 		#pragma omp parallel for schedule(static)
@@ -286,7 +280,6 @@ namespace iqs::mpi {
 			partitioned_real[id] = real[oid];
 			partitioned_imag[id] = imag[oid];
 			partitioned_hash[id] = hash[oid];
-			original_id[oid] = id;
 		}
 
 		/* share back partitions using cricular permutations */
@@ -345,15 +338,6 @@ namespace iqs::mpi {
 					insert_key(oid, node);
 		}
 
-		/*
-		!!!!!!!!!!!!!!!
-		debug code
-		!!!!!!!!!!!!!!!!!! */
-		/*for (int node = 0; node < size; ++node)
-			if (node_map[node].num_object != 0)
-				std::cout << node_map[node].num_object_after_interferences << "/" << node_map[node].num_object << " [" << node << "] for rank = " << rank << "\n";
-		*/
-		
 		/* share back partitions also using cricular permutations */
 		for (int offset = 1; offset <= size / 2; ++offset) {
 			/* compute neighbour nodes */
@@ -387,7 +371,7 @@ namespace iqs::mpi {
 		/* regenerate real, imag and is_unique */
 		#pragma omp parallel for schedule(static)
 		for (size_t id = 0; id < num_object; ++id) {
-			size_t oid = original_id[id];
+			size_t oid = next_oid[id];
 
 			real[oid] = partitioned_real[id];
 			imag[oid] = partitioned_imag[id];

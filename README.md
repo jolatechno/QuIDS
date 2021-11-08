@@ -72,10 +72,6 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-#### Current limitations
-
-There exist a weird bug, that make the interference step fail unless it is done on no more than 2 node. So _currently_, the interference step is done on the first two node. 
-
 ### Modifiers
 
 A `modifier` is a simple functions that takes a objects, and modify it in place, while keep its size unchanged.
