@@ -40,7 +40,6 @@ namespace iqs::mpi {
 
 		iqs::utils::numa_vector<PROBA_TYPE> partitioned_real, partitioned_imag;
 		iqs::utils::numa_vector<size_t> partitioned_hash;
-		iqs::utils::numa_vector<size_t> original_id;
 		iqs::utils::numa_vector<bool> partitioned_is_unique;
 
 		struct node_map_type {
@@ -70,7 +69,7 @@ namespace iqs::mpi {
 			partitioned_is_unique.resize(size);
 		}
 
-		long long int memory_size = (1 + 2) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+		long long int memory_size = (1 + 3) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
 	public:
 		mpi_symbolic_iteration() {}
@@ -131,7 +130,7 @@ namespace iqs::mpi {
 			} else {
 				auto [other_id, other_node_id] = it->second;
 
-				bool is_greater = node_map[node_id].num_object_after_interferences > node_map[other_node_id].num_object_after_interferences;
+				bool is_greater = node_map[node_id].num_object_after_interferences >= node_map[other_node_id].num_object_after_interferences;
 				if (is_greater) {
 					/* if it exist add the probabilities */
 					node_map[other_node_id].real[other_id] += node_map[node_id].real[oid];
@@ -139,10 +138,6 @@ namespace iqs::mpi {
 
 					/* discard this graph */
 					node_map[node_id].is_unique[oid] = false;
-
-					/* increment values */
-					#pragma omp atomic 
-					++node_map[other_node_id].num_object_after_interferences;
 				} else {
 					/* if the size aren't balanced, add the probabilities */
 					node_map[node_id].real[oid] += node_map[other_node_id].real[other_id];
@@ -207,6 +202,7 @@ namespace iqs::mpi {
 			node_map[rank].num_object = this_size;
 			node_map[rank].num_object_after_interferences = 0;
 			node_map[rank].resize(this_size);
+
 			/* copy partitioned properties into node map */
 			#pragma omp parallel for schedule(static)
 			for (size_t i = 0; i < this_size; ++i) {
@@ -227,7 +223,7 @@ namespace iqs::mpi {
 			if (this_size > 0) {
 				MPI_Recv(partitioned_real.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
 				MPI_Recv(partitioned_imag.begin() + modulo_begin[node], this_size, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI_CHAR, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI_CXX_BOOL, node, 0 /* tag */, communicator, &utils::global_status);
 			}
 		};
 
@@ -240,7 +236,7 @@ namespace iqs::mpi {
 			if (this_size > 0) {
 				MPI_Send(node_map[node].real.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
 				MPI_Send(node_map[node].imag.begin(), this_size, MPI_DOUBLE, node, 0 /* tag */, communicator);
-				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI_CHAR, node, 0 /* tag */, communicator);
+				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI_CXX_BOOL, node, 0 /* tag */, communicator);
 			}
 		};
 
@@ -272,14 +268,9 @@ namespace iqs::mpi {
 
 		/* partition nodes */
 		modulo_begin = (int*)calloc(size + 1, sizeof(int));
-		/* 
-		!!!!!!!!!!!
-		weird way to fix a weird bug (might be broken partitioning, or failed sharing):
-		!!!!!!!!!!! */
 		utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + num_object,
 			hash.begin(), modulo_begin,
-			2 /*size*/ );
-		for (int i = 3; i < size + 1; ++i) modulo_begin[i] = modulo_begin[i - 1]; // weird fix ?!
+			size);
 
 		/* generate partitioned hash */
 		#pragma omp parallel for schedule(static)
@@ -289,17 +280,34 @@ namespace iqs::mpi {
 			partitioned_real[id] = real[oid];
 			partitioned_imag[id] = imag[oid];
 			partitioned_hash[id] = hash[oid];
-			original_id[oid] = id;
 		}
 
-		/* share partitions */
-		for (int node = 0; node < size; ++node)
-			if (rank == node) {
-				for (int receive_node = 0; receive_node < size; ++receive_node)
-					if (receive_node != rank)
-						receive_data(receive_node);
-			} else
-				send_data(node);
+		/* share back partitions using cricular permutations */
+		for (int offset = 1; offset <= size / 2; ++offset) {
+			/* compute neighbour nodes */
+			int previous_node = (size + rank - offset) % size;
+			int next_node = (size + rank + offset) % size;
+
+			/* compute receive / send order */
+			bool send_first = rank % (2*offset) < offset;
+
+			/* send and receive data accordingly */
+			if (send_first) {
+				send_data(previous_node);
+				receive_data(previous_node);
+				if (next_node != previous_node) {
+					send_data(next_node);
+					receive_data(next_node);
+				}
+			} else {
+				receive_data(next_node);
+				send_data(next_node);
+				if (next_node != previous_node) {
+					receive_data(previous_node);
+					send_data(previous_node);
+				}
+			}
+		}
 
 		/* copy local data */
 		copy_data();
@@ -330,14 +338,32 @@ namespace iqs::mpi {
 					insert_key(oid, node);
 		}
 
-		/* share back partitions */
-		for (int node = 0; node < size; ++node)
-			if (rank == node) {
-				for (int receive_node = 0; receive_node < size; ++receive_node)
-					if (receive_node != rank)
-						receive_result(receive_node);
-			} else
-				send_result(node);
+		/* share back partitions also using cricular permutations */
+		for (int offset = 1; offset <= size / 2; ++offset) {
+			/* compute neighbour nodes */
+			int previous_node = (size + rank - offset) % size;
+			int next_node = (size + rank + offset) % size;
+
+			/* compute receive / send order */
+			bool send_first = rank % (2*offset) < offset;
+
+			/* send and receive data accordingly */
+			if (send_first) {
+				send_result(previous_node);
+				receive_result(previous_node);
+				if (next_node != previous_node) {
+					send_result(next_node);
+					receive_result(next_node);
+				}
+			} else {
+				receive_result(next_node);
+				send_result(next_node);
+				if (next_node != previous_node) {
+					receive_result(previous_node);
+					send_result(previous_node);
+				}
+			}
+		}
 
 		/* copy local data */
 		copy_result();
@@ -345,7 +371,7 @@ namespace iqs::mpi {
 		/* regenerate real, imag and is_unique */
 		#pragma omp parallel for schedule(static)
 		for (size_t id = 0; id < num_object; ++id) {
-			size_t oid = original_id[id];
+			size_t oid = next_oid[id];
 
 			real[oid] = partitioned_real[id];
 			imag[oid] = partitioned_imag[id];
