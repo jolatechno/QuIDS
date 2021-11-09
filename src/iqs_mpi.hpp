@@ -27,6 +27,61 @@ namespace iqs::mpi {
 		mpi_iteration() {}
 		mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
+		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator) {
+			/* send size */
+			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+
+			if (num_object_sent != 0) {
+				size_t begin = num_object - num_object_sent;
+
+				/* prepare send */
+				size_t send_object_begin = object_begin[begin];
+				#pragma omp parallel for schedule(static)
+				for (size_t i = begin + 1; i <= num_object; ++i)
+					object_begin[i] -= send_object_begin;
+
+				/* send properties */
+				MPI_Send(real.begin() + begin, num_object_sent, MPI_DOUBLE, node, 0 /* tag */, communicator);
+				MPI_Send(imag.begin() + begin, num_object_sent, MPI_DOUBLE, node, 0 /* tag */, communicator);
+				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+
+				/* send objects */
+				size_t send_object_size = object_begin[num_object];
+				MPI_Send(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator);
+
+				/* pop */
+				pop(num_object_sent, false);
+			}
+		}
+		void receive_objects(int node, MPI_Comm communicator) {
+			/* receive size */
+			size_t num_object_sent;
+			MPI_Recv(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+
+			if (num_object_sent != 0) {
+				/* prepare state */
+				resize(num_object + num_object_sent);
+
+				/* receive properties */
+				MPI_Recv(real.begin() + num_object, num_object_sent, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(imag.begin() + num_object, num_object_sent, MPI_DOUBLE, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+
+				/* prepare receive objects */
+				size_t send_object_begin = object_begin[num_object];
+				size_t send_object_size = object_begin[num_object + num_object_sent];
+				allocate(send_object_begin + send_object_size);
+
+				/* receive objects */
+				MPI_Recv(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator, &utils::global_status);
+
+				/* correct values */
+				#pragma omp parallel for schedule(static)
+				for (size_t i = num_object + 1; i <= num_object + num_object_sent; ++i)
+					object_begin[i] += send_object_begin;
+				num_object += num_object_sent;
+			}
+		}
 		void distribute_objects(MPI_Comm communicator, int node_id);
 		void gather_objects(MPI_Comm communicator, int node_id);
 	};
@@ -447,64 +502,17 @@ namespace iqs::mpi {
 		MPI_Comm_rank(communicator, &rank);
 
 		if (rank == node_id) {
-			size_t begin_offset = 0;
-			size_t begin_offset_0 = object_begin[num_object / size];
+			size_t num_object_sent = num_object / size;
 			for (int node = 1; node < size; ++node) {
 				int node_to_send = node <= node_id ? node - 1 : node;
 
-				/* compute sizes */
-				size_t begin = (node * num_object) / size;
-				size_t end = ((node + 1) * num_object) / size;
-				size_t num_object_sent = end - begin;
-
-				if (num_object_sent != 0) {
-					/* take offset into account */
-					begin_offset += object_begin[begin];
-
-					#pragma omp parallel for
-					for (size_t i = begin + 1; i <= end; ++i)
-						object_begin[i] -= begin_offset;
-				}
-				
-				/* send size */
-				MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node_to_send, 0 /* tag */, communicator);
-
-				if (num_object_sent != 0) {
-					/* send properties */
-					MPI_Send(real.begin() + begin, num_object_sent, MPI_DOUBLE, node_to_send, 0 /* tag */, communicator);
-					MPI_Send(imag.begin() + begin, num_object_sent, MPI_DOUBLE, node_to_send, 0 /* tag */, communicator);
-					MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node_to_send, 0 /* tag */, communicator);
-
-					/* send objects */
-					size_t objects_size = object_begin[end];
-					MPI_Send(objects.begin() + begin_offset, objects_size, MPI_CHAR, node_to_send, 0 /* tag */, communicator);
-				}
+				/* send objects */
+				send_objects(num_object_sent, node_to_send, communicator);
 			}
 
-			/* resize this node */
-			num_object = num_object / size;
-			object_begin[num_object] = begin_offset_0;
-			resize(num_object);
-			objects.resize(object_begin[num_object]);
-		} else {
-			/* receive size */
-			MPI_Recv(&num_object, 1, MPI_UNSIGNED_LONG_LONG, node_id, 0 /* tag */, communicator, &utils::global_status);
-
-			/* prepare state */
-			resize(num_object);
-
-			if (num_object != 0) {
-				/* receive properties */
-				MPI_Recv(real.begin(), num_object, MPI_DOUBLE, node_id, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(imag.begin(), num_object, MPI_DOUBLE, node_id, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(object_begin.begin() + 1, num_object, MPI_UNSIGNED_LONG_LONG, node_id, 0 /* tag */, communicator, &utils::global_status);
-
-				/* receive objects */
-				size_t objects_size = object_begin[num_object];
-				objects.zero_resize(objects_size);
-				MPI_Recv(objects.begin(), objects_size, MPI_CHAR, node_id, 0 /* tag */, communicator, &utils::global_status);
-			}
-		}
+		} else
+			/* receive objects */
+			receive_objects(node_id, communicator);
 	}
 
 	/*
@@ -518,57 +526,13 @@ namespace iqs::mpi {
 		if (rank == node_id) {
 			for (int node = 1; node < size; ++node) {
 				int receive_node = node <= node_id ? node - 1 : node;
-				size_t next_num_object, num_object_sent;
 
-				/* receive size */
-				MPI_Recv(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, receive_node, 0 /* tag */, communicator, &utils::global_status);
-				if (num_object_sent != 0) {
-					next_num_object = num_object_sent + num_object;
-
-					/* prepare state */
-					resize(next_num_object);
-
-					/* receive properties */
-					MPI_Recv(real.begin() + num_object, num_object_sent, MPI_DOUBLE, receive_node, 0 /* tag */, communicator, &utils::global_status);
-					MPI_Recv(imag.begin() + num_object, num_object_sent, MPI_DOUBLE, receive_node, 0 /* tag */, communicator, &utils::global_status);
-					MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, receive_node, 0 /* tag */, communicator, &utils::global_status);
-
-					/* take offset into account */
-					size_t objects_size = object_begin[next_num_object];
-					size_t begin_offset = object_begin[num_object];
-
-					#pragma omp parallel for
-					for (size_t i = num_object + 1; i <= next_num_object; ++i)
-						object_begin[i] += begin_offset;
-
-					/* receive objects */
-					objects.resize(objects_size);
-					MPI_Recv(objects.begin() + begin_offset, objects_size, MPI_CHAR, receive_node, 0 /* tag */, communicator, &utils::global_status);
-
-					/* set size */
-					num_object = next_num_object;
-				}
+				/* receive objects */
+				receive_objects(receive_node, communicator);
 			}
 
-		} else {
-			/* send size */
-			MPI_Send(&num_object, 1, MPI_UNSIGNED_LONG_LONG, node_id, 0 /* tag */, communicator);
-
-			if (num_object != 0) {
-				/* send properties */
-				MPI_Send(real.begin(), num_object, MPI_DOUBLE, node_id, 0 /* tag */, communicator);
-				MPI_Send(imag.begin(), num_object, MPI_DOUBLE, node_id, 0 /* tag */, communicator);
-				MPI_Send(object_begin.begin() + 1, num_object, MPI_UNSIGNED_LONG_LONG, node_id, 0 /* tag */, communicator);
-
-				/* send objects */
-				size_t objects_size = object_begin[num_object];
-				MPI_Send(objects.begin(), objects_size, MPI_CHAR, node_id, 0 /* tag */, communicator);
-
-				/* clear this state */
-				num_object = 0;
-				resize(num_object);
-				objects.zero_resize(0);
-			}
-		}
+		} else
+			/* send objects */
+			send_objects(num_object, node_id, communicator);
 	}
 }

@@ -1,4 +1,4 @@
-# Irregular Quantum Simulator
+# Irregular Quantum Simulator 
 
 ## Installation
 
@@ -180,6 +180,7 @@ public:
 	iteration(char* object_begin_, char* object_end_);
 
 	void append(char* object_begin_, char* object_end_, PROBA_TYPE real_ = 1, PROBA_TYPE imag_ = 0);
+	void pop(uint n=1, bool normalize_=true);
 	char* get_object(size_t object_id, size_t &object_size, PROBA_TYPE *&real_, PROBA_TYPE *&imag_);
 	char const* get_object(size_t object_id, size_t &object_size, PROBA_TYPE &real_, PROBA_TYPE &imag_) const;
 
@@ -192,6 +193,7 @@ The `iteration` class (or `it_t` type) has two constructors, a basic one, and on
 
 Member functions are:
 - `append(...)` : Append an object to the state, with a give magnitude (default = 1).
+- `pop(...)` : Remove the `n` last objects, and normalze (if `normalize_` is `true`).
 - `get_object(...)` : Allows to read (either as constant or not) an objects and its magnitude, with a given `object_id` between 0 and `num_object`. Note that the non-constant function takes pointers for `real` and `imag`.
 
 Member variables are:
@@ -224,6 +226,8 @@ public:
 	mpi_iteration() {}
 	mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
+	void send_objects(size_t num_object_sent, int node, MPI_Comm communicator);
+	void receive_objects(int node, MPI_Comm communicator);
 	void distribute_objects(MPI_Comm comunicator, int node_id);
 	void gather_objects(MPI_Comm comunicator, int node_id);
 
@@ -235,8 +239,10 @@ private:
 The `mpi_iteration` class (or `mpi_it_t` type) inehrits all the public memeber functions and varibale of the `iteration` class (or `it_t` type), and shares similar constructors.
 
 The additional member functions are:
-- `distribute_objects(..)` : distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes.
-- `gather_objects(...)` : gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined.
+- `send_objects(...)` : Send a given number of object to a node, and `pop` them of the sending one.
+- `receive_objects(...)` : Receiving end of the `send_objects(...)` function.
+- `distribute_objects(..)` : Distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes.
+- `gather_objects(...)` : Gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined.
 
 ### Global parameters
 

@@ -151,6 +151,16 @@ namespace iqs {
 			real[num_object - 1] = real_; imag[num_object - 1] = imag_;
 			object_begin[num_object] = offset + size;
 		}
+		void pop(size_t n=1, bool normalize_=true) {
+			if (n < 1)
+				return;
+
+			num_object -= n;
+			allocate(object_begin[num_object]);
+			resize(num_object);
+
+			if (normalize_) normalize();
+		}
 		char* get_object(size_t object_id, size_t &object_size, PROBA_TYPE *&real_, PROBA_TYPE *&imag_) {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
@@ -380,7 +390,7 @@ namespace iqs {
 		}
 
 		bool fast = false;
-		bool skip_test = num_object < utils::min_vector_size;
+		bool skip_test = (collision_test_proportion == 0) || (num_object < utils::min_vector_size);
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
 
 		/*
@@ -568,10 +578,11 @@ namespace iqs {
 
 		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
 
-		#pragma omp parallel for
-		for (size_t oid = 0; oid < num_object; ++oid) {
-			real[oid] /= normalization_factor;
-			imag[oid] /= normalization_factor;
-		}
+		if (normalization_factor != 1)
+			#pragma omp parallel for
+			for (size_t oid = 0; oid < num_object; ++oid) {
+				real[oid] /= normalization_factor;
+				imag[oid] /= normalization_factor;
+			}
 	}
 }
