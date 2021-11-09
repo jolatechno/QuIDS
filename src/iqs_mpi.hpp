@@ -494,6 +494,10 @@ namespace iqs::mpi {
 	}
 
 	/*
+	"utility" functions from here on:
+	*/
+
+	/*
 	function to distribute objects across nodes
 	*/
 	void mpi_iteration::distribute_objects(MPI_Comm communicator, int node_id=0) {
@@ -501,10 +505,11 @@ namespace iqs::mpi {
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 
+		size_t initial_num_object = num_object;
 		if (rank == node_id) {
-			size_t num_object_sent = num_object / size;
 			for (int node = 1; node < size; ++node) {
-				int node_to_send = node <= node_id ? node - 1 : node;
+				int node_to_send = node <= node_id ? node - 1 : node; //skip this node
+				size_t num_object_sent = (initial_num_object * (node + 1)) / size - (initial_num_object * node) / size; //better way to spread evently
 
 				/* send objects */
 				send_objects(num_object_sent, node_to_send, communicator);
