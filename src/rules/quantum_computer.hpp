@@ -3,14 +3,16 @@
 #include "../iqs.hpp"
 
 namespace iqs::rules::quantum_computer {
+	using namespace std::complex_literals;
+
 	namespace utils {
 		void print(iqs::it_t const &iter) {
 			for (auto oid = 0; oid < iter.num_object; ++oid) {
 				size_t size;
-				PROBA_TYPE real, imag;
-				auto begin = iter.get_object(oid, size, real, imag);
+				mag_t mag;
+				auto begin = iter.get_object(oid, size, mag);
 
-				std::cout << "\t" << real << (imag < 0 ? " - " : " + ") << std::abs(imag) << "i  ";
+				std::cout << "\t" << mag.real() << (mag.imag() < 0 ? " - " : " + ") << std::abs(mag.imag()) << "i  ";
 				for (auto it = begin; it != begin + size; ++it)
 					std::cout << (*it ? '1' : '0');
 				std::cout << "\n";
@@ -19,7 +21,7 @@ namespace iqs::rules::quantum_computer {
 	}
 
 	modifier_t inline cnot(uint32_t control_bit, uint32_t bit) {
-		return [=](char* begin, char* end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+		return [=](char* begin, char* end, mag_t &mag) {
 			begin[bit] ^= begin[control_bit];
 		};
 	}
@@ -33,10 +35,9 @@ namespace iqs::rules::quantum_computer {
 			num_child = 2;
 			max_child_size = std::distance(parent_begin, parent_end);
 		}
-		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const override {
 			static const PROBA_TYPE sqrt2 = 1/std::sqrt(2);
-			PROBA_TYPE multiplier = parent_begin[bit] && child_id ? -sqrt2 : sqrt2;
-			real *= multiplier; imag *= multiplier;
+			mag *= parent_begin[bit] && child_id ? -sqrt2 : sqrt2;
 
 			size_t n_bit = std::distance(parent_begin, parent_end);
 			for (auto i = 0; i < n_bit; ++i)
@@ -49,32 +50,25 @@ namespace iqs::rules::quantum_computer {
 	};
 
 	modifier_t inline Xgate(size_t bit) {
-		return [=](char* begin, char* end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+		return [=](char* begin, char* end, mag_t &mag) {
 			begin[bit] = !begin[bit];
 		};
 	}
 
 	modifier_t inline Ygate(size_t bit) {
-		return [=](char* begin, char* end, PROBA_TYPE &real, PROBA_TYPE &imag) {
-			PROBA_TYPE r = -imag;
-			imag = real;
-			real = r;
-
-			if (begin[bit]) {
-				real = -real;
-				imag = -imag;
-			}
+		return [=](char* begin, char* end, mag_t &mag) {
+			mag *= 1.0i;
+			if (begin[bit])
+				mag *= -1;
 
 			begin[bit] = !begin[bit];
 		};
 	}
 
 	modifier_t inline Zgate(size_t bit) {
-		return [=](char* begin, char* end, PROBA_TYPE &real, PROBA_TYPE &imag) {
-			if (begin[bit]) {
-				real = -real;
-				imag = -imag;
-			}
+		return [=](char* begin, char* end, mag_t &mag) {
+			if (begin[bit])
+				mag *= -1;
 
 			begin[bit] = !begin[bit];
 		};

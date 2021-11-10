@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
 
 	/* applying a modifier */
 	iqs::simulate(state, my_modifier);
-	iqs::simulate(state, [](char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+	iqs::simulate(state, [](char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
 			/* using lambda-expressions */
 		});
 
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
 
 	/* applying a modifier */
 	iqs::simulate(state, my_modifier);
-	iqs::simulate(state, [](char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+	iqs::simulate(state, [](char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
 			/* using lambda-expressions */
 		});
 
@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
 A `modifier` is a simple functions that takes a objects, and modify it in place, while keep its size unchanged.
 
 ```cpp
-void my_modifier(char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+void my_modifier(char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
 	// modify the object...
 }
 ```
@@ -95,7 +95,7 @@ public:
 
 	inline char* populate_child(char const *parent_begin, char const *parent_end, 
 		uint32_t child_id, 
-		PROBA_TYPE &real, PROBA_TYPE &imag,
+		std::complex<PROBA_TYPE> &mag,
 		char* child_begin) const override;
 
 	inline size_t hasher(char const *parent_begin, char const *parent_end) const; // optional
@@ -121,10 +121,10 @@ Note that `child_id` is a number from `0` to `num_child`, and simply identify "c
 ```cpp
 inline char* my_rule::populate_child(char const *parent_begin, char const *parent_end,
 	uint32_t child_id,
-	PROBA_TYPE &real, PROBA_TYPE &imag,
+	std::complex<PROBA_TYPE> &mag,
 	char* child_begin) const override
 {
-	// modify imag and real...
+	// modify mag...
 	// populate the child, starting at child_begin
 	return child_end;
 }
@@ -179,10 +179,10 @@ public:
 	iteration();
 	iteration(char* object_begin_, char* object_end_);
 
-	void append(char* object_begin_, char* object_end_, PROBA_TYPE real_ = 1, PROBA_TYPE imag_ = 0);
+	void append(char* object_begin_, char* object_end_, std::complex<PROBA_TYPE> &mag=1);
 	void pop(uint n=1, bool normalize_=true);
-	char* get_object(size_t object_id, size_t &object_size, PROBA_TYPE *&real_, PROBA_TYPE *&imag_);
-	char const* get_object(size_t object_id, size_t &object_size, PROBA_TYPE &real_, PROBA_TYPE &imag_) const;
+	char* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> *&mag);
+	char const* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> &mag) const;
 
 private:
 	/*...*/
@@ -194,7 +194,7 @@ The `iteration` class (or `it_t` type) has two constructors, a basic one, and on
 Member functions are:
 - `append(...)` : Append an object to the state, with a give magnitude (default = 1).
 - `pop(...)` : Remove the `n` last objects, and normalze (if `normalize_` is `true`).
-- `get_object(...)` : Allows to read (either as constant or not) an objects and its magnitude, with a given `object_id` between 0 and `num_object`. Note that the non-constant function takes pointers for `real` and `imag`.
+- `get_object(...)` : Allows to read (either as constant or not) an objects and its magnitude, with a given `object_id` between 0 and `num_object`. Note that the non-constant function takes pointers for `mag`.
 
 Member variables are:
 - `num_object` : Number of object describing this state currently in superposition.

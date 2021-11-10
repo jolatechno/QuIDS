@@ -3,6 +3,7 @@
 #include <parallel/algorithm>
 #include <parallel/numeric>
 
+#include <complex>
 #include <cstddef>
 #include <vector>
 #include <tbb/concurrent_hash_map.h> // For concurrent hash map.
@@ -36,8 +37,7 @@ defining openmp function's return values if openmp isn't installed or loaded
 
 namespace iqs {
 	namespace utils {
-		#include "utils/complex.hpp"
-		#include "utils/load_balancing.hpp"
+		//#include "utils/load_balancing.hpp"
 		#include "utils/memory.hpp"
 		#include "utils/random.hpp"
 		#include "utils/vector.hpp"
@@ -75,10 +75,11 @@ namespace iqs {
 	}();
 
 	/* forward typedef */
+	typedef std::complex<PROBA_TYPE> mag_t;
 	typedef class iteration it_t;
 	typedef class symbolic_iteration sy_it_t;
 	typedef class rule rule_t;
-	typedef std::function<void(char* parent_begin, char* parent_end, PROBA_TYPE &real, PROBA_TYPE &imag)> modifier_t;
+	typedef std::function<void(char* parent_begin, char* parent_end, mag_t &mag)> modifier_t;
 	typedef std::function<void(int step)> debug_t;
 
 	/* 
@@ -88,7 +89,7 @@ namespace iqs {
 	public:
 		rule() {};
 		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const = 0;
-		virtual inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const = 0;
+		virtual inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const = 0;
 		virtual inline size_t hasher(char const *parent_begin, char const *parent_end) const { //can be overwritten
 			return std::hash<std::string_view>()(std::string_view(parent_begin, std::distance(parent_begin, parent_end)));
 		}
@@ -104,14 +105,13 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
 	protected:
-		utils::numa_vector<PROBA_TYPE> real, imag;
+		utils::numa_vector<mag_t> magnitude;
 		utils::numa_vector<char> objects;
 		utils::numa_vector<size_t> object_begin;
 		mutable utils::numa_vector<uint32_t> num_childs;
 
 		void inline resize(size_t num_object) const {
-			real.resize(num_object);
-			imag.resize(num_object);
+			magnitude.resize(num_object);
 			num_childs.resize(num_object + 1);
 			object_begin.resize(num_object + 1);
 		}
@@ -138,7 +138,7 @@ namespace iqs {
 		iteration(char* object_begin_, char* object_end_) : iteration() {
 			append(object_begin_, object_end_);
 		}
-		void append(char* object_begin_, char* object_end_, PROBA_TYPE real_ = 1, PROBA_TYPE imag_ = 0) {
+		void append(char* object_begin_, char* object_end_, mag_t mag=1) {
 			size_t offset = object_begin[num_object];
 			size_t size = std::distance(object_begin_, object_end_);
 
@@ -148,7 +148,7 @@ namespace iqs {
 			for (size_t i = 0; i < size; ++i)
 				objects[offset + i] = object_begin_[i];
 
-			real[num_object - 1] = real_; imag[num_object - 1] = imag_;
+			magnitude[num_object - 1] = mag;
 			object_begin[num_object] = offset + size;
 		}
 		void pop(size_t n=1, bool normalize_=true) {
@@ -161,16 +161,16 @@ namespace iqs {
 
 			if (normalize_) normalize();
 		}
-		char* get_object(size_t object_id, size_t &object_size, PROBA_TYPE *&real_, PROBA_TYPE *&imag_) {
+		char* get_object(size_t object_id, size_t &object_size, mag_t *&mag) {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
-			real_ = &real[object_id]; imag_ = &imag[object_id];
+			mag = &magnitude[object_id];
 			return objects.begin() + this_object_begin;
 		}
-		char const* get_object(size_t object_id, size_t &object_size, PROBA_TYPE &real_, PROBA_TYPE &imag_) const {
+		char const* get_object(size_t object_id, size_t &object_size, mag_t &mag) const {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
-			real_ = real[object_id]; imag_ = imag[object_id];
+			mag = magnitude[object_id];
 			return objects.begin() + this_object_begin;
 		}
 	};
@@ -187,7 +187,7 @@ namespace iqs {
 		tbb::concurrent_hash_map<size_t, size_t> elimination_map;
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 
-		utils::numa_vector<PROBA_TYPE> real, imag;
+		utils::numa_vector<mag_t> magnitude;
 		utils::numa_vector<size_t> next_oid;
 		utils::numa_vector<size_t> size;
 		utils::numa_vector<size_t> hash;
@@ -197,8 +197,7 @@ namespace iqs {
 		utils::numa_vector<double> random_selector;
 
 		void inline resize(size_t num_object) {
-			real.resize(num_object);
-			imag.resize(num_object);
+			magnitude.resize(num_object);
 			next_oid.iota_resize(num_object);
 			size.zero_resize(num_object);
 			hash.zero_resize(num_object);
@@ -243,8 +242,8 @@ namespace iqs {
 
 		// get the total memory
 		long long int total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
-			last_iteration.real.size()*last_iteration.memory_size + next_iteration.real.size()*next_iteration.memory_size + // size of properties
-			symbolic_iteration.real.size()*symbolic_iteration.memory_size + // size of symbolic properties
+			last_iteration.magnitude.size()*last_iteration.memory_size + next_iteration.magnitude.size()*next_iteration.memory_size + // size of properties
+			symbolic_iteration.magnitude.size()*symbolic_iteration.memory_size + // size of symbolic properties
 			mem_difference; // free memory
 
 		// compute average object size
@@ -294,7 +293,7 @@ namespace iqs {
 			/* generate graph */
 			rule(objects.begin() + object_begin[oid],
 				objects.begin() + object_begin[oid + 1],
-				real[oid], imag[oid]);
+				magnitude[oid]);
 	}
 
 	/*
@@ -363,12 +362,11 @@ namespace iqs {
 				auto id = symbolic_iteration.parent_oid[oid];
 
 				/* generate graph */
-				symbolic_iteration.real[oid] = real[id];
-				symbolic_iteration.imag[oid] = imag[id];
+				symbolic_iteration.magnitude[oid] = magnitude[id];
 				char* end = rule->populate_child(objects.begin() + object_begin[id],
 					objects.begin() + object_begin[id + 1],
 					symbolic_iteration.child_id[oid],
-					symbolic_iteration.real[oid], symbolic_iteration.imag[oid], symbolic_iteration.placeholder[thread_id]);
+					symbolic_iteration.magnitude[oid], symbolic_iteration.placeholder[thread_id]);
 
 				symbolic_iteration.size[oid] = std::distance(symbolic_iteration.placeholder[thread_id], end);
 
@@ -402,10 +400,7 @@ namespace iqs {
 				return false;
 
 			/* check for zero probability */
-			PROBA_TYPE r = real[oid];
-			PROBA_TYPE i = imag[oid];
-
-			return r*r + i*i > tolerance;
+			return std::norm(magnitude[oid]) > tolerance;
 		};
 
 		/*
@@ -418,8 +413,7 @@ namespace iqs {
 				is_unique[oid] = true; /* keep this graph */
 			} else {
 				/* if it exist add the probabilities */
-				real[it->second] += real[oid];
-				imag[it->second] += imag[oid];
+				magnitude[it->second] += magnitude[oid];
 
 				/* discard this graph */
 				is_unique[oid] = false;
@@ -484,11 +478,8 @@ namespace iqs {
 			for (size_t i = 0; i < num_object_after_interferences; ++i)  {
 				size_t oid = next_oid[i];
 
-				PROBA_TYPE r = real[oid];
-				PROBA_TYPE i = imag[oid];
-
 				double random_number = utils::unfiorm_from_hash(hash[oid]); //random_generator();
-				random_selector[oid] = std::log( -std::log(1 - random_number) / (r*r + i*i));
+				random_selector[oid] = std::log( -std::log(1 - random_number) / std::norm(magnitude[oid]));
 			}
 
 			/* select graphs according to random selectors */
@@ -521,8 +512,7 @@ namespace iqs {
 			next_iteration.object_begin[oid + 1] = size[id];
 
 			/* assign magnitude */
-			next_iteration.real[oid] = real[id];
-			next_iteration.imag[oid] = imag[id];
+			next_iteration.magnitude[oid] = magnitude[id];
 		}
 
 		__gnu_parallel::partial_sum(next_iteration.object_begin.begin() + 1,
@@ -540,7 +530,7 @@ namespace iqs {
 		#pragma omp parallel
 		{
 			auto thread_id = omp_get_thread_num();
-			PROBA_TYPE real_, imag_;
+			mag_t mag_;
 
 			#pragma omp for schedule(static)
 			for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
@@ -550,7 +540,7 @@ namespace iqs {
 				rule->populate_child(last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid],
 					last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid + 1],
 					child_id[id],
-					real_, imag_,
+					mag_,
 					next_iteration.objects.begin() + next_iteration.object_begin[oid]);
 			}
 		}
@@ -569,20 +559,14 @@ namespace iqs {
 		total_proba = 0;
 
 		#pragma omp parallel for reduction(+:total_proba)
-		for (size_t oid = 0; oid < num_object; ++oid) {
-			PROBA_TYPE r = real[oid];
-			PROBA_TYPE i = imag[oid];
-
-			total_proba += r*r + i*i;
-		}
+		for (size_t oid = 0; oid < num_object; ++oid)
+			total_proba += std::norm(magnitude[oid]);
 
 		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
 
 		if (normalization_factor != 1)
 			#pragma omp parallel for
-			for (size_t oid = 0; oid < num_object; ++oid) {
-				real[oid] /= normalization_factor;
-				imag[oid] /= normalization_factor;
-			}
+			for (size_t oid = 0; oid < num_object; ++oid)
+				magnitude[oid] /= normalization_factor;
 	}
 }

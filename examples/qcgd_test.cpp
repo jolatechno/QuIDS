@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
 	iqs::it_t state = iqs::rules::qcgd::flags::read_state("6");//;3,imag=1,real=0");
 
 	auto [erase_create, reversed_erase_create] = iqs::rules::qcgd::flags::read_rule("erase_create,theta=0.3333");
-	auto [coin, reversed_coin] = iqs::rules::qcgd::flags::read_rule("erase_create,theta=0.25,phi=0.25");
+	auto [coin, reversed_coin] = iqs::rules::qcgd::flags::read_rule("coin,theta=0.25,phi=0.25");
 	auto [split_merge, reversed_split_merge] = iqs::rules::qcgd::flags::read_rule("split_merge,theta=0.25,phi=0.25");
 	auto [step, reversed_step] = iqs::rules::qcgd::flags::read_rule("step");
 	
@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 
 	std::cout << "initial state:\n"; iqs::rules::qcgd::utils::print(state);
 
-	iqs::simulate(state, iqs::rules::qcgd::step);
+	step(state, buffer, sy_it);
 	std::cout << "\nafter step:\n"; iqs::rules::qcgd::utils::print(state);
 
 	coin(state, buffer, sy_it);

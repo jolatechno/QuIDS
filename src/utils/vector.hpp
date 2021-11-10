@@ -83,7 +83,7 @@ public:
 
 			#pragma omp parallel for schedule(static)
 			for (size_t i = 0; i < size_; ++i)
-				((value_type volatile *)ptr)[i] = ptr[i]; // touch memory
+				volatile value_type _ = ptr[i]; // touch memory
     	}
     }
 
