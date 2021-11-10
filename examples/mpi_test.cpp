@@ -53,17 +53,16 @@ int main(int argc, char* argv[]) {
 	iqs::simulate(state, X2);
 
 	if (rank == 0) std::cout << "\napplied some gates:\n"; print_all(state, MPI_COMM_WORLD);
-
+	
 	state.distribute_objects(MPI_COMM_WORLD, master_node_id);
 
 	if (rank == 0) std::cout << "\ndistributed all objects:\n"; print_all(state, MPI_COMM_WORLD);
 
 	iqs::simulate(state, X2);
 	iqs::mpi::simulate(state, H0, buffer, sy_it, MPI_COMM_WORLD);
-	if (rank == 0) std::cout << "\napplied first gate in reverse other (" << state.total_proba << "=P):\n"; print_all(state, MPI_COMM_WORLD);
 	iqs::mpi::simulate(state, H2, buffer, sy_it, MPI_COMM_WORLD);
-	if (rank == 0) std::cout << "\napplied second gate in reverse other (" << state.total_proba << "=P):\n"; print_all(state, MPI_COMM_WORLD);
 	iqs::mpi::simulate(state, H1, buffer, sy_it, MPI_COMM_WORLD);
+
 	if (rank == 0) std::cout << "\napplied all gate in reverse other (" << state.total_proba << "=P):\n"; print_all(state, MPI_COMM_WORLD);
 
 	state.gather_objects(MPI_COMM_WORLD, master_node_id);

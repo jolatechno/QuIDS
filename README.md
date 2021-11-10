@@ -226,6 +226,7 @@ public:
 	mpi_iteration() {}
 	mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
+	void equalize(MPI_Comm communicator);
 	void send_objects(size_t num_object_sent, int node, MPI_Comm communicator);
 	void receive_objects(int node, MPI_Comm communicator);
 	void distribute_objects(MPI_Comm comunicator, int node_id);
@@ -239,6 +240,7 @@ private:
 The `mpi_iteration` class (or `mpi_it_t` type) inehrits all the public memeber functions and varibale of the `iteration` class (or `it_t` type), and shares similar constructors.
 
 The additional member functions are:
+- `equalize(...)` : Does its best at equalizing the number of object on each node. Will only equalize among pair (in hopefully the optimal pair-arangment), so it's up to you to check if the objects are equally shared among nodes, as some spetial cases can't be equalized well by this algorithm.
 - `send_objects(...)` : Send a given number of object to a node, and `pop` them of the sending one.
 - `receive_objects(...)` : Receiving end of the `send_objects(...)` function.
 - `distribute_objects(..)` : Distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes.

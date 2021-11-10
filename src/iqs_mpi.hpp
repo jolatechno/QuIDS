@@ -82,6 +82,7 @@ namespace iqs::mpi {
 				num_object += num_object_sent;
 			}
 		}
+		void equalize(MPI_Comm communicator);
 		void distribute_objects(MPI_Comm communicator, int node_id);
 		void gather_objects(MPI_Comm communicator, int node_id);
 	};
@@ -539,5 +540,68 @@ namespace iqs::mpi {
 		} else
 			/* send objects */
 			send_objects(num_object, node_id, communicator);
+	}
+
+	/*
+	equalize the number of objects across nodes
+	*/
+	void mpi_iteration::equalize(MPI_Comm communicator) {
+		static const int alone_marker = -1;
+
+		int size, rank;
+		MPI_Comm_size(communicator, &size);
+		MPI_Comm_rank(communicator, &rank);
+
+		/* gather sizes */
+		size_t *sizes;
+		if (rank == 0)
+			sizes = (size_t*)calloc(size, sizeof(size_t));
+		MPI_Gather(&num_object, 1, MPI_LONG_LONG_INT, sizes, 1, MPI_LONG_LONG_INT, 0, communicator);
+
+		int this_pair_id;
+		if (rank == 0) {
+			/* partition */
+			int *pair_id = (int*)calloc(size / 2, sizeof(int));
+			int alone_node = utils::make_equal_pairs(sizes, sizes + size, pair_id);
+
+			/* tell which node is alone */
+			if (alone_node >= 0) {
+				MPI_Send(&alone_marker, 1, MPI_INT, alone_node, 0 /* tag */, communicator);
+			}
+
+			/* send pair idx */
+			this_pair_id = pair_id[0];
+			for (int i = 0; i < size / 2; ++i) {
+				if (i != 0) MPI_Send(&pair_id[i], 1, MPI_INT, i, 0 /* tag */, communicator);
+				MPI_Send(&i, 1, MPI_INT, pair_id[i], 0 /* tag */, communicator);
+			}
+
+		} else
+			/* receive pair idx */
+			MPI_Recv(&this_pair_id, 1, MPI_INT, 0, 0 /* tag */, communicator, &utils::global_status);
+
+		/* skip if this node is alone */
+		if (this_pair_id == alone_marker)
+			return;
+
+		/* get the number of objects of the respective pairs */
+		size_t other_num_object;
+		if (rank < size / 2) {
+			MPI_Send(&num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator);
+			MPI_Recv(&other_num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator, &utils::global_status);
+		} else {
+			MPI_Recv(&other_num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator, &utils::global_status);
+			MPI_Send(&num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator);
+		}
+
+		/* equalize amoung pairs */
+		if (num_object == other_num_object)
+			return;
+		if (num_object > other_num_object) {
+			size_t num_object_sent = (num_object -  other_num_object) / 2;
+			send_objects(num_object_sent, this_pair_id, communicator);
+		} else {
+			receive_objects(this_pair_id, communicator);
+		}
 	}
 }
