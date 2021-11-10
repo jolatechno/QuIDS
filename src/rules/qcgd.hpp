@@ -233,9 +233,9 @@ namespace iqs::rules::qcgd {
 
 		void randomize(iqs::it_t &iter) {
 			size_t size;
-			PROBA_TYPE *real, *imag;
+			mag_t *mag_;
 			for (auto gid = 0; gid < iter.num_object; ++gid) {
-				char *begin = iter.get_object(gid, size, real, imag);
+				char *begin = iter.get_object(gid, size, mag_);
 				graphs::randomize(begin);
 			}
 		}
@@ -269,11 +269,11 @@ namespace iqs::rules::qcgd {
 			__gnu_parallel::sort(gids, gids + iter.num_object, [&](size_t gid1, size_t gid2) {
 				size_t size;
 
-				PROBA_TYPE r1, r2, i1, i2;
-				iter.get_object(gid1, size, r1, i1);
-				iter.get_object(gid2, size, r2, i2);
+				mag_t mag1, mag2;
+				iter.get_object(gid1, size, mag1);
+				iter.get_object(gid2, size, mag2);
 
-				return r1*r1 + i1*i1 > r2*r2 + i2*i2;
+				return std::norm(mag1) > std::norm(mag2);
 			});
 
 			size_t num_prints = std::min(iter.num_object, max_print_num_graphs);
@@ -281,13 +281,13 @@ namespace iqs::rules::qcgd {
 				size_t gid = gids[i];
 
 				size_t size;
-				PROBA_TYPE real, imag;
-				const char* begin = iter.get_object(gid, size, real, imag);
+				mag_t mag;
+				const char* begin = iter.get_object(gid, size, mag);
 
 				uint16_t const num_nodes = graphs::num_nodes(begin);
 
-				real = std::abs(real) < iqs::tolerance ? 0 : real;
-				imag = std::abs(imag) < iqs::tolerance ? 0 : imag;
+				PROBA_TYPE real = std::abs(mag.real()) < iqs::tolerance ? 0 : mag.real();
+				PROBA_TYPE imag = std::abs(mag.imag()) < iqs::tolerance ? 0 : mag.imag();
 
 				std::cout << "\t" << real << (imag < 0 ? " - " : " + ") << std::abs(imag) << "i  ";
 
@@ -320,17 +320,17 @@ namespace iqs::rules::qcgd {
 
 			for (auto gid = 0; gid < iter.num_object; ++gid) {
 				size_t size;
-				PROBA_TYPE r, i;
-				const char* begin = iter.get_object(gid, size, r, i);
+				mag_t mag;
+				const char* begin = iter.get_object(gid, size, mag);
 
-				double proba = r*r + i*i;
+				double proba = std::norm(mag);
 
 				uint16_t const num_nodes = graphs::num_nodes(begin);
 				double double_num_nodes = num_nodes;
 
 				double density = 0;
 				for (auto i = 0; i < num_nodes; ++i)
-					density += graphs::left(begin, i); + graphs::right(begin, i);
+					density += graphs::left(begin, i) + graphs::right(begin, i);
 				density /= 2*double_num_nodes;
 
 				avg_size += proba*double_num_nodes;
@@ -360,7 +360,7 @@ namespace iqs::rules::qcgd {
 		}
 	}
 
-	void step(char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+	void step(char *parent_begin, char *parent_end, mag_t &mag) {
 		uint16_t num_nodes = graphs::num_nodes(parent_begin);
 		auto left_ = graphs::left(parent_begin);
 		auto right_ = graphs::right(parent_begin);
@@ -368,7 +368,7 @@ namespace iqs::rules::qcgd {
 		std::rotate(right_, right_ + num_nodes - 1, right_ + num_nodes);
 	}
 
-	void reversed_step(char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+	void reversed_step(char *parent_begin, char *parent_end, mag_t &mag) {
 		uint16_t num_nodes = graphs::num_nodes(parent_begin);
 		auto left_ = graphs::left(parent_begin);
 		auto right_ = graphs::right(parent_begin);
@@ -377,17 +377,17 @@ namespace iqs::rules::qcgd {
 	}
 
 	class erase_create : public iqs::rule {
-		PROBA_TYPE do_real = 1;
-		PROBA_TYPE do_imag = 0;
-		PROBA_TYPE do_not_real = 0;
-		PROBA_TYPE do_not_imag = 0;
+		mag_t do_ = 1;
+		mag_t do_not = 0;
+		mag_t do_conj = 1;
+		mag_t do_not_conj = 0;
 
 	public:
 		erase_create(PROBA_TYPE theta, PROBA_TYPE phi = 0, PROBA_TYPE xi = 0) {
-			do_real = std::sin(theta) * std::cos(phi);
-			do_imag = std::sin(theta) * std::sin(phi);
-			do_not_real = std::cos(theta) * std::cos(xi);
-			do_not_imag = std::cos(theta) * std::sin(xi);
+			do_ = std::polar(std::sin(theta), phi);
+			do_not = std::polar(std::cos(theta), xi);
+			do_conj = std::conj(do_);
+			do_not_conj = std::conj(do_not);
 		}
 		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
@@ -404,7 +404,7 @@ namespace iqs::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const override {
 			char* child_end = operations::copy(parent_begin, parent_end, child_begin);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -414,13 +414,13 @@ namespace iqs::rules::qcgd {
 
 				uint8_t sum = left + right;
 				if ((sum & 1) == 0) {
-					PROBA_TYPE sign = 1 - sum;
+					bool conj = sum / 2;
 					if (child_id & 1) {
-						iqs::utils::time_equal(real, imag, do_real, sign*do_imag);
+						mag *= conj ? do_conj : do_;
 						left = !left;
 						right = !right;
 					} else
-						iqs::utils::time_equal(real, imag, sign*do_not_real, do_not_imag);
+						mag *= conj ? -do_not_conj : do_not;
 					child_id >>= 1;
 				}
 			}
@@ -430,17 +430,17 @@ namespace iqs::rules::qcgd {
 	};
 
 	class coin : public iqs::rule {
-		PROBA_TYPE do_real = 1;
-		PROBA_TYPE do_imag = 0;
-		PROBA_TYPE do_not_real = 0;
-		PROBA_TYPE do_not_imag = 0;
+		mag_t do_ = 1;
+		mag_t do_not = 0;
+		mag_t do_conj = 1;
+		mag_t do_not_conj = 0;
 
 	public:
 		coin(PROBA_TYPE theta, PROBA_TYPE phi = 0, PROBA_TYPE xi = 0) {
-			do_real = std::sin(theta) * std::cos(phi);
-			do_imag = std::sin(theta) * std::sin(phi);
-			do_not_real = std::cos(theta) * std::cos(xi);
-			do_not_imag = std::cos(theta) * std::sin(xi);
+			do_ = std::polar(std::sin(theta), phi);
+			do_not = std::polar(std::cos(theta), xi);
+			do_conj = std::conj(do_);
+			do_not_conj = std::conj(do_not);
 		}
 		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
@@ -457,7 +457,7 @@ namespace iqs::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const override {
 			char* child_end = operations::copy(parent_begin, parent_end, child_begin);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -466,13 +466,13 @@ namespace iqs::rules::qcgd {
 				bool &right = graphs::right(child_begin, i);
 
 				if (left ^ right /* == 1 */) {
-					PROBA_TYPE sign = 1 - 2*left;
+					bool conj = left;
 					if (child_id & 1) {
-						iqs::utils::time_equal(real, imag, do_real, sign*do_imag);
+						mag *= conj ? do_conj : do_;
 						left = !left;
 						right = !right;
 					} else
-						iqs::utils::time_equal(real, imag, sign*do_not_real, do_not_imag);
+						mag *= conj ? -do_not_conj : do_not;
 					child_id >>= 1;
 				}
 			}
@@ -482,17 +482,17 @@ namespace iqs::rules::qcgd {
 	};
 
 	class split_merge : public iqs::rule {
-		PROBA_TYPE do_real = 1;
-		PROBA_TYPE do_imag = 0;
-		PROBA_TYPE do_not_real = 0;
-		PROBA_TYPE do_not_imag = 0;
+		mag_t do_ = 1;
+		mag_t do_not = 0;
+		mag_t do_conj = 1;
+		mag_t do_not_conj = 0;
 
 	public:
 		split_merge(PROBA_TYPE theta, PROBA_TYPE phi = 0, PROBA_TYPE xi = 0) {
-			do_real = std::sin(theta) * std::cos(phi);
-			do_imag = std::sin(theta) * std::sin(phi);
-			do_not_real = std::cos(theta) * std::cos(xi);
-			do_not_imag = std::cos(theta) * std::sin(xi);
+			do_ = std::polar(std::sin(theta), phi);
+			do_not = std::polar(std::cos(theta), xi);
+			do_conj = std::conj(do_);
+			do_not_conj = std::conj(do_not);
 		}
 		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
@@ -517,7 +517,7 @@ namespace iqs::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, PROBA_TYPE &real, PROBA_TYPE &imag, char* child_begin) const override {
+		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const override {
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 
 			/* check for first split or last merge */
@@ -530,15 +530,15 @@ namespace iqs::rules::qcgd {
 			/* proba for first split or last merge */
 			first_split &= child_id; //forget last split if it shouldn't happend
 			if (first_split) {
-				iqs::utils::time_equal(real, imag, do_real, do_imag);
+				mag *= do_;
 				child_id >>= 1;
 			}
 			if (last_merge) {
 				if (child_id & 1) {
-					iqs::utils::time_equal(real, imag, do_real, -do_imag);
+					mag *= do_conj;
 				} else {
 					last_merge = false;
-					iqs::utils::time_equal(real, imag, -do_not_real, do_not_imag);
+					mag *= -do_not_conj;
 				}
 				child_id >>= 1;
 			}	
@@ -561,15 +561,15 @@ namespace iqs::rules::qcgd {
 
 						/* get proba */
 						if (split) {
-							iqs::utils::time_equal(real, imag, do_real, do_imag);
+							mag *= do_;
 						} else
-							iqs::utils::time_equal(real, imag, do_real, -do_imag);
+							mag *= do_conj;
 					} else
 						/* get proba */
 						if (split) {
-							iqs::utils::time_equal(real, imag, do_not_real, do_not_imag);
+							mag *= do_not;
 						} else
-							iqs::utils::time_equal(real, imag, -do_not_real, do_not_imag);
+							mag *= -do_not_conj;
 
 					child_id_copy >>= 1;
 				}
@@ -818,7 +818,7 @@ namespace iqs::rules::qcgd {
 				for (auto i = 0; i < n_graphs; ++i) {
 					char *begin, *end;
 					utils::make_graph(begin, end, n_node);
-					state.append(begin, end, real, imag);
+					state.append(begin, end, {real, imag});
 				}
 			}
 

@@ -40,9 +40,9 @@ int main(int argc, char* argv[]) {
 		char starting_state_1[4] = {true, true, false, false};
 		char starting_state_2[5] = {false, true, true, false, true};
 		char starting_state_3[6] = {false, true, true, false, true, false};
-		state.append(starting_state_1, starting_state_1 + 4, 0.5, -0.5);
-		state.append(starting_state_2, starting_state_2 + 5, 0, 0.5);
-		state.append(starting_state_3, starting_state_3 + 6, 0.5, 0);
+		state.append(starting_state_1, starting_state_1 + 4, {0.5, -0.5});
+		state.append(starting_state_2, starting_state_2 + 5, {0, 0.5});
+		state.append(starting_state_3, starting_state_3 + 6, 0.5);
 	}
 
 	if (rank == 0) std::cout << "initial state:\n"; print_all(state, MPI_COMM_WORLD);
@@ -60,10 +60,9 @@ int main(int argc, char* argv[]) {
 
 	iqs::simulate(state, X2);
 	iqs::mpi::simulate(state, H0, buffer, sy_it, MPI_COMM_WORLD);
-	if (rank == 0) std::cout << "\napplied first gate in reverse other (" << state.total_proba << "=P):\n"; print_all(state, MPI_COMM_WORLD);
 	iqs::mpi::simulate(state, H2, buffer, sy_it, MPI_COMM_WORLD);
-	if (rank == 0) std::cout << "\napplied second gate in reverse other (" << state.total_proba << "=P):\n"; print_all(state, MPI_COMM_WORLD);
 	iqs::mpi::simulate(state, H1, buffer, sy_it, MPI_COMM_WORLD);
+
 	if (rank == 0) std::cout << "\napplied all gate in reverse other (" << state.total_proba << "=P):\n"; print_all(state, MPI_COMM_WORLD);
 
 	state.gather_objects(MPI_COMM_WORLD, master_node_id);

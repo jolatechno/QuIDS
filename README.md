@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
 
 	/* applying a modifier */
 	iqs::simulate(state, my_modifier);
-	iqs::simulate(state, [](char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+	iqs::simulate(state, [](char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
 			/* using lambda-expressions */
 		});
 
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
 
 	/* applying a modifier */
 	iqs::simulate(state, my_modifier);
-	iqs::simulate(state, [](char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+	iqs::simulate(state, [](char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
 			/* using lambda-expressions */
 		});
 
@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
 A `modifier` is a simple functions that takes a objects, and modify it in place, while keep its size unchanged.
 
 ```cpp
-void my_modifier(char *parent_begin, char *parent_end, PROBA_TYPE &real, PROBA_TYPE &imag) {
+void my_modifier(char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
 	// modify the object...
 }
 ```
@@ -95,7 +95,7 @@ public:
 
 	inline char* populate_child(char const *parent_begin, char const *parent_end, 
 		uint32_t child_id, 
-		PROBA_TYPE &real, PROBA_TYPE &imag,
+		std::complex<PROBA_TYPE> &mag,
 		char* child_begin) const override;
 
 	inline size_t hasher(char const *parent_begin, char const *parent_end) const; // optional
@@ -121,10 +121,10 @@ Note that `child_id` is a number from `0` to `num_child`, and simply identify "c
 ```cpp
 inline char* my_rule::populate_child(char const *parent_begin, char const *parent_end,
 	uint32_t child_id,
-	PROBA_TYPE &real, PROBA_TYPE &imag,
+	std::complex<PROBA_TYPE> &mag,
 	char* child_begin) const override
 {
-	// modify imag and real...
+	// modify mag...
 	// populate the child, starting at child_begin
 	return child_end;
 }
@@ -179,9 +179,10 @@ public:
 	iteration();
 	iteration(char* object_begin_, char* object_end_);
 
-	void append(char* object_begin_, char* object_end_, PROBA_TYPE real_ = 1, PROBA_TYPE imag_ = 0);
-	char* get_object(size_t object_id, size_t &object_size, PROBA_TYPE *&real_, PROBA_TYPE *&imag_);
-	char const* get_object(size_t object_id, size_t &object_size, PROBA_TYPE &real_, PROBA_TYPE &imag_) const;
+	void append(char* object_begin_, char* object_end_, std::complex<PROBA_TYPE> &mag=1);
+	void pop(uint n=1, bool normalize_=true);
+	char* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> *&mag);
+	char const* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> &mag) const;
 
 private:
 	/*...*/
@@ -192,7 +193,8 @@ The `iteration` class (or `it_t` type) has two constructors, a basic one, and on
 
 Member functions are:
 - `append(...)` : Append an object to the state, with a give magnitude (default = 1).
-- `get_object(...)` : Allows to read (either as constant or not) an objects and its magnitude, with a given `object_id` between 0 and `num_object`. Note that the non-constant function takes pointers for `real` and `imag`.
+- `pop(...)` : Remove the `n` last objects, and normalze (if `normalize_` is `true`).
+- `get_object(...)` : Allows to read (either as constant or not) an objects and its magnitude, with a given `object_id` between 0 and `num_object`. Note that the non-constant function takes pointers for `mag`.
 
 Member variables are:
 - `num_object` : Number of object describing this state currently in superposition.
@@ -224,6 +226,9 @@ public:
 	mpi_iteration() {}
 	mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
+	void equalize(MPI_Comm communicator);
+	void send_objects(size_t num_object_sent, int node, MPI_Comm communicator);
+	void receive_objects(int node, MPI_Comm communicator);
 	void distribute_objects(MPI_Comm comunicator, int node_id);
 	void gather_objects(MPI_Comm comunicator, int node_id);
 
@@ -235,8 +240,11 @@ private:
 The `mpi_iteration` class (or `mpi_it_t` type) inehrits all the public memeber functions and varibale of the `iteration` class (or `it_t` type), and shares similar constructors.
 
 The additional member functions are:
-- `distribute_objects(..)` : distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes.
-- `gather_objects(...)` : gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined.
+- `equalize(...)` : Does its best at equalizing the number of object on each node. Will only equalize among pair (in hopefully the optimal pair-arangment), so it's up to you to check if the objects are equally shared among nodes, as some spetial cases can't be equalized well by this algorithm.
+- `send_objects(...)` : Send a given number of object to a node, and `pop` them of the sending one.
+- `receive_objects(...)` : Receiving end of the `send_objects(...)` function.
+- `distribute_objects(..)` : Distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes.
+- `gather_objects(...)` : Gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined.
 
 ### Global parameters
 
