@@ -207,15 +207,10 @@ namespace iqs::mpi {
 
 		/* equalize and/or normalize */
 		size_t average_num_object = iteration.get_total_num_object(communicator) / size;
-		if (average_num_object > min_equalize_size) {
-
-			/* if both condition are met equalize */
-			float max_imbalance = get_max_num_object_imbalance(iteration, average_num_object, communicator);
-			if (max_imbalance > equalize_imablance)
-				do {
-					iteration.equalize(communicator);
-				} while(get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance);
-		}
+		if (average_num_object > min_equalize_size)
+			/* equalize if both condition are met equalize */
+			while (get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance)
+				iteration.equalize(communicator);
 			
 		mid_step_function(8);
 
@@ -417,46 +412,28 @@ namespace iqs::mpi {
 
 			/* compute receive / send order */
 			bool send_first = rank % (2*offset) < offset;
-			bool send_last = (rank == size - 1) && (size % 2 == 1);
+			bool previous_send_first = previous_node % (2*offset) < offset;
 
-			/* weird edge case */
-			if (send_last) {
-				/* send accordingly to next_node */
-				bool other_send_first = next_node % (2*offset) < offset;
-				if (other_send_first) {
-					receive_data(next_node);
-					send_data(next_node);
-				} else {
-					send_data(next_node);
-					receive_data(next_node);
-				}
-
-				/* receive accordingly from next_node */
-				other_send_first = previous_node % (2*offset) < offset;
-				if (other_send_first) {
-					receive_data(previous_node);
-					send_data(previous_node);
-				} else {
-					send_data(previous_node);
-					receive_data(previous_node);
-				}
-			} else
-				/* send and receive data normaly */
-				if (send_first) {
-					send_data(next_node);
-					receive_data(next_node);
-					if (next_node != previous_node) {
+			/* send and receive data normaly */
+			if (send_first) {
+				send_data(next_node);
+				receive_data(next_node);
+				if (next_node != previous_node)
+					if (previous_send_first) {
+						receive_data(previous_node);
+						send_data(previous_node);
+					} else {
 						send_data(previous_node);
 						receive_data(previous_node);
 					}
-				} else {
-					receive_data(previous_node);
-					send_data(previous_node);
-					if (next_node != previous_node) {
-						receive_data(next_node);
-						send_data(next_node);
-					}
+			} else {
+				receive_data(previous_node);
+				send_data(previous_node);
+				if (next_node != previous_node) {
+					receive_data(next_node);
+					send_data(next_node);
 				}
+			}
 		}
 
 		/* copy local data */
@@ -496,46 +473,28 @@ namespace iqs::mpi {
 
 			/* compute receive / send order */
 			bool send_first = rank % (2*offset) < offset;
-			bool send_last = (rank == size - 1) && (size % 2 == 1);
+			bool previous_send_first = previous_node % (2*offset) < offset;
 
-			/* weird edge case */
-			if (send_last) {
-				/* send accordingly to next_node */
-				bool other_send_first = next_node % (2*offset) < offset;
-				if (other_send_first) {
-					receive_result(next_node);
-					send_result(next_node);
-				} else {
-					send_result(next_node);
-					receive_result(next_node);
-				}
-
-				/* receive accordingly from next_node */
-				other_send_first = previous_node % (2*offset) < offset;
-				if (other_send_first) {
-					receive_result(previous_node);
-					send_result(previous_node);
-				} else {
-					send_result(previous_node);
-					receive_result(previous_node);
-				}
-			} else
-				/* send and receive data normaly */
-				if (send_first) {
-					send_result(next_node);
-					receive_result(next_node);
-					if (next_node != previous_node) {
+			/* send and receive data normaly */
+			if (send_first) {
+				send_result(next_node);
+				receive_result(next_node);
+				if (next_node != previous_node)
+					if (previous_send_first) {
+						receive_result(previous_node);
+						send_result(previous_node);
+					} else {
 						send_result(previous_node);
 						receive_result(previous_node);
 					}
-				} else {
-					receive_result(previous_node);
-					send_result(previous_node);
-					if (next_node != previous_node) {
-						receive_result(next_node);
-						send_result(next_node);
-					}
+			} else {
+				receive_result(previous_node);
+				send_result(previous_node);
+				if (next_node != previous_node) {
+					receive_result(next_node);
+					send_result(next_node);
 				}
+			}
 		}
 
 		/* copy local data */
