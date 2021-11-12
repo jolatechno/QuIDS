@@ -40,9 +40,9 @@ int main(int argc, char* argv[]) {
 		char starting_state_1[4] = {true, true, false, false};
 		char starting_state_2[5] = {false, true, true, false, true};
 		char starting_state_3[6] = {false, true, true, false, true, false};
-		state.append(starting_state_1, starting_state_1 + 4, {0.5, -0.5});
+		state.append(starting_state_1, starting_state_1 + 4, 0.5);
 		state.append(starting_state_2, starting_state_2 + 5, {0, 0.5});
-		state.append(starting_state_3, starting_state_3 + 6, 0.5);
+		state.append(starting_state_3, starting_state_3 + 6, {0.5, -0.5});
 	}
 
 	if (rank == 0) std::cout << "initial state:\n"; print_all(state, MPI_COMM_WORLD);
@@ -57,6 +57,15 @@ int main(int argc, char* argv[]) {
 	state.distribute_objects(MPI_COMM_WORLD, master_node_id);
 
 	if (rank == 0) std::cout << "\ndistributed all objects:\n"; print_all(state, MPI_COMM_WORLD);
+
+	float average_size = state.average_value(
+		(std::function<float(const char*, const char*)>)[](const char *begin, const char *end) {
+			return (float)std::distance(begin, end);
+		}, MPI_COMM_WORLD);
+	if (rank == 0) std::cout << "\nthe average size is " << average_size << "\n";
+
+	size_t total_num_object = state.get_total_num_object(MPI_COMM_WORLD);
+	if (rank == 0) std::cout << "the total number of objects is " << total_num_object << "\n";
 
 	iqs::simulate(state, X2);
 	iqs::mpi::simulate(state, H0, buffer, sy_it, MPI_COMM_WORLD);

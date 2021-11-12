@@ -161,6 +161,31 @@ namespace iqs {
 
 			if (normalize_) normalize();
 		}
+		template<class T>
+		T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const {
+			T avg = 0;
+
+			#pragma omp parallel
+			{	
+				/* compute average per thread */
+				T local_avg = 0;
+				#pragma omp for schedule(static)
+				for (size_t oid = 0; oid < num_object; ++oid) {
+					size_t size;
+					std::complex<PROBA_TYPE> mag;
+
+					/* get object and accumulate */
+					char const *this_object_begin = get_object(oid, size, mag);
+					local_avg += observable(this_object_begin, this_object_begin + size) * std::norm(mag);
+				}
+
+				/* accumulate thread averages */
+				#pragma omp critical
+				avg += local_avg;
+			}
+
+			return avg;
+		}
 		char* get_object(size_t object_id, size_t &object_size, mag_t *&mag) {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;

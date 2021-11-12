@@ -26,9 +26,75 @@ namespace iqs::mpi {
 		void normalize(MPI_Comm communicator);
 
 	public:
+		PROBA_TYPE node_total_proba = 0;
+
 		mpi_iteration() {}
 		mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
+		size_t get_total_num_object(MPI_Comm communicator) {
+			int size, rank;
+			MPI_Comm_size(communicator, &size);
+			MPI_Comm_rank(communicator, &rank);
+
+			/* accumulate number of node */
+			size_t total_num_object = num_object;
+			if (rank == 0) {
+				/* add the number of node for each node */
+				size_t local_num_object;
+				for (int node = 1; node < size; ++node) {
+					MPI_Recv(&local_num_object, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+					total_num_object += local_num_object;
+				}
+
+				/* send back number of node */
+				for (int node = 1; node < size; ++node)
+					MPI_Send(&total_num_object, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
+			} else {
+				/* send local number of node */
+				MPI_Send(&num_object, 1, MPI::UNSIGNED_LONG, 0, 0 /* tag */, communicator);
+
+				/* receive total number of node */
+				MPI_Recv(&total_num_object, 1, MPI::UNSIGNED_LONG, 0, 0 /* tag */, communicator, &utils::global_status);
+			}
+
+			return total_num_object;
+		}
+		template<class T>
+		T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const {
+			return iqs::iteration::average_value(observable) / node_total_proba;
+		}
+		template<class T>
+		T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable, MPI_Comm communicator) const {
+			int size, rank;
+			MPI_Comm_size(communicator, &size);
+			MPI_Comm_rank(communicator, &rank);
+
+			/* compute local average */
+			T avg = iqs::iteration::average_value(observable);
+
+			/* accumulate average value */
+			MPI_Datatype avg_datatype = utils::get_mpi_datatype(avg);
+			if (rank == 0) {
+				/* add avgerages for each node */
+				T local_avg;
+				for (int node = 1; node < size; ++node) {
+					MPI_Recv(&local_avg, 1, avg_datatype, node, 0 /* tag */, communicator, &utils::global_status);
+					avg += local_avg;
+				}
+
+				/* send back total avgerage */
+				for (int node = 1; node < size; ++node)
+					MPI_Send(&avg, 1, avg_datatype, node, 0 /* tag */, communicator);
+			} else {
+				/* send local avgerage */
+				MPI_Send(&avg, 1, avg_datatype, 0, 0 /* tag */, communicator);
+
+				/* receive total avgerage */
+				MPI_Recv(&avg, 1, avg_datatype, 0, 0 /* tag */, communicator, &utils::global_status);
+			}
+
+			return avg;
+		}
 		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator) {
 			/* send size */
 			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
@@ -438,17 +504,18 @@ namespace iqs::mpi {
 		step (8)
 		 !!!!!!!!!!!!!!!! */
 
-		PROBA_TYPE local_total_proba = 0;
+		node_total_proba = 0;
 		total_proba = 0;
 
-		#pragma omp parallel for reduction(+:local_total_proba)
+		#pragma omp parallel for reduction(+:node_total_proba)
 		for (size_t oid = 0; oid < num_object; ++oid)
-			local_total_proba += std::norm(magnitude[oid]);
+			node_total_proba += std::norm(magnitude[oid]);
 
 		/* accumulate probabilities on the master node */
 		if (rank == 0) {
 			/* add total proba for each node */
-			total_proba = local_total_proba;
+			total_proba = node_total_proba;
+			PROBA_TYPE local_total_proba;
 			for (int node = 1; node < size; ++node) {
 				MPI_Recv(&local_total_proba, 1, Proba_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
 				total_proba += local_total_proba;
@@ -459,7 +526,7 @@ namespace iqs::mpi {
 				MPI_Send(&total_proba, 1, Proba_MPI_Datatype, node, 0 /* tag */, communicator);
 		} else {
 			/* send local proba */
-			MPI_Send(&local_total_proba, 1, Proba_MPI_Datatype, 0, 0 /* tag */, communicator);
+			MPI_Send(&node_total_proba, 1, Proba_MPI_Datatype, 0, 0 /* tag */, communicator);
 
 			/* receive total proba */
 			MPI_Recv(&total_proba, 1, Proba_MPI_Datatype, 0, 0 /* tag */, communicator, &utils::global_status);
@@ -470,6 +537,8 @@ namespace iqs::mpi {
 			#pragma omp parallel for
 			for (size_t oid = 0; oid < num_object; ++oid)
 				magnitude[oid] /= normalization_factor;
+
+		node_total_proba /= total_proba;
 	}
 
 	/*
@@ -497,6 +566,9 @@ namespace iqs::mpi {
 		} else
 			/* receive objects */
 			receive_objects(node_id, communicator);
+
+		/* to compute node_total_proba */
+		normalize(communicator);
 	}
 
 	/*
@@ -518,6 +590,10 @@ namespace iqs::mpi {
 		} else
 			/* send objects */
 			send_objects(num_object, node_id, communicator);
+
+		/* compute node_total_proba */
+			if (rank != node_id)
+				node_total_proba = 0;
 	}
 
 	/*
@@ -581,5 +657,8 @@ namespace iqs::mpi {
 		} else {
 			receive_objects(this_pair_id, communicator);
 		}
+
+		/* to compute node_total_proba */
+		normalize(communicator);
 	}
 }

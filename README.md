@@ -184,6 +184,9 @@ public:
 	char* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> *&mag);
 	char const* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> &mag) const;
 
+	template<class T>
+	T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const;
+
 private:
 	/*...*/
 };
@@ -195,6 +198,7 @@ Member functions are:
 - `append(...)` : Append an object to the state, with a give magnitude (default = 1).
 - `pop(...)` : Remove the `n` last objects, and normalze (if `normalize_` is `true`).
 - `get_object(...)` : Allows to read (either as constant or not) an objects and its magnitude, with a given `object_id` between 0 and `num_object`. Note that the non-constant function takes pointers for `mag`.
+- `average_value(...)` : Compute the average value of an observable (a function) of any type (that can be added, initialized by `T x = 0`, and multiplied by an object of type `PROBA_TYPE`).
 
 Member variables are:
 - `num_object` : Number of object describing this state currently in superposition.
@@ -223,14 +227,20 @@ typedef class mpi_iteration mpi_it_t;
 
 class mpi_iteration : public iqs::iteration {
 public:
+	PROBA_TYPE node_total_proba = 0;
+
 	mpi_iteration() {}
 	mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
 	void equalize(MPI_Comm communicator);
+	size_t get_total_num_object(MPI_Comm communicator);
 	void send_objects(size_t num_object_sent, int node, MPI_Comm communicator);
 	void receive_objects(int node, MPI_Comm communicator);
 	void distribute_objects(MPI_Comm comunicator, int node_id);
 	void gather_objects(MPI_Comm comunicator, int node_id);
+
+	template<class T>
+	T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable, MPI_Comm communicator) const
 
 private:
 	/*...*/
@@ -241,10 +251,14 @@ The `mpi_iteration` class (or `mpi_it_t` type) inehrits all the public memeber f
 
 The additional member functions are:
 - `equalize(...)` : Does its best at equalizing the number of object on each node. Will only equalize among pair (in hopefully the optimal pair-arangment), so it's up to you to check if the objects are equally shared among nodes, as some spetial cases can't be equalized well by this algorithm.
+- `get_total_num_object(...)` : Get the total number of object accross all nodes.
 - `send_objects(...)` : Send a given number of object to a node, and `pop` them of the sending one.
 - `receive_objects(...)` : Receiving end of the `send_objects(...)` function.
 - `distribute_objects(..)` : Distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes.
 - `gather_objects(...)` : Gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined.
+- `average_value(...)` : equiavlent to the normal `iteration` member function, but for the whole distributed wave function (__note that calling__ `average_value(...)` __without an__ `MPI_Comm` __will return a local average value for retrocompatibility with the basic__ `iteration` __class__).
+
+`node_total_proba` is the only additional member variable, and is the proportion of total probability that is held by a given node.
 
 ### Global parameters
 
