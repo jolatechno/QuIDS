@@ -211,6 +211,8 @@ typedef class mpi_symbolic_iteration mpi_sy_it_t;
 
 class mpi_symbolic_iteration : public iqs::symbolic_iteration {
 public:
+	size_t get_total_num_object(MPI_Comm communicator) const;
+	size_t get_total_num_object_after_interferences(MPI_Comm communicator) const;
 	mpi_symbolic_iteration() {}
 
 private:
@@ -219,6 +221,10 @@ private:
 ```
 
 The `mpi_symbolic_iteration` class (or `mpi_sy_it_t` type) can be considered as exactly equivalent to the `symbolic_iteration` class (or `sy_it_t` type).
+
+The two added member functions are:
+- `get_total_num_object(...)` : Get the total number of object at symbolic iteration accross all nodes.
+- `get_total_num_object_after_interferences(...)` : Get the total number of object at symbolic iteration, after interferences but before truncation, accross all nodes.
 
 #### MPI iteration
 
@@ -233,7 +239,7 @@ public:
 	mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
 	void equalize(MPI_Comm communicator);
-	size_t get_total_num_object(MPI_Comm communicator);
+	size_t get_total_num_object(MPI_Comm communicator) const;
 	void send_objects(size_t num_object_sent, int node, MPI_Comm communicator);
 	void receive_objects(int node, MPI_Comm communicator);
 	void distribute_objects(MPI_Comm comunicator, int node_id);
@@ -266,10 +272,17 @@ In addition to classes, some global parameters are used to modify the behaviour 
 
 ```cpp
 namespace iqs {
-	void set_tolerance(PROBA_TYPE val) { /* ... */ } // default is TOLERANCE
-	void set_safety_margin(float val) { /* ... */ } // default is SAFETY_MARGIN
-	void set_collision_test_proportion(float val) { /* ... */ } // default is COLLISION_TEST_PROPORTION
-	void set_collision_tolerance(float val) { /* ... */ } // default is COLLISION_TOLERANCE
+	PROBA_TYPE tolerance = TOLERANCE;
+	float safety_margin = SAFETY_MARGIN;
+	float collision_test_proportion = COLLISION_TEST_PROPORTION;
+	float collision_tolerance = default is COLLISION_TOLERANCE;
+
+	namespace mpi {
+		size_t min_equalize_size = MIN_EQUALIZE_SIZE;
+		float equalize_imablance = EQUALIZE_IMBALANCE;
+
+		/* ... */
+	}
 
 	namespace utils {
 		float upsize_policy = UPSIZE_POLICY;
@@ -287,17 +300,25 @@ The default value of any of those variable can be altered at compilation, by pas
 
 #### tolerance
 
-`tolerance` (which is only accessible through `set_tolerance()`) represents the minimum probability considered non-zero (default is `1e-18`, to compensate for numerical errors).
+`tolerance` represents the minimum probability considered non-zero (default is `1e-18`, to compensate for numerical errors).
 
 #### safety margin
 
-`safety_margin` (which is only accessible through `set_safety_margin()`) represents the target proportion of memory to keep free (default is `0.2` for 20%).
+`safety_margin` represents the target proportion of memory to keep free (default is `0.2` for 20%).
 
 #### collision test proportion and collision tolerance
 
-`collision_test_proportion` (which is only accessible through `set_safety_margin()`) represents the proportion of objects for which with first remove duplicates, we then continue removing duplicates only if the proportion of duplicates is greater than `collision_tolerance` (which is itself only accessible through `set_collision_tolerance()`).
+`collision_test_proportion` represents the proportion of objects for which with first remove duplicates, we then continue removing duplicates only if the proportion of duplicates is greater than `collision_tolerance`.
 
 `collision_test_proportion` has a default of  `0.1` and `collision_tolerance` has a default of `0.05`.
+
+#### minimum equalize size and equalize imbalance.
+
+`mpi::min_equalize_size` represents the minimum per node average size required to automaticly call `equalize(...)` after a call to `iqs::mpi::simulate(...)`.
+
+If this first condition is met, `equalize(...)` if the maximum relative imbalance in the number of object accross the nodes is greater than `mpi::equalize_imablance`.
+
+`mpi::min_equalize_size` has the same default as `utils::min_vector_size` by default, and `mpi::equalize_imablance` has a default of `0.2`.
 
 #### min vector size
 

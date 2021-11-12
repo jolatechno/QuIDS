@@ -22,7 +22,7 @@ void print_all(iqs::mpi::mpi_it_t const &iteration, MPI_Comm comunicator) {
 int main(int argc, char* argv[]) {
 	int master_node_id = 1;
 
-	iqs::set_tolerance(1e-8);
+	iqs::tolerance = 1e-8;
 
 	int size, rank;
     MPI_Init(&argc, &argv);

@@ -21,12 +21,8 @@ namespace iqs::mpi {
 	/* 
 	global variables
 	*/
-	namespace {
-		size_t min_equalize_size = MIN_EQUALIZE_SIZE;
-		float equalize_imablance = EQUALIZE_IMBALANCE;
-	}
-	void set_min_equalize_size(size_t value) { min_equalize_size = value; }
-	void set_equalize_imablance(float value) { equalize_imablance = value; }
+	size_t min_equalize_size = MIN_EQUALIZE_SIZE;
+	float equalize_imablance = EQUALIZE_IMBALANCE;
 
 	/* forward typedef */
 	typedef class mpi_iteration mpi_it_t;
@@ -48,11 +44,7 @@ namespace iqs::mpi {
 		mpi_iteration() {}
 		mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
-		size_t get_total_num_object(MPI_Comm communicator) {
-			int size, rank;
-			MPI_Comm_size(communicator, &size);
-			MPI_Comm_rank(communicator, &rank);
-
+		size_t get_total_num_object(MPI_Comm communicator) const {
 			/* accumulate number of node */
 			size_t total_num_object;
 			MPI_Allreduce(&num_object, &total_num_object, 1, MPI::UNSIGNED_LONG, MPI_SUM, communicator);
@@ -165,9 +157,7 @@ namespace iqs::mpi {
 		std::vector<node_map_type> node_map;
 
 		void compute_collisions(MPI_Comm communicator);
-		void resize(size_t size) {
-			iqs::symbolic_iteration::resize(size);
-
+		void mpi_resize(size_t size) {
 			partitioned_mag.resize(size);
 			partitioned_hash.resize(size);
 			partitioned_is_unique.resize(size);
@@ -176,6 +166,20 @@ namespace iqs::mpi {
 		long long int memory_size = (1 + 3) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
 	public:
+		size_t get_total_num_object(MPI_Comm communicator) const {
+			/* accumulate number of node */
+			size_t total_num_object;
+			MPI_Allreduce(&num_object, &total_num_object, 1, MPI::UNSIGNED_LONG, MPI_SUM, communicator);
+
+			return total_num_object;
+		}
+		size_t get_total_num_object_after_interferences(MPI_Comm communicator) const {
+			/* accumulate number of node */
+			size_t total_num_object_after_interference;
+			MPI_Allreduce(&num_object_after_interferences, &total_num_object_after_interference, 1, MPI::UNSIGNED_LONG, MPI_SUM, communicator);
+
+			return total_num_object_after_interference;
+		}
 		mpi_symbolic_iteration() {}
 	};
 
@@ -256,22 +260,25 @@ namespace iqs::mpi {
 				#pragma omp atomic 
 				++node_map[node_id].num_object_after_interferences;
 			} else {
-				auto [other_id, other_node_id] = it->second;
+				auto [other_oid, other_node_id] = it->second;
 
 				bool is_greater = node_map[node_id].num_object_after_interferences >= node_map[other_node_id].num_object_after_interferences;
 				if (is_greater) {
 					/* if it exist add the probabilities */
-					node_map[other_node_id].magnitude[other_id] += node_map[node_id].magnitude[oid];
+					node_map[other_node_id].magnitude[other_oid] += node_map[node_id].magnitude[oid];
 
 					/* discard this graph */
 					node_map[node_id].is_unique[oid] = false;
 				} else {
+					/* keep this graph */
+					it->second = {oid, node_id};
+
 					/* if the size aren't balanced, add the probabilities */
-					node_map[node_id].magnitude[oid] += node_map[other_node_id].magnitude[other_id];
+					node_map[node_id].magnitude[oid] += node_map[other_node_id].magnitude[other_oid];
 
 					/* discard the other graph */
 					node_map[node_id].is_unique[oid] = true;
-					node_map[other_node_id].is_unique[other_id] = false;
+					node_map[other_node_id].is_unique[other_oid] = false;
 
 					/* increment values */
 					#pragma omp atomic 
@@ -385,6 +392,7 @@ namespace iqs::mpi {
 		MPI_Comm_rank(communicator, &rank);
 
 		node_map.resize(size);
+		mpi_resize(num_object);
 
 		/* partition nodes */
 		modulo_begin = (int*)calloc(size + 1, sizeof(int));
@@ -457,8 +465,8 @@ namespace iqs::mpi {
 		/* generate the interference table */
 		for (int node = 0; node < size; ++node) {
 			bool fast = false;
-			bool skip_test = false; //node_map[node].num_object < iqs::utils::min_vector_size || collision_tolerance == 0;
-			size_t test_size = 0; //skip_test ? 0 : node_map[node].num_object*collision_test_proportion;
+			bool skip_test = node_map[node].num_object < iqs::utils::min_vector_size || collision_tolerance == 0;
+			size_t test_size = skip_test ? 0 : node_map[node].num_object*collision_test_proportion;
 
 			/* first fast test */
 			if (!skip_test) {
@@ -466,7 +474,7 @@ namespace iqs::mpi {
 				for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
 					insert_key(oid, node);
 
-				fast = true; //test_size - elimination_map.size() < test_size*collision_test_proportion;
+				fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
 				if (fast)
 					#pragma omp parallel for schedule(static)
 					for (size_t oid = test_size; oid < node_map[node].num_object; ++oid)
@@ -554,10 +562,6 @@ namespace iqs::mpi {
 	distributed normalization function
 	*/
 	void mpi_iteration::normalize(MPI_Comm communicator) {
-		int size, rank;
-		MPI_Comm_size(communicator, &size);
-		MPI_Comm_rank(communicator, &rank);
-
 		/* !!!!!!!!!!!!!!!!
 		step (8)
 		 !!!!!!!!!!!!!!!! */

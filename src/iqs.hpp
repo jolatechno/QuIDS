@@ -46,20 +46,10 @@ namespace iqs {
 	/*
 	global variable definition
 	*/
-	namespace {
-		PROBA_TYPE tolerance = TOLERANCE;
-		float safety_margin = SAFETY_MARGIN;
-		float collision_test_proportion = COLLISION_TEST_PROPORTION;
-		float collision_tolerance = COLLISION_TOLERANCE;
-	}
-	
-	/*
-	global variable setters
-	*/
-	void set_tolerance(PROBA_TYPE val) { tolerance = val; }
-	void set_safety_margin(float val) { safety_margin = val; }
-	void set_collision_test_proportion(float val) { collision_test_proportion = val; }
-	void set_collision_tolerance(float val) { collision_tolerance = val; }
+	PROBA_TYPE tolerance = TOLERANCE;
+	float safety_margin = SAFETY_MARGIN;
+	float collision_test_proportion = COLLISION_TEST_PROPORTION;
+	float collision_tolerance = COLLISION_TOLERANCE;
 
 	/*
 	number of threads
@@ -241,7 +231,7 @@ namespace iqs {
 				for (size_t i = 0; i < max_size; ++i) buffer[i] = 0; // touch
 			}
 		}
-		
+
 		void compute_collisions();
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function);
 
@@ -451,26 +441,24 @@ namespace iqs {
 			for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
 				insert_key(oid);
 
-			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
-
 			/* check if we should continue */
-			if (fast) {
+			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
+			if (fast)
 				/* get all unique graphs with a non zero probability */
-				auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + test_size, partitioner);
-				partitioned_it = std::rotate(partitioned_it, next_oid.begin() + test_size, next_oid.begin() + num_object);
-				num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
-			}
+				#pragma omp parallel for schedule(static)
+				for (size_t oid = test_size; oid < num_object; ++oid)
+					is_unique[oid] = true;
 		}
 
 		if (!fast) {
 			#pragma omp parallel for schedule(static)
 			for (size_t oid = test_size; oid < num_object; ++oid) //size_t oid = oid[i];
 				insert_key(oid);
-
-			/* get all unique graphs with a non zero probability */
-			auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
-			num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 		}
+
+		/* get all unique graphs with a non zero probability */
+		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
+		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 				
 		elimination_map.clear();
 	}

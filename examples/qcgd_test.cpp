@@ -7,7 +7,7 @@
 #define PI 3.14159265359
 
 int main(int argc, char* argv[]) {
-	iqs::set_tolerance(1e-8);
+	iqs::tolerance = 1e-8;
 
 	iqs::rules::qcgd::flags::read_n_iter("1");
 	iqs::it_t state = iqs::rules::qcgd::flags::read_state("6");//;3,imag=1,real=0");
@@ -38,12 +38,12 @@ int main(int argc, char* argv[]) {
 	split_merge(state, buffer, sy_it);
 	std::cout << "\nafter step + split_merge(P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 
-	iqs::rules::qcgd::utils::set_max_print_num_graphs(10);
+	iqs::rules::qcgd::utils::max_print_num_graphs = 10;
 
 	reversed_split_merge(state, buffer, sy_it);
 	reversed_step(state, buffer, sy_it);
 	reversed_split_merge(state, buffer, sy_it);
 	reversed_erase_create(state, buffer, sy_it);
 	reversed_step(state, buffer, sy_it);
-	std::cout << "\napplied all previous gates in reverse order (P=" << state.total_proba << "):\n"; iqs::set_tolerance(1e-8); iqs::rules::qcgd::utils::print(state);
+	std::cout << "\napplied all previous gates in reverse order (P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 }
