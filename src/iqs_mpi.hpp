@@ -1,18 +1,28 @@
-#ifndef MPI_PROBA_TYPE
-	#define MPI_PROBA_TYPE MPI::DOUBLE
-#endif
-#ifndef MPI_MAG_TYPE
-	#define MPI_MAG_TYPE MPI::DOUBLE_COMPLEX
-#endif
-
 #include "iqs.hpp"
 
 #include <mpi.h>
+
+#ifndef MIN_EQUALIZE_SIZE
+	#define MIN_EQUALIZE_SIZE MIN_VECTOR_SIZE
+#endif
+#ifndef EQUALIZE_IMBALANCE
+	#define EQUALIZE_IMBALANCE 0.2
+#endif
 
 namespace iqs::mpi {
 	namespace utils {        
 		#include "utils/mpi_utils.hpp"
 	}
+
+	/* mpi auto type */
+	const static MPI_Datatype Proba_MPI_Datatype = utils::get_mpi_datatype((PROBA_TYPE)0);
+	const static MPI_Datatype mag_MPI_Datatype = utils::get_mpi_datatype((std::complex<PROBA_TYPE>)0);
+
+	/* 
+	global variables
+	*/
+	size_t min_equalize_size = MIN_EQUALIZE_SIZE;
+	float equalize_imablance = EQUALIZE_IMBALANCE;
 
 	/* forward typedef */
 	typedef class mpi_iteration mpi_it_t;
@@ -29,12 +39,41 @@ namespace iqs::mpi {
 		void normalize(MPI_Comm communicator);
 
 	public:
+		PROBA_TYPE node_total_proba = 0;
+
 		mpi_iteration() {}
 		mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
+		size_t get_total_num_object(MPI_Comm communicator) const {
+			/* accumulate number of node */
+			size_t total_num_object;
+			MPI_Allreduce(&num_object, &total_num_object, 1, MPI::UNSIGNED_LONG, MPI_SUM, communicator);
+
+			return total_num_object;
+		}
+		template<class T>
+		T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const {
+			return iqs::iteration::average_value(observable) / node_total_proba;
+		}
+		template<class T>
+		T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable, MPI_Comm communicator) const {
+			int size, rank;
+			MPI_Comm_size(communicator, &size);
+			MPI_Comm_rank(communicator, &rank);
+
+			/* compute local average */
+			T local_avg = iqs::iteration::average_value(observable);
+
+			/* accumulate average value */
+			T avg;
+			MPI_Datatype avg_datatype = utils::get_mpi_datatype(avg);
+			MPI_Allreduce(&local_avg, &avg, 1, avg_datatype, MPI_SUM, communicator);
+
+			return avg;
+		}
 		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator) {
 			/* send size */
-			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+			MPI_Send(&num_object_sent, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
 
 			if (num_object_sent != 0) {
 				size_t begin = num_object - num_object_sent;
@@ -46,8 +85,8 @@ namespace iqs::mpi {
 					object_begin[i] -= send_object_begin;
 
 				/* send properties */
-				MPI_Send(magnitude.begin() + begin, num_object_sent, MPI_MAG_TYPE, node, 0 /* tag */, communicator);
-				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+				MPI_Send(magnitude.begin() + begin, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator);
+				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
 
 				/* send objects */
 				size_t send_object_size = object_begin[num_object];
@@ -60,15 +99,15 @@ namespace iqs::mpi {
 		void receive_objects(int node, MPI_Comm communicator) {
 			/* receive size */
 			size_t num_object_sent;
-			MPI_Recv(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+			MPI_Recv(&num_object_sent, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
 
 			if (num_object_sent != 0) {
 				/* prepare state */
 				resize(num_object + num_object_sent);
 
 				/* receive properties */
-				MPI_Recv(magnitude.begin() + num_object, num_object_sent, MPI_MAG_TYPE, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(magnitude.begin() + num_object, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
 
 				/* prepare receive objects */
 				size_t send_object_begin = object_begin[num_object];
@@ -118,9 +157,7 @@ namespace iqs::mpi {
 		std::vector<node_map_type> node_map;
 
 		void compute_collisions(MPI_Comm communicator);
-		void resize(size_t size) {
-			iqs::symbolic_iteration::resize(size);
-
+		void mpi_resize(size_t size) {
 			partitioned_mag.resize(size);
 			partitioned_hash.resize(size);
 			partitioned_is_unique.resize(size);
@@ -129,21 +166,63 @@ namespace iqs::mpi {
 		long long int memory_size = (1 + 3) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
 	public:
+		size_t get_total_num_object(MPI_Comm communicator) const {
+			/* accumulate number of node */
+			size_t total_num_object;
+			MPI_Allreduce(&num_object, &total_num_object, 1, MPI::UNSIGNED_LONG, MPI_SUM, communicator);
+
+			return total_num_object;
+		}
+		size_t get_total_num_object_after_interferences(MPI_Comm communicator) const {
+			/* accumulate number of node */
+			size_t total_num_object_after_interference;
+			MPI_Allreduce(&num_object_after_interferences, &total_num_object_after_interference, 1, MPI::UNSIGNED_LONG, MPI_SUM, communicator);
+
+			return total_num_object_after_interference;
+		}
 		mpi_symbolic_iteration() {}
 	};
+
+	/*
+	function to compute the maximum per node size imbablance
+	*/
+	float get_max_num_object_imbalance(mpi_it_t const &iteration, size_t const size_comp, MPI_Comm communicator) {
+		size_t total_imbalance, local_imbalance = (size_t)std::abs((long long int)iteration.num_object - (long long int)size_comp);
+		MPI_Allreduce(&local_imbalance, &total_imbalance, 1, MPI::UNSIGNED_LONG, MPI_MAX, communicator);
+		return ((float) total_imbalance) / ((float) size_comp);
+	}
 
 	/*
 	simulation function
 	*/
 	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, iqs::debug_t mid_step_function=[](int){}) {
+		int size;
+		MPI_Comm_size(communicator, &size);
+
+		/* actual simulation */
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(communicator);
 		symbolic_iteration.finalize(rule, iteration, iteration_buffer, mid_step_function);
-		iteration_buffer.normalize(communicator);
-
-		mid_step_function(8);
-		
 		std::swap(iteration_buffer, iteration);
+
+		/* equalize and/or normalize */
+		size_t average_num_object = iteration.get_total_num_object(communicator) / size;
+		if (average_num_object > min_equalize_size) {
+
+			/* if both condition are met equalize */
+			float max_imbalance = get_max_num_object_imbalance(iteration, average_num_object, communicator);
+			if (max_imbalance > equalize_imablance)
+				do {
+					iteration.equalize(communicator);
+				} while(get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance);
+		}
+			
+		mid_step_function(8);
+
+		/* finish by normalizing */
+		iteration.normalize(communicator);
+
+		mid_step_function(9);
 	}
 
 	/*
@@ -181,22 +260,25 @@ namespace iqs::mpi {
 				#pragma omp atomic 
 				++node_map[node_id].num_object_after_interferences;
 			} else {
-				auto [other_id, other_node_id] = it->second;
+				auto [other_oid, other_node_id] = it->second;
 
 				bool is_greater = node_map[node_id].num_object_after_interferences >= node_map[other_node_id].num_object_after_interferences;
 				if (is_greater) {
 					/* if it exist add the probabilities */
-					node_map[other_node_id].magnitude[other_id] += node_map[node_id].magnitude[oid];
+					node_map[other_node_id].magnitude[other_oid] += node_map[node_id].magnitude[oid];
 
 					/* discard this graph */
 					node_map[node_id].is_unique[oid] = false;
 				} else {
+					/* keep this graph */
+					it->second = {oid, node_id};
+
 					/* if the size aren't balanced, add the probabilities */
-					node_map[node_id].magnitude[oid] += node_map[other_node_id].magnitude[other_id];
+					node_map[node_id].magnitude[oid] += node_map[other_node_id].magnitude[other_oid];
 
 					/* discard the other graph */
 					node_map[node_id].is_unique[oid] = true;
-					node_map[other_node_id].is_unique[other_id] = false;
+					node_map[other_node_id].is_unique[other_oid] = false;
 
 					/* increment values */
 					#pragma omp atomic 
@@ -213,7 +295,7 @@ namespace iqs::mpi {
 		static const auto receive_data = [&](int node) {
 			/* receive size */
 			size_t this_size;
-			MPI_Recv(&this_size, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+			MPI_Recv(&this_size, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
 
 			/* prepare receive */
 			node_map[node].num_object = this_size;
@@ -222,8 +304,8 @@ namespace iqs::mpi {
 
 			/* receive properties */
 			if (this_size > 0) {
-				MPI_Recv(node_map[node].magnitude.begin(), this_size, MPI_MAG_TYPE, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(node_map[node].hash.begin(), this_size, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(node_map[node].magnitude.begin(), this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(node_map[node].hash.begin(), this_size, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
 			}
 		};
 
@@ -233,12 +315,12 @@ namespace iqs::mpi {
 		static const auto send_data = [&](int node) {
 			/* send size */
 			size_t this_size = modulo_begin[node + 1] - modulo_begin[node];
-			MPI_Send(&this_size, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+			MPI_Send(&this_size, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
 
 			/* send properties */
 			if (this_size > 0) {
-				MPI_Send(partitioned_mag.begin() + modulo_begin[node], this_size, MPI_MAG_TYPE, node, 0 /* tag */, communicator);
-				MPI_Send(partitioned_hash.begin() + modulo_begin[node], this_size, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+				MPI_Send(partitioned_mag.begin() + modulo_begin[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator);
+				MPI_Send(partitioned_hash.begin() + modulo_begin[node], this_size, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
 			}
 		};
 
@@ -269,8 +351,8 @@ namespace iqs::mpi {
 			/* receive properties */
 			size_t this_size = modulo_begin[node + 1] - modulo_begin[node];
 			if (this_size > 0) {
-				MPI_Recv(partitioned_mag.begin() + modulo_begin[node], this_size, MPI_MAG_TYPE, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI_CXX_BOOL, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_mag.begin() + modulo_begin[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI::BOOL, node, 0 /* tag */, communicator, &utils::global_status);
 			}
 		};
 
@@ -281,8 +363,8 @@ namespace iqs::mpi {
 			/* send properties */
 			size_t this_size = node_map[node].num_object;
 			if (this_size > 0) {
-				MPI_Send(node_map[node].magnitude.begin(), this_size, MPI_MAG_TYPE, node, 0 /* tag */, communicator);
-				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI_CXX_BOOL, node, 0 /* tag */, communicator);
+				MPI_Send(node_map[node].magnitude.begin(), this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator);
+				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI::BOOL, node, 0 /* tag */, communicator);
 			}
 		};
 
@@ -310,6 +392,7 @@ namespace iqs::mpi {
 		MPI_Comm_rank(communicator, &rank);
 
 		node_map.resize(size);
+		mpi_resize(num_object);
 
 		/* partition nodes */
 		modulo_begin = (int*)calloc(size + 1, sizeof(int));
@@ -334,23 +417,46 @@ namespace iqs::mpi {
 
 			/* compute receive / send order */
 			bool send_first = rank % (2*offset) < offset;
+			bool send_last = (rank == size - 1) && (size % 2 == 1);
 
-			/* send and receive data accordingly */
-			if (send_first) {
-				send_data(previous_node);
-				receive_data(previous_node);
-				if (next_node != previous_node) {
+			/* weird edge case */
+			if (send_last) {
+				/* send accordingly to next_node */
+				bool other_send_first = next_node % (2*offset) < offset;
+				if (other_send_first) {
+					receive_data(next_node);
+					send_data(next_node);
+				} else {
 					send_data(next_node);
 					receive_data(next_node);
 				}
-			} else {
-				receive_data(next_node);
-				send_data(next_node);
-				if (next_node != previous_node) {
+
+				/* receive accordingly from next_node */
+				other_send_first = previous_node % (2*offset) < offset;
+				if (other_send_first) {
 					receive_data(previous_node);
 					send_data(previous_node);
+				} else {
+					send_data(previous_node);
+					receive_data(previous_node);
 				}
-			}
+			} else
+				/* send and receive data normaly */
+				if (send_first) {
+					send_data(next_node);
+					receive_data(next_node);
+					if (next_node != previous_node) {
+						send_data(previous_node);
+						receive_data(previous_node);
+					}
+				} else {
+					receive_data(previous_node);
+					send_data(previous_node);
+					if (next_node != previous_node) {
+						receive_data(next_node);
+						send_data(next_node);
+					}
+				}
 		}
 
 		/* copy local data */
@@ -359,7 +465,7 @@ namespace iqs::mpi {
 		/* generate the interference table */
 		for (int node = 0; node < size; ++node) {
 			bool fast = false;
-			bool skip_test = node_map[node].num_object < iqs::utils::min_vector_size;
+			bool skip_test = node_map[node].num_object < iqs::utils::min_vector_size || collision_tolerance == 0;
 			size_t test_size = skip_test ? 0 : node_map[node].num_object*collision_test_proportion;
 
 			/* first fast test */
@@ -390,23 +496,46 @@ namespace iqs::mpi {
 
 			/* compute receive / send order */
 			bool send_first = rank % (2*offset) < offset;
+			bool send_last = (rank == size - 1) && (size % 2 == 1);
 
-			/* send and receive data accordingly */
-			if (send_first) {
-				send_result(previous_node);
-				receive_result(previous_node);
-				if (next_node != previous_node) {
+			/* weird edge case */
+			if (send_last) {
+				/* send accordingly to next_node */
+				bool other_send_first = next_node % (2*offset) < offset;
+				if (other_send_first) {
+					receive_result(next_node);
+					send_result(next_node);
+				} else {
 					send_result(next_node);
 					receive_result(next_node);
 				}
-			} else {
-				receive_result(next_node);
-				send_result(next_node);
-				if (next_node != previous_node) {
+
+				/* receive accordingly from next_node */
+				other_send_first = previous_node % (2*offset) < offset;
+				if (other_send_first) {
 					receive_result(previous_node);
 					send_result(previous_node);
+				} else {
+					send_result(previous_node);
+					receive_result(previous_node);
 				}
-			}
+			} else
+				/* send and receive data normaly */
+				if (send_first) {
+					send_result(next_node);
+					receive_result(next_node);
+					if (next_node != previous_node) {
+						send_result(previous_node);
+						receive_result(previous_node);
+					}
+				} else {
+					receive_result(previous_node);
+					send_result(previous_node);
+					if (next_node != previous_node) {
+						receive_result(next_node);
+						send_result(next_node);
+					}
+				}
 		}
 
 		/* copy local data */
@@ -433,96 +562,32 @@ namespace iqs::mpi {
 	distributed normalization function
 	*/
 	void mpi_iteration::normalize(MPI_Comm communicator) {
-		int size, rank;
-		MPI_Comm_size(communicator, &size);
-		MPI_Comm_rank(communicator, &rank);
-
 		/* !!!!!!!!!!!!!!!!
 		step (8)
 		 !!!!!!!!!!!!!!!! */
 
-		PROBA_TYPE local_total_proba = 0;
+		node_total_proba = 0;
 		total_proba = 0;
 
-		#pragma omp parallel for reduction(+:local_total_proba)
+		#pragma omp parallel for reduction(+:node_total_proba)
 		for (size_t oid = 0; oid < num_object; ++oid)
-			local_total_proba += std::norm(magnitude[oid]);
+			node_total_proba += std::norm(magnitude[oid]);
 
 		/* accumulate probabilities on the master node */
-		if (rank == 0) {
-			/* add total proba for each node */
-			total_proba = local_total_proba;
-			for (int node = 1; node < size; ++node) {
-				MPI_Recv(&local_total_proba, 1, MPI_PROBA_TYPE, node, 0 /* tag */, communicator, &utils::global_status);
-				total_proba += local_total_proba;
-			}
-
-			/* send back total proba */
-			for (int node = 1; node < size; ++node)
-				MPI_Send(&total_proba, 1, MPI_PROBA_TYPE, node, 0 /* tag */, communicator);
-		} else {
-			/* send local proba */
-			MPI_Send(&local_total_proba, 1, MPI_PROBA_TYPE, 0, 0 /* tag */, communicator);
-
-			/* receive total proba */
-			MPI_Recv(&total_proba, 1, MPI_PROBA_TYPE, 0, 0 /* tag */, communicator, &utils::global_status);
-		}
+		MPI_Allreduce(&node_total_proba, &total_proba, 1, Proba_MPI_Datatype, MPI_SUM, communicator);
 		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
 
 		if (normalization_factor != 1)
 			#pragma omp parallel for
 			for (size_t oid = 0; oid < num_object; ++oid)
 				magnitude[oid] /= normalization_factor;
+
+		node_total_proba /= total_proba;
 	}
 
 	/*
 	"utility" functions from here on:
 	*/
-
-	/*
-	function to distribute objects across nodes
-	*/
-	void mpi_iteration::distribute_objects(MPI_Comm communicator, int node_id=0) {
-		int size, rank;
-		MPI_Comm_size(communicator, &size);
-		MPI_Comm_rank(communicator, &rank);
-
-		size_t initial_num_object = num_object;
-		if (rank == node_id) {
-			for (int node = 1; node < size; ++node) {
-				int node_to_send = node <= node_id ? node - 1 : node; //skip this node
-				size_t num_object_sent = (initial_num_object * (node + 1)) / size - (initial_num_object * node) / size; //better way to spread evently
-
-				/* send objects */
-				send_objects(num_object_sent, node_to_send, communicator);
-			}
-
-		} else
-			/* receive objects */
-			receive_objects(node_id, communicator);
-	}
-
-	/*
-	function to gather object from all nodes
-	*/
-	void mpi_iteration::gather_objects(MPI_Comm communicator, int node_id=0) {
-		int size, rank;
-		MPI_Comm_size(communicator, &size);
-		MPI_Comm_rank(communicator, &rank);
-
-		if (rank == node_id) {
-			for (int node = 1; node < size; ++node) {
-				int receive_node = node <= node_id ? node - 1 : node;
-
-				/* receive objects */
-				receive_objects(receive_node, communicator);
-			}
-
-		} else
-			/* send objects */
-			send_objects(num_object, node_id, communicator);
-	}
-
 	/*
 	equalize the number of objects across nodes
 	*/
@@ -576,13 +641,58 @@ namespace iqs::mpi {
 		}
 
 		/* equalize amoung pairs */
-		if (num_object == other_num_object)
-			return;
 		if (num_object > other_num_object) {
 			size_t num_object_sent = (num_object -  other_num_object) / 2;
 			send_objects(num_object_sent, this_pair_id, communicator);
-		} else {
+		} else if (num_object < other_num_object) {
 			receive_objects(this_pair_id, communicator);
 		}
+	}
+
+	/*
+	function to distribute objects across nodes
+	*/
+	void mpi_iteration::distribute_objects(MPI_Comm communicator, int node_id=0) {
+		int size, rank;
+		MPI_Comm_size(communicator, &size);
+		MPI_Comm_rank(communicator, &rank);
+
+		size_t initial_num_object = num_object;
+		if (rank == node_id) {
+			for (int node = 1; node < size; ++node) {
+				int node_to_send = node <= node_id ? node - 1 : node; //skip this node
+				size_t num_object_sent = (initial_num_object * (node + 1)) / size - (initial_num_object * node) / size; //better way to spread evently
+
+				/* send objects */
+				send_objects(num_object_sent, node_to_send, communicator);
+			}
+
+		} else
+			/* receive objects */
+			receive_objects(node_id, communicator);
+	}
+
+	/*
+	function to gather object from all nodes
+	*/
+	void mpi_iteration::gather_objects(MPI_Comm communicator, int node_id=0) {
+		int size, rank;
+		MPI_Comm_size(communicator, &size);
+		MPI_Comm_rank(communicator, &rank);
+
+		if (rank == node_id) {
+			for (int node = 1; node < size; ++node) {
+				int receive_node = node <= node_id ? node - 1 : node;
+
+				/* receive objects */
+				receive_objects(receive_node, communicator);
+			}
+
+		} else
+			/* send objects */
+			send_objects(num_object, node_id, communicator);
+
+		/* compute node_total_proba */
+		node_total_proba = rank == node_id;
 	}
 }

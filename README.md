@@ -179,10 +179,13 @@ public:
 	iteration();
 	iteration(char* object_begin_, char* object_end_);
 
-	void append(char* object_begin_, char* object_end_, std::complex<PROBA_TYPE> &mag=1);
+	void append(char const *object_begin_, char const *object_end_, std::complex<PROBA_TYPE> &mag=1);
 	void pop(uint n=1, bool normalize_=true);
 	char* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> *&mag);
 	char const* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> &mag) const;
+
+	template<class T>
+	T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const;
 
 private:
 	/*...*/
@@ -195,6 +198,7 @@ Member functions are:
 - `append(...)` : Append an object to the state, with a give magnitude (default = 1).
 - `pop(...)` : Remove the `n` last objects, and normalze (if `normalize_` is `true`).
 - `get_object(...)` : Allows to read (either as constant or not) an objects and its magnitude, with a given `object_id` between 0 and `num_object`. Note that the non-constant function takes pointers for `mag`.
+- `average_value(...)` : Compute the average value of an observable (a function) of any type (that can be added, initialized by `T x = 0`, and multiplied by an object of type `PROBA_TYPE`).
 
 Member variables are:
 - `num_object` : Number of object describing this state currently in superposition.
@@ -207,6 +211,8 @@ typedef class mpi_symbolic_iteration mpi_sy_it_t;
 
 class mpi_symbolic_iteration : public iqs::symbolic_iteration {
 public:
+	size_t get_total_num_object(MPI_Comm communicator) const;
+	size_t get_total_num_object_after_interferences(MPI_Comm communicator) const;
 	mpi_symbolic_iteration() {}
 
 private:
@@ -216,6 +222,10 @@ private:
 
 The `mpi_symbolic_iteration` class (or `mpi_sy_it_t` type) can be considered as exactly equivalent to the `symbolic_iteration` class (or `sy_it_t` type).
 
+The two added member functions are:
+- `get_total_num_object(...)` : Get the total number of object at symbolic iteration accross all nodes.
+- `get_total_num_object_after_interferences(...)` : Get the total number of object at symbolic iteration, after interferences but before truncation, accross all nodes.
+
 #### MPI iteration
 
 ```cpp
@@ -223,14 +233,20 @@ typedef class mpi_iteration mpi_it_t;
 
 class mpi_iteration : public iqs::iteration {
 public:
+	PROBA_TYPE node_total_proba = 0;
+
 	mpi_iteration() {}
 	mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
 
 	void equalize(MPI_Comm communicator);
+	size_t get_total_num_object(MPI_Comm communicator) const;
 	void send_objects(size_t num_object_sent, int node, MPI_Comm communicator);
 	void receive_objects(int node, MPI_Comm communicator);
 	void distribute_objects(MPI_Comm comunicator, int node_id);
 	void gather_objects(MPI_Comm comunicator, int node_id);
+
+	template<class T>
+	T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable, MPI_Comm communicator) const
 
 private:
 	/*...*/
@@ -240,11 +256,15 @@ private:
 The `mpi_iteration` class (or `mpi_it_t` type) inehrits all the public memeber functions and varibale of the `iteration` class (or `it_t` type), and shares similar constructors.
 
 The additional member functions are:
-- `equalize(...)` : Does its best at equalizing the number of object on each node. Will only equalize among pair (in hopefully the optimal pair-arangment), so it's up to you to check if the objects are equally shared among nodes, as some spetial cases can't be equalized well by this algorithm.
-- `send_objects(...)` : Send a given number of object to a node, and `pop` them of the sending one.
-- `receive_objects(...)` : Receiving end of the `send_objects(...)` function.
-- `distribute_objects(..)` : Distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes.
-- `gather_objects(...)` : Gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined.
+- `equalize(...)` : Does its best at equalizing the number of object on each node. Will only equalize among pair (in hopefully the optimal pair-arangment), so it's up to you to check if the objects are equally shared among nodes, as some spetial cases can't be equalized well by this algorithm. `normalize(MPI_Comm ...)` should be after `equalize(...)` at the end to compute `node_total_proba`.
+- `get_total_num_object(...)` : Get the total number of object accross all nodes.
+- `send_objects(...)` : Send a given number of object to a node, and `pop` them of the sending one. `normalize(MPI_Comm ...)` should be after `send_objects(...)` at the end to compute `node_total_proba`.
+- `receive_objects(...)` : Receiving end of the `send_objects(...)` function. `normalize(MPI_Comm ...)` should be after `receive_objects(...)` at the end to compute `node_total_proba`.
+- `distribute_objects(..)` : Distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes. `normalize(MPI_Comm ...)` should be after `distribute_objects(...)` at the end to compute `node_total_proba`.
+- `gather_objects(...)` : Gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined. `node_total_proba` is calculated at the end as it doesn't require a calling `normalize(MPI_Comm ...)`.
+- `average_value(...)` : equiavlent to the normal `iteration` member function, but for the whole distributed wave function (__note that calling__ `average_value(...)` __without an__ `MPI_Comm` __will return a local average value for retrocompatibility with the basic__ `iteration` __class__).
+
+`node_total_proba` is the only additional member variable, and is the proportion of total probability that is held by a given node.
 
 ### Global parameters
 
@@ -252,10 +272,17 @@ In addition to classes, some global parameters are used to modify the behaviour 
 
 ```cpp
 namespace iqs {
-	void set_tolerance(PROBA_TYPE val) { /* ... */ } // default is TOLERANCE
-	void set_safety_margin(float val) { /* ... */ } // default is SAFETY_MARGIN
-	void set_collision_test_proportion(float val) { /* ... */ } // default is COLLISION_TEST_PROPORTION
-	void set_collision_tolerance(float val) { /* ... */ } // default is COLLISION_TOLERANCE
+	PROBA_TYPE tolerance = TOLERANCE;
+	float safety_margin = SAFETY_MARGIN;
+	float collision_test_proportion = COLLISION_TEST_PROPORTION;
+	float collision_tolerance = default is COLLISION_TOLERANCE;
+
+	namespace mpi {
+		size_t min_equalize_size = MIN_EQUALIZE_SIZE;
+		float equalize_imablance = EQUALIZE_IMBALANCE;
+
+		/* ... */
+	}
 
 	namespace utils {
 		float upsize_policy = UPSIZE_POLICY;
@@ -273,17 +300,25 @@ The default value of any of those variable can be altered at compilation, by pas
 
 #### tolerance
 
-`tolerance` (which is only accessible through `set_tolerance()`) represents the minimum probability considered non-zero (default is `1e-18`, to compensate for numerical errors).
+`tolerance` represents the minimum probability considered non-zero (default is `1e-18`, to compensate for numerical errors).
 
 #### safety margin
 
-`safety_margin` (which is only accessible through `set_safety_margin()`) represents the target proportion of memory to keep free (default is `0.2` for 20%).
+`safety_margin` represents the target proportion of memory to keep free (default is `0.2` for 20%).
 
 #### collision test proportion and collision tolerance
 
-`collision_test_proportion` (which is only accessible through `set_safety_margin()`) represents the proportion of objects for which with first remove duplicates, we then continue removing duplicates only if the proportion of duplicates is greater than `collision_tolerance` (which is itself only accessible through `set_collision_tolerance()`).
+`collision_test_proportion` represents the proportion of objects for which with first remove duplicates, we then continue removing duplicates only if the proportion of duplicates is greater than `collision_tolerance`.
 
 `collision_test_proportion` has a default of  `0.1` and `collision_tolerance` has a default of `0.05`.
+
+#### minimum equalize size and equalize imbalance.
+
+`mpi::min_equalize_size` represents the minimum per node average size required to automaticly call `equalize(...)` after a call to `iqs::mpi::simulate(...)`.
+
+If this first condition is met, `equalize(...)` if the maximum relative imbalance in the number of object accross the nodes is greater than `mpi::equalize_imablance`.
+
+`mpi::min_equalize_size` has the same default as `utils::min_vector_size` by default, and `mpi::equalize_imablance` has a default of `0.2`.
 
 #### min vector size
 

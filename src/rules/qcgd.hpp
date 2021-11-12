@@ -207,11 +207,7 @@ namespace iqs::rules::qcgd {
 	}
 
 	namespace utils {
-		namespace {
-			size_t max_print_num_graphs = -1;
-		}
-
-		void set_max_print_num_graphs(size_t val) { max_print_num_graphs = val; }
+		size_t max_print_num_graphs = -1;
 
 		void make_graph(char* &object_begin, char* &object_end, uint16_t size) {
 			static auto per_node_size = 2 + sizeof(uint16_t) + sizeof(graphs::sub_node);
@@ -785,21 +781,13 @@ namespace iqs::rules::qcgd {
 
 			int reversed_n_iters = parse_int_with_default(string_arg, "reversed_n_iter=", ",", n_iters);
 
-			int max_print_num_graphs = parse_int_with_default(string_arg, "max_print_num_graphs=", ",", -1);
-			utils::set_max_print_num_graphs(max_print_num_graphs);
+			utils::max_print_num_graphs = parse_int_with_default(string_arg, "max_print_num_graphs=", ",", utils::max_print_num_graphs);
 
-			float tolerance = parse_float_with_default(string_arg, "tolerance=", ",", TOLERANCE);
-			iqs::set_tolerance(tolerance);
+			iqs::tolerance = parse_float_with_default(string_arg, "tolerance=", ",", iqs::tolerance);
+			iqs::safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", iqs::safety_margin);
+			iqs::collision_test_proportion = parse_float_with_default(string_arg, "collision_test_proportion=", ",", iqs::collision_test_proportion);
+			iqs::collision_tolerance = parse_float_with_default(string_arg, "collision_tolerance=", ",", iqs::collision_tolerance);
 
-			float safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", SAFETY_MARGIN);
-			iqs::set_safety_margin(safety_margin);
-
-			float collision_test_proportion = parse_float_with_default(string_arg, "collision_test_proportion=", ",", COLLISION_TEST_PROPORTION);
-			iqs::set_collision_test_proportion(collision_test_proportion);
-
-			float collision_tolerance = parse_float_with_default(string_arg, "collision_tolerance=", ",", COLLISION_TOLERANCE);
-			iqs::set_collision_tolerance(collision_tolerance);
-			
 			return {n_iters, reversed_n_iters};
 		}
 

@@ -46,20 +46,10 @@ namespace iqs {
 	/*
 	global variable definition
 	*/
-	namespace {
-		PROBA_TYPE tolerance = TOLERANCE;
-		float safety_margin = SAFETY_MARGIN;
-		float collision_test_proportion = COLLISION_TEST_PROPORTION;
-		float collision_tolerance = COLLISION_TOLERANCE;
-	}
-	
-	/*
-	global variable setters
-	*/
-	void set_tolerance(PROBA_TYPE val) { tolerance = val; }
-	void set_safety_margin(float val) { safety_margin = val; }
-	void set_collision_test_proportion(float val) { collision_test_proportion = val; }
-	void set_collision_tolerance(float val) { collision_tolerance = val; }
+	PROBA_TYPE tolerance = TOLERANCE;
+	float safety_margin = SAFETY_MARGIN;
+	float collision_test_proportion = COLLISION_TEST_PROPORTION;
+	float collision_tolerance = COLLISION_TOLERANCE;
 
 	/*
 	number of threads
@@ -100,7 +90,7 @@ namespace iqs {
 	*/
 	class iteration {
 		friend symbolic_iteration;
-		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
+		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function);  
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
@@ -138,7 +128,7 @@ namespace iqs {
 		iteration(char* object_begin_, char* object_end_) : iteration() {
 			append(object_begin_, object_end_);
 		}
-		void append(char* object_begin_, char* object_end_, mag_t mag=1) {
+		void append(char const *object_begin_, char const *object_end_, mag_t mag=1) {
 			size_t offset = object_begin[num_object];
 			size_t size = std::distance(object_begin_, object_end_);
 
@@ -161,6 +151,31 @@ namespace iqs {
 
 			if (normalize_) normalize();
 		}
+		template<class T>
+		T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const {
+			T avg = 0;
+
+			#pragma omp parallel
+			{	
+				/* compute average per thread */
+				T local_avg = 0;
+				#pragma omp for schedule(static)
+				for (size_t oid = 0; oid < num_object; ++oid) {
+					size_t size;
+					std::complex<PROBA_TYPE> mag;
+
+					/* get object and accumulate */
+					char const *this_object_begin = get_object(oid, size, mag);
+					local_avg += observable(this_object_begin, this_object_begin + size) * std::norm(mag);
+				}
+
+				/* accumulate thread averages */
+				#pragma omp critical
+				avg += local_avg;
+			}
+
+			return avg;
+		}
 		char* get_object(size_t object_id, size_t &object_size, mag_t *&mag) {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
@@ -180,7 +195,7 @@ namespace iqs {
 	*/
 	class symbolic_iteration {
 		friend iteration;
-		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
+		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function); 
 
 	protected:
@@ -232,22 +247,19 @@ namespace iqs {
 	/*
 	for memory managment
 	*/
-	long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
+	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
 		// get the free memory and the total amount of memory...
-		long long int total_memory, free_mem;
-		utils::get_mem_usage_and_free_mem(total_memory, free_mem);
-
-		// and according to the "safety_margin" (a proportion of total memory) compute the total delta between the amount free memory and the target
-		long long int mem_difference = free_mem - total_memory*safety_margin;
+		size_t free_mem;
+		utils::get_free_mem(free_mem);
 
 		// get the total memory
-		long long int total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
+		size_t total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
 			last_iteration.magnitude.size()*last_iteration.memory_size + next_iteration.magnitude.size()*next_iteration.memory_size + // size of properties
 			symbolic_iteration.magnitude.size()*symbolic_iteration.memory_size + // size of symbolic properties
-			mem_difference; // free memory
+			free_mem; // free memory
 
 		// compute average object size
-		long long int iteration_size_per_object = 0;
+		size_t iteration_size_per_object = 0;
 
 		// compute the average size of an object for the next iteration:
 		#pragma omp parallel for reduction(+:iteration_size_per_object)
@@ -264,7 +276,7 @@ namespace iqs {
 		// and the cost of unused space
 		iteration_size_per_object *= utils::upsize_policy;
 
-		return total_useable_memory / iteration_size_per_object;
+		return total_useable_memory / iteration_size_per_object * (1 - safety_margin);
 	}
 
 	/*
@@ -429,26 +441,24 @@ namespace iqs {
 			for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
 				insert_key(oid);
 
-			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
-
 			/* check if we should continue */
-			if (fast) {
+			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
+			if (fast)
 				/* get all unique graphs with a non zero probability */
-				auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + test_size, partitioner);
-				partitioned_it = std::rotate(partitioned_it, next_oid.begin() + test_size, next_oid.begin() + num_object);
-				num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
-			}
+				#pragma omp parallel for schedule(static)
+				for (size_t oid = test_size; oid < num_object; ++oid)
+					is_unique[oid] = true;
 		}
 
 		if (!fast) {
 			#pragma omp parallel for schedule(static)
 			for (size_t oid = test_size; oid < num_object; ++oid) //size_t oid = oid[i];
 				insert_key(oid);
-
-			/* get all unique graphs with a non zero probability */
-			auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
-			num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 		}
+
+		/* get all unique graphs with a non zero probability */
+		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
+		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 				
 		elimination_map.clear();
 	}
