@@ -100,7 +100,7 @@ namespace iqs {
 	*/
 	class iteration {
 		friend symbolic_iteration;
-		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
+		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function);  
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
@@ -180,7 +180,7 @@ namespace iqs {
 	*/
 	class symbolic_iteration {
 		friend iteration;
-		friend long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
+		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function); 
 
 	protected:
@@ -232,22 +232,19 @@ namespace iqs {
 	/*
 	for memory managment
 	*/
-	long long int inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
+	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
 		// get the free memory and the total amount of memory...
-		long long int total_memory, free_mem;
-		utils::get_mem_usage_and_free_mem(total_memory, free_mem);
-
-		// and according to the "safety_margin" (a proportion of total memory) compute the total delta between the amount free memory and the target
-		long long int mem_difference = free_mem - total_memory*safety_margin;
+		size_t free_mem;
+		utils::get_free_mem(free_mem);
 
 		// get the total memory
-		long long int total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
+		size_t total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
 			last_iteration.magnitude.size()*last_iteration.memory_size + next_iteration.magnitude.size()*next_iteration.memory_size + // size of properties
 			symbolic_iteration.magnitude.size()*symbolic_iteration.memory_size + // size of symbolic properties
-			mem_difference; // free memory
+			free_mem; // free memory
 
 		// compute average object size
-		long long int iteration_size_per_object = 0;
+		size_t iteration_size_per_object = 0;
 
 		// compute the average size of an object for the next iteration:
 		#pragma omp parallel for reduction(+:iteration_size_per_object)
@@ -264,7 +261,7 @@ namespace iqs {
 		// and the cost of unused space
 		iteration_size_per_object *= utils::upsize_policy;
 
-		return total_useable_memory / iteration_size_per_object;
+		return total_useable_memory / iteration_size_per_object * (1 - safety_margin);
 	}
 
 	/*
