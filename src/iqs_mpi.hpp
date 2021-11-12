@@ -1,10 +1,3 @@
-#ifndef MPI_PROBA_TYPE
-	#define MPI_PROBA_TYPE MPI::DOUBLE
-#endif
-#ifndef MPI_MAG_TYPE
-	#define MPI_MAG_TYPE MPI::DOUBLE_COMPLEX
-#endif
-
 #include "iqs.hpp"
 
 #include <mpi.h>
@@ -13,6 +6,10 @@ namespace iqs::mpi {
 	namespace utils {        
 		#include "utils/mpi_utils.hpp"
 	}
+
+	/* mpi auto type */
+	const static MPI_Datatype Proba_MPI_Datatype = utils::get_mpi_datatype((PROBA_TYPE)0);
+	const static MPI_Datatype mag_MPI_Datatype = utils::get_mpi_datatype((std::complex<PROBA_TYPE>)0);
 
 	/* forward typedef */
 	typedef class mpi_iteration mpi_it_t;
@@ -46,7 +43,7 @@ namespace iqs::mpi {
 					object_begin[i] -= send_object_begin;
 
 				/* send properties */
-				MPI_Send(magnitude.begin() + begin, num_object_sent, MPI_MAG_TYPE, node, 0 /* tag */, communicator);
+				MPI_Send(magnitude.begin() + begin, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator);
 				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 
 				/* send objects */
@@ -67,7 +64,7 @@ namespace iqs::mpi {
 				resize(num_object + num_object_sent);
 
 				/* receive properties */
-				MPI_Recv(magnitude.begin() + num_object, num_object_sent, MPI_MAG_TYPE, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(magnitude.begin() + num_object, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
 				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
 
 				/* prepare receive objects */
@@ -222,7 +219,7 @@ namespace iqs::mpi {
 
 			/* receive properties */
 			if (this_size > 0) {
-				MPI_Recv(node_map[node].magnitude.begin(), this_size, MPI_MAG_TYPE, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(node_map[node].magnitude.begin(), this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
 				MPI_Recv(node_map[node].hash.begin(), this_size, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, &utils::global_status);
 			}
 		};
@@ -237,7 +234,7 @@ namespace iqs::mpi {
 
 			/* send properties */
 			if (this_size > 0) {
-				MPI_Send(partitioned_mag.begin() + modulo_begin[node], this_size, MPI_MAG_TYPE, node, 0 /* tag */, communicator);
+				MPI_Send(partitioned_mag.begin() + modulo_begin[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator);
 				MPI_Send(partitioned_hash.begin() + modulo_begin[node], this_size, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 			}
 		};
@@ -269,8 +266,8 @@ namespace iqs::mpi {
 			/* receive properties */
 			size_t this_size = modulo_begin[node + 1] - modulo_begin[node];
 			if (this_size > 0) {
-				MPI_Recv(partitioned_mag.begin() + modulo_begin[node], this_size, MPI_MAG_TYPE, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI_CXX_BOOL, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_mag.begin() + modulo_begin[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI::BOOL, node, 0 /* tag */, communicator, &utils::global_status);
 			}
 		};
 
@@ -281,8 +278,8 @@ namespace iqs::mpi {
 			/* send properties */
 			size_t this_size = node_map[node].num_object;
 			if (this_size > 0) {
-				MPI_Send(node_map[node].magnitude.begin(), this_size, MPI_MAG_TYPE, node, 0 /* tag */, communicator);
-				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI_CXX_BOOL, node, 0 /* tag */, communicator);
+				MPI_Send(node_map[node].magnitude.begin(), this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator);
+				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI::BOOL, node, 0 /* tag */, communicator);
 			}
 		};
 
@@ -453,19 +450,19 @@ namespace iqs::mpi {
 			/* add total proba for each node */
 			total_proba = local_total_proba;
 			for (int node = 1; node < size; ++node) {
-				MPI_Recv(&local_total_proba, 1, MPI_PROBA_TYPE, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(&local_total_proba, 1, Proba_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
 				total_proba += local_total_proba;
 			}
 
 			/* send back total proba */
 			for (int node = 1; node < size; ++node)
-				MPI_Send(&total_proba, 1, MPI_PROBA_TYPE, node, 0 /* tag */, communicator);
+				MPI_Send(&total_proba, 1, Proba_MPI_Datatype, node, 0 /* tag */, communicator);
 		} else {
 			/* send local proba */
-			MPI_Send(&local_total_proba, 1, MPI_PROBA_TYPE, 0, 0 /* tag */, communicator);
+			MPI_Send(&local_total_proba, 1, Proba_MPI_Datatype, 0, 0 /* tag */, communicator);
 
 			/* receive total proba */
-			MPI_Recv(&total_proba, 1, MPI_PROBA_TYPE, 0, 0 /* tag */, communicator, &utils::global_status);
+			MPI_Recv(&total_proba, 1, Proba_MPI_Datatype, 0, 0 /* tag */, communicator, &utils::global_status);
 		}
 		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
 
