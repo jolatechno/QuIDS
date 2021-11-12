@@ -138,7 +138,7 @@ namespace iqs {
 		iteration(char* object_begin_, char* object_end_) : iteration() {
 			append(object_begin_, object_end_);
 		}
-		void append(char* object_begin_, char* object_end_, mag_t mag=1) {
+		void append(char const *object_begin_, char const *object_end_, mag_t mag=1) {
 			size_t offset = object_begin[num_object];
 			size_t size = std::distance(object_begin_, object_end_);
 
@@ -241,7 +241,7 @@ namespace iqs {
 				for (size_t i = 0; i < max_size; ++i) buffer[i] = 0; // touch
 			}
 		}
-
+		
 		void compute_collisions();
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function);
 

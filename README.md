@@ -179,7 +179,7 @@ public:
 	iteration();
 	iteration(char* object_begin_, char* object_end_);
 
-	void append(char* object_begin_, char* object_end_, std::complex<PROBA_TYPE> &mag=1);
+	void append(char const *object_begin_, char const *object_end_, std::complex<PROBA_TYPE> &mag=1);
 	void pop(uint n=1, bool normalize_=true);
 	char* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> *&mag);
 	char const* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> &mag) const;
@@ -250,12 +250,12 @@ private:
 The `mpi_iteration` class (or `mpi_it_t` type) inehrits all the public memeber functions and varibale of the `iteration` class (or `it_t` type), and shares similar constructors.
 
 The additional member functions are:
-- `equalize(...)` : Does its best at equalizing the number of object on each node. Will only equalize among pair (in hopefully the optimal pair-arangment), so it's up to you to check if the objects are equally shared among nodes, as some spetial cases can't be equalized well by this algorithm.
+- `equalize(...)` : Does its best at equalizing the number of object on each node. Will only equalize among pair (in hopefully the optimal pair-arangment), so it's up to you to check if the objects are equally shared among nodes, as some spetial cases can't be equalized well by this algorithm. `normalize(MPI_Comm ...)` should be after `equalize(...)` at the end to compute `node_total_proba`.
 - `get_total_num_object(...)` : Get the total number of object accross all nodes.
-- `send_objects(...)` : Send a given number of object to a node, and `pop` them of the sending one.
-- `receive_objects(...)` : Receiving end of the `send_objects(...)` function.
-- `distribute_objects(..)` : Distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes.
-- `gather_objects(...)` : Gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined.
+- `send_objects(...)` : Send a given number of object to a node, and `pop` them of the sending one. `normalize(MPI_Comm ...)` should be after `send_objects(...)` at the end to compute `node_total_proba`.
+- `receive_objects(...)` : Receiving end of the `send_objects(...)` function. `normalize(MPI_Comm ...)` should be after `receive_objects(...)` at the end to compute `node_total_proba`.
+- `distribute_objects(..)` : Distribute objects that are located on a single node of id `node_id` (0 if not specified) equally on all other nodes. `normalize(MPI_Comm ...)` should be after `distribute_objects(...)` at the end to compute `node_total_proba`.
+- `gather_objects(...)` : Gather objects on all nodes to the node of id `node_id` (0 if not specified). If all objects can't fit on the memory of this node, the function will throw a `bad alloc` error as the behavior is undefined. `node_total_proba` is calculated at the end as it doesn't require a calling `normalize(MPI_Comm ...)`.
 - `average_value(...)` : equiavlent to the normal `iteration` member function, but for the whole distributed wave function (__note that calling__ `average_value(...)` __without an__ `MPI_Comm` __will return a local average value for retrocompatibility with the basic__ `iteration` __class__).
 
 `node_total_proba` is the only additional member variable, and is the proportion of total probability that is held by a given node.

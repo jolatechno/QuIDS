@@ -290,6 +290,7 @@ namespace iqs::rules::qcgd {
 				PROBA_TYPE imag = std::abs(mag.imag()) < iqs::tolerance ? 0 : mag.imag();
 
 				std::cout << "\t" << real << (imag < 0 ? " - " : " + ") << std::abs(imag) << "i  ";
+				std::cout << graphs::hash_graph(begin) << "  ";
 
 				for (auto i = 0; i < num_nodes; ++i) {
 					auto name_begin = graphs::node_name_begin(begin, i);
