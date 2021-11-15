@@ -43,6 +43,9 @@ void generalized_modulo_partition(size_t *idx_begin, size_t *idx_end, size_t con
 function to partition into pair of almost equal sum
 */
 int make_equal_pairs(size_t *size_begin, size_t *size_end, int *pair_id) {
+
+	/* !!! trie puis pair inverse !!! */
+
 	size_t size = std::distance(size_begin, size_end);
 
 	/* compute average value */

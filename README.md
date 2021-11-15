@@ -93,10 +93,9 @@ public:
 	inline void get_num_child(char const *parent_begin, char const *parent_end, 
 		uint32_t &num_child, size_t &max_child_size) const override;
 
-	inline char* populate_child(char const *parent_begin, char const *parent_end, 
-		uint32_t child_id, 
-		std::complex<PROBA_TYPE> &mag,
-		char* child_begin) const override;
+	inline void populate_child(char const *parent_begin, char const *parent_end,
+		char* const child_begin, uint32_t const child_id,
+		size_t &size, std::complex<PROBA_TYPE> &mag) const override;
 
 	inline size_t hasher(char const *parent_begin, char const *parent_end) const; // optional
 };
@@ -119,14 +118,13 @@ The second function, `populate_child(...)`, simply "populate" (create) an object
 Note that `child_id` is a number from `0` to `num_child`, and simply identify "child" amoung its "siblings" (objects with the same "parent").
 
 ```cpp
-inline char* my_rule::populate_child(char const *parent_begin, char const *parent_end,
-	uint32_t child_id,
-	std::complex<PROBA_TYPE> &mag,
-	char* child_begin) const override
+inline void populate_child(char const *parent_begin, char const *parent_end,
+	char* const child_begin, uint32_t const child_id,
+	size_t &size, std::complex<PROBA_TYPE> &mag) const override
 {
 	// modify mag...
 	// populate the child, starting at child_begin
-	return child_end;
+	size = actual_child_size;
 }
 ```
 
@@ -179,10 +177,10 @@ public:
 	iteration();
 	iteration(char* object_begin_, char* object_end_);
 
-	void append(char const *object_begin_, char const *object_end_, std::complex<PROBA_TYPE> &mag=1);
+	void append(char const *object_begin_, char const *object_end_, std::complex<PROBA_TYPE> const mag=1);
 	void pop(uint n=1, bool normalize_=true);
-	char* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> *&mag);
-	char const* get_object(size_t object_id, size_t &object_size, std::complex<PROBA_TYPE> &mag) const;
+	void get_object(size_t const object_id, char *& object_begin, size_t &object_size, std::complex<PROBA_TYPE> *&mag);
+	void get_object(size_t const object_id, char const *& object_begin, size_t &object_size, std::complex<PROBA_TYPE> &mag) const;
 
 	template<class T>
 	T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const;

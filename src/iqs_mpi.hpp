@@ -1,3 +1,5 @@
+#pragma once
+
 #include "iqs.hpp"
 
 #include <mpi.h>
@@ -409,6 +411,12 @@ namespace iqs::mpi {
 			partitioned_hash[id] = hash[oid];
 		}
 
+		/*
+		MPI_Alltoall(size)
+		MPI_Alltoallv(hash)
+		MPI_Alltoallv(mag)
+		*/
+
 		/* share back partitions using cricular permutations */
 		for (int offset = 1; offset <= size / 2; ++offset) {
 			/* compute neighbour nodes */
@@ -487,6 +495,12 @@ namespace iqs::mpi {
 				for (size_t oid = test_size; oid < node_map[node].num_object; ++oid) //size_t oid = oid[i];
 					insert_key(oid, node);
 		}
+
+		/*
+		MPI_Alltoall(size)
+		MPI_Alltoallv(is_unique)
+		MPI_Alltoallv(mag)
+		*/
 
 		/* share back partitions also using cricular permutations */
 		for (int offset = 1; offset <= size / 2; ++offset) {

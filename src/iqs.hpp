@@ -79,7 +79,7 @@ namespace iqs {
 	public:
 		rule() {};
 		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const = 0;
-		virtual inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const = 0;
+		virtual inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id, size_t &size, mag_t &mag) const = 0;
 		virtual inline size_t hasher(char const *parent_begin, char const *parent_end) const { //can be overwritten
 			return std::hash<std::string_view>()(std::string_view(parent_begin, std::distance(parent_begin, parent_end)));
 		}
@@ -128,7 +128,7 @@ namespace iqs {
 		iteration(char* object_begin_, char* object_end_) : iteration() {
 			append(object_begin_, object_end_);
 		}
-		void append(char const *object_begin_, char const *object_end_, mag_t mag=1) {
+		void append(char const *object_begin_, char const *object_end_, mag_t const mag=1) {
 			size_t offset = object_begin[num_object];
 			size_t size = std::distance(object_begin_, object_end_);
 
@@ -165,7 +165,8 @@ namespace iqs {
 					std::complex<PROBA_TYPE> mag;
 
 					/* get object and accumulate */
-					char const *this_object_begin = get_object(oid, size, mag);
+					char const *this_object_begin;
+					get_object(oid, this_object_begin, size, mag);
 					local_avg += observable(this_object_begin, this_object_begin + size) * std::norm(mag);
 				}
 
@@ -176,17 +177,17 @@ namespace iqs {
 
 			return avg;
 		}
-		char* get_object(size_t object_id, size_t &object_size, mag_t *&mag) {
+		void get_object(size_t const object_id, char *& object_begin_, size_t &object_size, mag_t *&mag) {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
 			mag = &magnitude[object_id];
-			return objects.begin() + this_object_begin;
+			object_begin_ = objects.begin() + this_object_begin;
 		}
-		char const* get_object(size_t object_id, size_t &object_size, mag_t &mag) const {
+		void get_object(size_t const object_id, char const *& object_begin_, size_t &object_size, mag_t &mag) const {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
 			mag = magnitude[object_id];
-			return objects.begin() + this_object_begin;
+			object_begin_ = objects.begin() + this_object_begin;
 		}
 	};
 
@@ -228,7 +229,7 @@ namespace iqs {
 				if (buffer == NULL)
 					free(buffer);
 				buffer = new char[max_size];
-				for (size_t i = 0; i < max_size; ++i) buffer[i] = 0; // touch
+				for (size_t i = 0; i < max_size; ++i) ((volatile char*)buffer)[i] = 0; // touch
 			}
 		}
 
@@ -375,15 +376,14 @@ namespace iqs {
 
 				/* generate graph */
 				symbolic_iteration.magnitude[oid] = magnitude[id];
-				char* end = rule->populate_child(objects.begin() + object_begin[id],
+				rule->populate_child(objects.begin() + object_begin[id],
 					objects.begin() + object_begin[id + 1],
-					symbolic_iteration.child_id[oid],
-					symbolic_iteration.magnitude[oid], symbolic_iteration.placeholder[thread_id]);
-
-				symbolic_iteration.size[oid] = std::distance(symbolic_iteration.placeholder[thread_id], end);
+					symbolic_iteration.placeholder[thread_id], symbolic_iteration.child_id[oid],
+					symbolic_iteration.size[oid], symbolic_iteration.magnitude[oid]);
 
 				/* compute hash */
-				symbolic_iteration.hash[oid] = rule->hasher(symbolic_iteration.placeholder[thread_id], end);
+				symbolic_iteration.hash[oid] = rule->hasher(symbolic_iteration.placeholder[thread_id],
+					symbolic_iteration.placeholder[thread_id] + symbolic_iteration.size[oid]);
 			}
 		}
 
@@ -398,10 +398,6 @@ namespace iqs {
 			num_object_after_interferences = 0;
 			return;
 		}
-
-		bool fast = false;
-		bool skip_test = (collision_test_proportion == 0) || (num_object < utils::min_vector_size);
-		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
 
 		/*
 		function for partition
@@ -436,6 +432,10 @@ namespace iqs {
 		step (4)
 		 !!!!!!!!!!!!!!!! */
 
+		bool fast = false;
+		bool skip_test = (collision_test_proportion == 0) || (num_object < utils::min_vector_size);
+		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
+
 		if (!skip_test) {
 			#pragma omp parallel for schedule(static)
 			for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
@@ -450,11 +450,10 @@ namespace iqs {
 					is_unique[oid] = true;
 		}
 
-		if (!fast) {
+		if (!fast)
 			#pragma omp parallel for schedule(static)
 			for (size_t oid = test_size; oid < num_object; ++oid) //size_t oid = oid[i];
 				insert_key(oid);
-		}
 
 		/* get all unique graphs with a non zero probability */
 		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
@@ -541,6 +540,7 @@ namespace iqs {
 		{
 			auto thread_id = omp_get_thread_num();
 			mag_t mag_;
+			size_t size_;
 
 			#pragma omp for schedule(static)
 			for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
@@ -549,9 +549,9 @@ namespace iqs {
 				
 				rule->populate_child(last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid],
 					last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid + 1],
+					next_iteration.objects.begin() + next_iteration.object_begin[oid],
 					child_id[id],
-					mag_,
-					next_iteration.objects.begin() + next_iteration.object_begin[oid]);
+					size_, mag_);
 			}
 		}
 		
@@ -568,15 +568,19 @@ namespace iqs {
 
 		total_proba = 0;
 
-		#pragma omp parallel for reduction(+:total_proba)
-		for (size_t oid = 0; oid < num_object; ++oid)
-			total_proba += std::norm(magnitude[oid]);
-
-		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
-
-		if (normalization_factor != 1)
-			#pragma omp parallel for
+		#pragma omp parallel
+		{
+			#pragma omp for reduction(+:total_proba)
 			for (size_t oid = 0; oid < num_object; ++oid)
-				magnitude[oid] /= normalization_factor;
+				total_proba += std::norm(magnitude[oid]);
+
+			PROBA_TYPE normalization_factor = std::sqrt(total_proba);
+
+			if (normalization_factor != 1)
+				#pragma omp for
+				for (size_t oid = 0; oid < num_object; ++oid)
+					magnitude[oid] /= normalization_factor;
+		}
+		
 	}
 }

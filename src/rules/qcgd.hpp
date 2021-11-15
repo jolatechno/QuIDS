@@ -230,8 +230,9 @@ namespace iqs::rules::qcgd {
 		void randomize(iqs::it_t &iter) {
 			size_t size;
 			mag_t *mag_;
-			for (auto gid = 0; gid < iter.num_object; ++gid) {
-				char *begin = iter.get_object(gid, size, mag_);
+			char *begin;
+			for (auto gid = 0; gid < iter.num_object; ++gid) {;
+				iter.get_object(gid, begin, size, mag_);
 				graphs::randomize(begin);
 			}
 		}
@@ -263,11 +264,12 @@ namespace iqs::rules::qcgd {
 			size_t *gids = new size_t[iter.num_object];
 			std::iota(gids, gids + iter.num_object, 0);
 			__gnu_parallel::sort(gids, gids + iter.num_object, [&](size_t gid1, size_t gid2) {
-				size_t size;
+				size_t size_;
+				char const *begin_;
 
 				mag_t mag1, mag2;
-				iter.get_object(gid1, size, mag1);
-				iter.get_object(gid2, size, mag2);
+				iter.get_object(gid1, begin_, size_, mag1);
+				iter.get_object(gid2, begin_, size_, mag2);
 
 				return std::norm(mag1) > std::norm(mag2);
 			});
@@ -278,7 +280,8 @@ namespace iqs::rules::qcgd {
 
 				size_t size;
 				mag_t mag;
-				const char* begin = iter.get_object(gid, size, mag);
+				char const *begin;
+				iter.get_object(gid, begin, size, mag);
 
 				uint16_t const num_nodes = graphs::num_nodes(begin);
 
@@ -317,7 +320,8 @@ namespace iqs::rules::qcgd {
 			for (auto gid = 0; gid < iter.num_object; ++gid) {
 				size_t size;
 				mag_t mag;
-				const char* begin = iter.get_object(gid, size, mag);
+				char const *begin;
+				iter.get_object(gid, begin, size, mag);
 
 				double proba = std::norm(mag);
 
@@ -400,8 +404,11 @@ namespace iqs::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const override {
-			char* child_end = operations::copy(parent_begin, parent_end, child_begin);
+		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_, size_t &size, mag_t &mag) const override {
+			operations::copy(parent_begin, parent_end, child_begin);
+			size = std::distance(parent_begin, parent_end);
+
+			uint32_t child_id = child_id_;
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 			for (int i = 0; i < num_nodes; ++i) {
@@ -420,8 +427,6 @@ namespace iqs::rules::qcgd {
 					child_id >>= 1;
 				}
 			}
-
-			return child_end;
 		}
 	};
 
@@ -453,8 +458,11 @@ namespace iqs::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const override {
-			char* child_end = operations::copy(parent_begin, parent_end, child_begin);
+		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_, size_t &size, mag_t &mag) const override {
+			operations::copy(parent_begin, parent_end, child_begin);
+			size = std::distance(parent_begin, parent_end);
+
+			uint32_t child_id = child_id_;
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 			for (int i = 0; i < num_nodes; ++i) {
@@ -472,8 +480,6 @@ namespace iqs::rules::qcgd {
 					child_id >>= 1;
 				}
 			}
-
-			return child_end;
 		}
 	};
 
@@ -513,7 +519,8 @@ namespace iqs::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const override {
+		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_, size_t &size, mag_t &mag) const override {
+			uint32_t child_id = child_id_;
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 
 			/* check for first split or last merge */
@@ -716,7 +723,7 @@ namespace iqs::rules::qcgd {
 				graphs::node_name_begin(child_begin, child_num_nodes) = std::distance(child_node_name_begin, node_name_end);
 			}
 
-			return (char*)(child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes));
+			size = std::distance(child_begin, (char*)(child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes)));
 		}
 	};
 

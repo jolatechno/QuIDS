@@ -10,7 +10,8 @@ namespace iqs::rules::quantum_computer {
 			for (auto oid = 0; oid < iter.num_object; ++oid) {
 				size_t size;
 				mag_t mag;
-				auto begin = iter.get_object(oid, size, mag);
+				char const *begin;
+				iter.get_object(oid, begin, size, mag);
 
 				std::cout << "\t" << mag.real() << (mag.imag() < 0 ? " - " : " + ") << std::abs(mag.imag()) << "i  ";
 				for (auto it = begin; it != begin + size; ++it)
@@ -35,17 +36,15 @@ namespace iqs::rules::quantum_computer {
 			num_child = 2;
 			max_child_size = std::distance(parent_begin, parent_end);
 		}
-		inline char* populate_child(char const *parent_begin, char const *parent_end, uint32_t child_id, mag_t &mag, char* child_begin) const override {
+		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id, size_t &size, mag_t &mag) const override {
 			static const PROBA_TYPE sqrt2 = 1/std::sqrt(2);
 			mag *= parent_begin[bit] && child_id ? -sqrt2 : sqrt2;
 
-			size_t n_bit = std::distance(parent_begin, parent_end);
-			for (auto i = 0; i < n_bit; ++i)
+			size = std::distance(parent_begin, parent_end);
+			for (auto i = 0; i < size; ++i)
 				child_begin[i] = parent_begin[i];
 
 			child_begin[bit] ^= !child_id;
-
-			return child_begin + n_bit;
 		}
 	};
 
