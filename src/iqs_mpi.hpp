@@ -606,8 +606,6 @@ namespace iqs::mpi {
 	equalize the number of objects across nodes
 	*/
 	void mpi_iteration::equalize(MPI_Comm communicator) {
-		static const int alone_marker = -1;
-
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
@@ -618,30 +616,17 @@ namespace iqs::mpi {
 			sizes = (size_t*)calloc(size, sizeof(size_t));
 		MPI_Gather(&num_object, 1, MPI::LONG_LONG_INT, sizes, 1, MPI::LONG_LONG_INT, 0, communicator);
 
+		/* compute pair_id*/
 		int this_pair_id;
-		if (rank == 0) {
-			/* partition */
-			int *pair_id = (int*)calloc(size / 2, sizeof(int));
-			int alone_node = utils::make_equal_pairs(sizes, sizes + size, pair_id);
+		int *pair_id = rank == 0 ? (int*)calloc(size, sizeof(int)) : NULL;
+		if (rank == 0)
+			utils::make_equal_pairs(sizes, sizes + size, pair_id);
 
-			/* tell which node is alone */
-			if (alone_node >= 0) {
-				MPI_Send(&alone_marker, 1, MPI::INT, alone_node, 0 /* tag */, communicator);
-			}
-
-			/* send pair idx */
-			this_pair_id = pair_id[0];
-			for (int i = 0; i < size / 2; ++i) {
-				if (i != 0) MPI_Send(&pair_id[i], 1, MPI::INT, i, 0 /* tag */, communicator);
-				MPI_Send(&i, 1, MPI::INT, pair_id[i], 0 /* tag */, communicator);
-			}
-
-		} else
-			/* receive pair idx */
-			MPI_Recv(&this_pair_id, 1, MPI::INT, 0, 0 /* tag */, communicator, &utils::global_status);
+		/* scatter pair_id */
+		MPI_Scatter(pair_id, 1, MPI::INT, &this_pair_id, 1, MPI::INT, 0, communicator);
 
 		/* skip if this node is alone */
-		if (this_pair_id == alone_marker)
+		if (this_pair_id == rank)
 			return;
 
 		/* get the number of objects of the respective pairs */

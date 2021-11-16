@@ -42,56 +42,21 @@ void generalized_modulo_partition(size_t *idx_begin, size_t *idx_end, size_t con
 /*
 function to partition into pair of almost equal sum
 */
-int make_equal_pairs(size_t *size_begin, size_t *size_end, int *pair_id) {
-
-	/* !!! trie puis pair inverse !!! */
-
+void make_equal_pairs(size_t *size_begin, size_t *size_end, int *pair_id) {
 	size_t size = std::distance(size_begin, size_end);
 
+	int *node_ids = new int[size];
+	std::iota(node_ids, node_ids + size, 0);
+
 	/* compute average value */
-	long long int avg_size = __gnu_parallel::accumulate(size_begin, size_end, 0) / size;
+	__gnu_parallel::sort(node_ids, node_ids + size,
+		[&](int const node_id1, int const node_id2) {
+			return size_begin[node_id1] > size_begin[node_id2];
+		});
 
-	/* if size is odd, find the node to not pair */
-	int alone_node = size;
-	if (size % 2 == 1) {
-		auto min_it = __gnu_parallel::min_element(size_begin + size / 2, size_end,
-			[&](size_t size1, size_t size2) {
-				long long int diff1 = std::abs((long long int)avg_size - (long long int)size1);
-				long long int diff2 = std::abs((long long int)avg_size - (long long int)size2);
-				return diff1 < diff2;
-			});
-		alone_node = std::distance(size_begin, min_it);
-	}
-
-	/* initial guess */
 	#pragma omp parallel for
-	for (int i = 0; i < size / 2; ++i) {
-		pair_id[i] = size / 2 + i;
-		pair_id[i] += pair_id[i] >= alone_node;
-	}
-
-	/* iterativly improve the guess */
-	if (size / 2 > 1)
-		for (size_t step = 0; step < 10*size*size; ++step) {
-			/* generate two random indexes */
-			int i = rand() % (size / 2);
-			int j = rand() % (size / 2 - 1);
-			j += i == j;
-
-			/* compute starting average values */
-			long long int size_diff_i = std::abs(avg_size - (long long int)(size_begin[i] + size_begin[pair_id[i]]) / 2);
-			long long int size_diff_j = std::abs(avg_size - (long long int)(size_begin[j] + size_begin[pair_id[j]]) / 2);
-
-			/* compute average values after swap */
-			long long int size_diff_i_swaped = std::abs(avg_size - (long long int)(size_begin[i] + size_begin[pair_id[j]]) / 2);
-			long long int size_diff_j_swaped = std::abs(avg_size - (long long int)(size_begin[j] + size_begin[pair_id[i]]) / 2); 
-
-			/* swap if necessary */
-			if (std::max(size_diff_i_swaped, size_diff_j_swaped) < std::max(size_diff_i, size_diff_j))
-				std::swap(pair_id[i], pair_id[j]);
-		}
-
-	return alone_node == size ? -1 : alone_node;
+	for (int i = 0; i < size; ++i)
+		pair_id[node_ids[i]] = pair_id[node_ids[size - i - 1]];
 } 
 
 /*
