@@ -5,7 +5,7 @@ MPI_Status global_status;
 /*
 function to partition into n section according to the modulo of an array element
 */
-void generalized_modulo_partition(size_t *idx_begin, size_t *idx_end, size_t const *begin, size_t *offset, int n_segment) {
+void generalized_modulo_partition(size_t *idx_begin, size_t *idx_end, size_t const *begin, int *offset, int n_segment) {
 	/* limit values */
 	offset[0] = 0;
 	offset[n_segment] = std::distance(idx_begin, idx_end);

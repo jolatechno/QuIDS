@@ -136,33 +136,26 @@ namespace iqs::mpi {
 		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, iqs::debug_t mid_step_function); 
 
 	protected:
-		tbb::concurrent_hash_map<size_t, std::pair<size_t, int>> distributed_elimination_map;
-
 		iqs::utils::numa_vector<mag_t> partitioned_mag;
 		iqs::utils::numa_vector<size_t> partitioned_hash;
 		iqs::utils::numa_vector<bool> partitioned_is_unique;
 
-		struct node_map_type {
-			size_t num_object = 0;
-			size_t num_object_after_interferences = 0;
-
-			iqs::utils::numa_vector<mag_t> magnitude;
-			iqs::utils::numa_vector<size_t> hash;
-			iqs::utils::numa_vector<bool> is_unique;
-
-			void resize(size_t size) {
-				magnitude.resize(size);
-				hash.resize(size);
-				is_unique.resize(size);
-			}
-		};
-		std::vector<node_map_type> node_map;
+		iqs::utils::numa_vector<mag_t> mag_buffer;
+		iqs::utils::numa_vector<size_t> hash_buffer;
+		iqs::utils::numa_vector<bool> is_unique_buffer;
+		iqs::utils::numa_vector<int> node_id_buffer;
 
 		void compute_collisions(MPI_Comm communicator);
 		void mpi_resize(size_t size) {
-			partitioned_mag.resize(size);
-			partitioned_hash.resize(size);
-			partitioned_is_unique.resize(size);
+			partitioned_mag.zero_resize(size);
+			partitioned_hash.zero_resize(size);
+			partitioned_is_unique.zero_resize(size);
+		}
+		void buffer_resize(size_t size) {
+			mag_buffer.zero_resize(size);
+			hash_buffer.zero_resize(size);
+			is_unique_buffer.zero_resize(size);
+			node_id_buffer.zero_resize(size);
 		}
 
 		long long int memory_size = (1 + 3) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
@@ -231,7 +224,8 @@ namespace iqs::mpi {
 	distributed interference function
 	*/
 	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator) {
-		size_t *local_disp, *local_count, *global_disp, *global_count;
+		int *local_disp, *local_count, *global_disp, *global_count;
+		size_t *global_num_object_after_interferences;
 		int size, rank;
 
 		/*
@@ -248,139 +242,46 @@ namespace iqs::mpi {
 		/*
 		function to add a key
 		*/
-		auto static const insert_key = [&](size_t oid, int node_id) {
-			size_t hash = node_map[node_id].hash[oid];
+		auto static const insert_key = [&](size_t oid) {
+			int node_id = node_id_buffer[oid];
 
 			/* accessing key */
-			tbb::concurrent_hash_map<size_t, std::pair<size_t, int>>::accessor it;
-			bool unique = distributed_elimination_map.insert(it, {hash, {oid, node_id}});
-			if (unique) {
+			tbb::concurrent_hash_map<size_t, size_t>::accessor it;
+			if (elimination_map.insert(it, {hash_buffer[oid], oid})) {
 				/* keep this graph */
-				node_map[node_id].is_unique[oid] = true;
+				is_unique_buffer[oid] = true;
 
 				/* increment values */
 				#pragma omp atomic 
-				++node_map[node_id].num_object_after_interferences;
+				++global_num_object_after_interferences[node_id];
 			} else {
-				auto [other_oid, other_node_id] = it->second;
+				auto other_oid = it->second;
+				auto other_node_id = node_id_buffer[other_oid];
 
-				bool is_greater = node_map[node_id].num_object_after_interferences >= node_map[other_node_id].num_object_after_interferences;
+				bool is_greater = true; //global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
 				if (is_greater) {
 					/* if it exist add the probabilities */
-					node_map[other_node_id].magnitude[other_oid] += node_map[node_id].magnitude[oid];
+					mag_buffer[other_oid] += mag_buffer[oid];
 
 					/* discard this graph */
-					node_map[node_id].is_unique[oid] = false;
+					is_unique_buffer[oid] = false;
 				} else {
 					/* keep this graph */
-					it->second = {oid, node_id};
+					it->second = oid;
 
 					/* if the size aren't balanced, add the probabilities */
-					node_map[node_id].magnitude[oid] += node_map[other_node_id].magnitude[other_oid];
+					mag_buffer[oid] += mag_buffer[other_oid];
 
 					/* discard the other graph */
-					node_map[node_id].is_unique[oid] = true;
-					node_map[other_node_id].is_unique[other_oid] = false;
+					is_unique_buffer[oid] = true;
+					is_unique_buffer[other_oid] = false;
 
 					/* increment values */
 					#pragma omp atomic 
-					++node_map[node_id].num_object_after_interferences;
+					++global_num_object_after_interferences[node_id];
 					#pragma omp atomic 
-					--node_map[other_node_id].num_object_after_interferences;
+					--global_num_object_after_interferences[other_node_id];
 				}
-			}
-		};
-
-		/*
-		function to receive initial data
-		*/
-		static const auto receive_data = [&](int node) {
-			/* receive size */
-			size_t this_size;
-			MPI_Recv(&this_size, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
-
-			/* prepare receive */
-			node_map[node].num_object = this_size;
-			node_map[node].num_object_after_interferences = 0;
-			node_map[node].resize(this_size);
-
-			/* receive properties */
-			if (this_size > 0) {
-				MPI_Recv(node_map[node].magnitude.begin(), this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(node_map[node].hash.begin(), this_size, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
-			}
-		};
-
-		/*
-		function to send initial data
-		*/
-		static const auto send_data = [&](int node) {
-			/* send size */
-			size_t this_size = local_disp[node + 1] - local_disp[node];
-			MPI_Send(&this_size, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
-
-			/* send properties */
-			if (this_size > 0) {
-				MPI_Send(partitioned_mag.begin() + local_disp[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator);
-				MPI_Send(partitioned_hash.begin() + local_disp[node], this_size, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
-			}
-		};
-
-		/* 
-		function to copy initial data locally
-		*/
-		static const auto copy_data = [&]() {
-			/* resize */
-			size_t this_size = local_disp[rank + 1] - local_disp[rank];
-			node_map[rank].num_object = this_size;
-			node_map[rank].num_object_after_interferences = 0;
-			node_map[rank].resize(this_size);
-
-			/* copy partitioned properties into node map */
-			#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < this_size; ++i) {
-				size_t id = local_disp[rank] + i;
-
-				node_map[rank].magnitude[i] = partitioned_mag[id];
-				node_map[rank].hash[i] = partitioned_hash[id];
-			}
-		};
-
-		/*
-		function to receive final result
-		*/
-		static const auto receive_result = [&](int node) {
-			/* receive properties */
-			size_t this_size = local_disp[node + 1] - local_disp[node];
-			if (this_size > 0) {
-				MPI_Recv(partitioned_mag.begin() + local_disp[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(partitioned_is_unique.begin() + local_disp[node], this_size, MPI::BOOL, node, 0 /* tag */, communicator, &utils::global_status);
-			}
-		};
-
-		/*
-		function to send final result
-		*/
-		static const auto send_result = [&](int node) {
-			/* send properties */
-			size_t this_size = node_map[node].num_object;
-			if (this_size > 0) {
-				MPI_Send(node_map[node].magnitude.begin(), this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator);
-				MPI_Send(node_map[node].is_unique.begin(), this_size, MPI::BOOL, node, 0 /* tag */, communicator);
-			}
-		};
-
-		/*
-		function to copy final result locally
-		*/
-		static const auto copy_result = [&]() {
-			size_t this_size = local_disp[rank + 1] - local_disp[rank];
-			#pragma omp for schedule(static)
-			for (size_t i = 0; i < this_size; ++i) {
-				size_t id = local_disp[rank] + i;
-
-				partitioned_mag[id] = node_map[rank].magnitude[i];
-				partitioned_is_unique[id] = node_map[rank].is_unique[i];
 			}
 		};
 
@@ -394,12 +295,12 @@ namespace iqs::mpi {
 		MPI_Comm_rank(communicator, &rank);
 
 		/* prepare buffers */
-		local_disp = new size_t[size + 1];
-		local_count = new size_t[size];
-		global_disp = new size_t[size + 1];
-		global_count = new size_t[size];
+		local_disp = new int[size + 1];
+		local_count = new int[size];
+		global_disp = new int[size + 1];
+		global_count = new int[size];
+		global_num_object_after_interferences = new size_t[size]();
 
-		node_map.resize(size);
 		mpi_resize(num_object);
 
 		/* partition nodes */
@@ -409,9 +310,17 @@ namespace iqs::mpi {
 		__gnu_parallel::adjacent_difference(local_disp + 1, local_disp + size + 1, local_count, std::minus<size_t>());
 
 		/* get global count and disp */
-		MPI_Alltoall(local_count, 1, MPI::UNSIGNED_LONG, global_count, 1, MPI::UNSIGNED_LONG, communicator);
+		MPI_Alltoall(local_count, 1, MPI::INT, global_count, 1, MPI::INT, communicator);
 		global_disp[0] = 0;
-		__gnu_parallel::partial_sum(global_count + 1, global_count + size + 1, global_disp + 1);
+		__gnu_parallel::partial_sum(global_count, global_count + size, global_disp + 1);
+
+		/* resize and prepare node_id buffer */
+		size_t global_num_object = global_disp[size];
+		buffer_resize(global_num_object);
+		for (int node = 0; node < size; ++node)
+			#pragma omp parallel for
+			for (size_t i = global_disp[node]; i < global_disp[node + 1]; ++i)
+				node_id_buffer[i] = node;
 
 		/* generate partitioned hash */
 		#pragma omp parallel for schedule(static)
@@ -421,150 +330,42 @@ namespace iqs::mpi {
 			partitioned_mag[id] = magnitude[oid];
 			partitioned_hash[id] = hash[oid];
 		}
-
-		/*
-		MPI_Alltoall(size)
-		MPI_Alltoallv(hash)
-		MPI_Alltoallv(mag)
-		*/
-
-		/* share back partitions using cricular permutations */
-		for (int offset = 1; offset <= size / 2; ++offset) {
-			/* compute neighbour nodes */
-			int previous_node = (size + rank - offset) % size;
-			int next_node = (size + rank + offset) % size;
-
-			/* compute receive / send order */
-			bool send_first = rank % (2*offset) < offset;
-			bool send_last = (rank == size - 1) && (size % 2 == 1);
-
-			/* weird edge case */
-			if (send_last) {
-				/* send accordingly to next_node */
-				bool other_send_first = next_node % (2*offset) < offset;
-				if (other_send_first) {
-					receive_data(next_node);
-					send_data(next_node);
-				} else {
-					send_data(next_node);
-					receive_data(next_node);
-				}
-
-				/* receive accordingly from next_node */
-				other_send_first = previous_node % (2*offset) < offset;
-				if (other_send_first) {
-					receive_data(previous_node);
-					send_data(previous_node);
-				} else {
-					send_data(previous_node);
-					receive_data(previous_node);
-				}
-			} else
-				/* send and receive data normaly */
-				if (send_first) {
-					send_data(next_node);
-					receive_data(next_node);
-					if (next_node != previous_node) {
-						send_data(previous_node);
-						receive_data(previous_node);
-					}
-				} else {
-					receive_data(previous_node);
-					send_data(previous_node);
-					if (next_node != previous_node) {
-						receive_data(next_node);
-						send_data(next_node);
-					}
-				}
-		}
-
-		/* copy local data */
-		copy_data();
+			
+		/* share hash and magnitude */
+		MPI_Alltoallv(partitioned_hash.begin(), local_count, local_disp, MPI::UNSIGNED_LONG,
+			hash_buffer.begin(), global_count, global_disp, MPI::UNSIGNED_LONG, communicator);
+		MPI_Alltoallv(partitioned_mag.begin(), local_count, local_disp, mag_MPI_Datatype,
+			mag_buffer.begin(), global_count, global_disp, mag_MPI_Datatype, communicator);
 
 		/* generate the interference table */
-		for (int node = 0; node < size; ++node) {
-			bool fast = false;
-			bool skip_test = node_map[node].num_object < iqs::utils::min_vector_size || collision_tolerance == 0;
-			size_t test_size = skip_test ? 0 : node_map[node].num_object*collision_test_proportion;
+		bool fast = false;
+		bool skip_test = global_num_object < iqs::utils::min_vector_size || collision_tolerance == 0;
+		size_t test_size = skip_test ? 0 : global_num_object*collision_test_proportion;
 
-			/* first fast test */
-			if (!skip_test) {
+		/* first fast test */
+		if (!skip_test) {
+			#pragma omp parallel for schedule(static)
+			for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
+				insert_key(oid);
+
+			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
+			if (fast)
 				#pragma omp parallel for schedule(static)
-				for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
-					insert_key(oid, node);
-
-				fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
-				if (fast)
-					#pragma omp parallel for schedule(static)
-					for (size_t oid = test_size; oid < node_map[node].num_object; ++oid)
-						node_map[node].is_unique[oid] = true;
-			}
-
-			/* second complete test */
-			if (!fast)
-				#pragma omp parallel for schedule(static)
-				for (size_t oid = test_size; oid < node_map[node].num_object; ++oid) //size_t oid = oid[i];
-					insert_key(oid, node);
+				for (size_t oid = test_size; oid < global_num_object; ++oid)
+					is_unique_buffer[oid] = true;
 		}
 
-		/*
-		MPI_Alltoall(size)
-		MPI_Alltoallv(is_unique)
-		MPI_Alltoallv(mag)
-		*/
+		/* second complete test */
+		if (!fast)
+			#pragma omp parallel for schedule(static)
+			for (size_t oid = test_size; oid < global_num_object; ++oid) //size_t oid = oid[i];
+				insert_key(oid);
 
-		/* share back partitions also using cricular permutations */
-		for (int offset = 1; offset <= size / 2; ++offset) {
-			/* compute neighbour nodes */
-			int previous_node = (size + rank - offset) % size;
-			int next_node = (size + rank + offset) % size;
-
-			/* compute receive / send order */
-			bool send_first = rank % (2*offset) < offset;
-			bool send_last = (rank == size - 1) && (size % 2 == 1);
-
-			/* weird edge case */
-			if (send_last) {
-				/* send accordingly to next_node */
-				bool other_send_first = next_node % (2*offset) < offset;
-				if (other_send_first) {
-					receive_result(next_node);
-					send_result(next_node);
-				} else {
-					send_result(next_node);
-					receive_result(next_node);
-				}
-
-				/* receive accordingly from next_node */
-				other_send_first = previous_node % (2*offset) < offset;
-				if (other_send_first) {
-					receive_result(previous_node);
-					send_result(previous_node);
-				} else {
-					send_result(previous_node);
-					receive_result(previous_node);
-				}
-			} else
-				/* send and receive data normaly */
-				if (send_first) {
-					send_result(next_node);
-					receive_result(next_node);
-					if (next_node != previous_node) {
-						send_result(previous_node);
-						receive_result(previous_node);
-					}
-				} else {
-					receive_result(previous_node);
-					send_result(previous_node);
-					if (next_node != previous_node) {
-						receive_result(next_node);
-						send_result(next_node);
-					}
-				}
-		}
-
-		/* copy local data */
-		copy_result();
+		/* share is_unique and magnitude */
+		MPI_Alltoallv(is_unique_buffer.begin(), global_count, global_disp, MPI::BOOL,
+			partitioned_is_unique.begin(), local_count, local_disp, MPI::BOOL, communicator);
+		MPI_Alltoallv(mag_buffer.begin(), global_count, global_disp, mag_MPI_Datatype,
+			partitioned_mag.begin(), local_count, local_disp, mag_MPI_Datatype, communicator);
 
 		/* regenerate real, imag and is_unique */
 		#pragma omp parallel for schedule(static)
@@ -580,11 +381,12 @@ namespace iqs::mpi {
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 
 		/* clear map */
-		distributed_elimination_map.clear();
+		elimination_map.clear();
 		delete[] local_disp;
 		delete[] local_count;
 		delete[] global_disp;
 		delete[] global_count;
+		delete[] global_num_object_after_interferences;
 	}
 
 	/*
