@@ -231,7 +231,7 @@ namespace iqs::mpi {
 	distributed interference function
 	*/
 	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator) {
-		int *modulo_begin;
+		size_t *local_disp, *local_count, *global_disp, *global_count;
 		int size, rank;
 
 		/*
@@ -316,13 +316,13 @@ namespace iqs::mpi {
 		*/
 		static const auto send_data = [&](int node) {
 			/* send size */
-			size_t this_size = modulo_begin[node + 1] - modulo_begin[node];
+			size_t this_size = local_disp[node + 1] - local_disp[node];
 			MPI_Send(&this_size, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
 
 			/* send properties */
 			if (this_size > 0) {
-				MPI_Send(partitioned_mag.begin() + modulo_begin[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator);
-				MPI_Send(partitioned_hash.begin() + modulo_begin[node], this_size, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
+				MPI_Send(partitioned_mag.begin() + local_disp[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator);
+				MPI_Send(partitioned_hash.begin() + local_disp[node], this_size, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
 			}
 		};
 
@@ -331,7 +331,7 @@ namespace iqs::mpi {
 		*/
 		static const auto copy_data = [&]() {
 			/* resize */
-			size_t this_size = modulo_begin[rank + 1] - modulo_begin[rank];
+			size_t this_size = local_disp[rank + 1] - local_disp[rank];
 			node_map[rank].num_object = this_size;
 			node_map[rank].num_object_after_interferences = 0;
 			node_map[rank].resize(this_size);
@@ -339,7 +339,7 @@ namespace iqs::mpi {
 			/* copy partitioned properties into node map */
 			#pragma omp parallel for schedule(static)
 			for (size_t i = 0; i < this_size; ++i) {
-				size_t id = modulo_begin[rank] + i;
+				size_t id = local_disp[rank] + i;
 
 				node_map[rank].magnitude[i] = partitioned_mag[id];
 				node_map[rank].hash[i] = partitioned_hash[id];
@@ -351,10 +351,10 @@ namespace iqs::mpi {
 		*/
 		static const auto receive_result = [&](int node) {
 			/* receive properties */
-			size_t this_size = modulo_begin[node + 1] - modulo_begin[node];
+			size_t this_size = local_disp[node + 1] - local_disp[node];
 			if (this_size > 0) {
-				MPI_Recv(partitioned_mag.begin() + modulo_begin[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(partitioned_is_unique.begin() + modulo_begin[node], this_size, MPI::BOOL, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_mag.begin() + local_disp[node], this_size, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(partitioned_is_unique.begin() + local_disp[node], this_size, MPI::BOOL, node, 0 /* tag */, communicator, &utils::global_status);
 			}
 		};
 
@@ -374,10 +374,10 @@ namespace iqs::mpi {
 		function to copy final result locally
 		*/
 		static const auto copy_result = [&]() {
-			size_t this_size = modulo_begin[rank + 1] - modulo_begin[rank];
+			size_t this_size = local_disp[rank + 1] - local_disp[rank];
 			#pragma omp for schedule(static)
 			for (size_t i = 0; i < this_size; ++i) {
-				size_t id = modulo_begin[rank] + i;
+				size_t id = local_disp[rank] + i;
 
 				partitioned_mag[id] = node_map[rank].magnitude[i];
 				partitioned_is_unique[id] = node_map[rank].is_unique[i];
@@ -393,14 +393,25 @@ namespace iqs::mpi {
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 
+		/* prepare buffers */
+		local_disp = new size_t[size + 1];
+		local_count = new size_t[size];
+		global_disp = new size_t[size + 1];
+		global_count = new size_t[size];
+
 		node_map.resize(size);
 		mpi_resize(num_object);
 
 		/* partition nodes */
-		modulo_begin = (int*)calloc(size + 1, sizeof(int));
 		utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + num_object,
-			hash.begin(), modulo_begin,
+			hash.begin(), local_disp,
 			size);
+		__gnu_parallel::adjacent_difference(local_disp + 1, local_disp + size + 1, local_count, std::minus<size_t>());
+
+		/* get global count and disp */
+		MPI_Alltoall(local_count, 1, MPI::UNSIGNED_LONG, global_count, 1, MPI::UNSIGNED_LONG, communicator);
+		global_disp[0] = 0;
+		__gnu_parallel::partial_sum(global_count + 1, global_count + size + 1, global_disp + 1);
 
 		/* generate partitioned hash */
 		#pragma omp parallel for schedule(static)
@@ -570,6 +581,10 @@ namespace iqs::mpi {
 
 		/* clear map */
 		distributed_elimination_map.clear();
+		delete[] local_disp;
+		delete[] local_count;
+		delete[] global_disp;
+		delete[] global_count;
 	}
 
 	/*
@@ -618,12 +633,14 @@ namespace iqs::mpi {
 
 		/* compute pair_id*/
 		int this_pair_id;
-		int *pair_id = rank == 0 ? (int*)calloc(size, sizeof(int)) : NULL;
+		int *pair_id = rank == 0 ? new int[size] : NULL;
 		if (rank == 0)
 			utils::make_equal_pairs(sizes, sizes + size, pair_id);
 
 		/* scatter pair_id */
 		MPI_Scatter(pair_id, 1, MPI::INT, &this_pair_id, 1, MPI::INT, 0, communicator);
+		if (rank == 0)
+			delete[] pair_id;
 
 		/* skip if this node is alone */
 		if (this_pair_id == rank)
