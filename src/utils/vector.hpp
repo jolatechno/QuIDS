@@ -74,16 +74,66 @@ public:
     void resize(size_t n) const {
     	n = std::max(min_vector_size, n); // never resize under min_vector_size
 
+    	if (ptr == NULL) { // just alloc if the vector is empty
+    		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
+    		ptr = (value_type *)malloc(size_*sizeof(value_type));
+
+    		#pragma omp for schedule(static)
+    		for (size_t i = 0; i < size_; ++i)
+    			volatile value_type _ = ptr[i]; // touch memory
+
+    		return;
+    	}
+
     	if (size_ < n || // resize if we absolutely have to because the state won't fit
     		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
 
+    		size_t old_size = size_;
     		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
+			size_t half_size = size_ / 2; // resize in two part to limit memory overhead
 
-    		ptr = (value_type*)realloc(ptr, size_*sizeof(value_type));
+			/*
+			copy the first half
+			*/
 
-			#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < size_; ++i)
-				volatile value_type _ = ptr[i]; // touch memory
+			// alloc the first part
+    		value_type *new_ptr = (value_type *)malloc(half_size*sizeof(value_type));
+
+    		// copy the first part
+    		#pragma omp parallel for schedule(static)
+    		for (size_t i = 0; i < size_; ++i)
+    			if (i < half_size)
+    				if (i < old_size) {
+    					new_ptr[i] = ptr[i];
+    				} else
+    					volatile value_type _ = new_ptr[i]; // touch memory
+
+    		/*
+			copy the second half
+			*/
+
+    		// move the second half to the first part of the old pointer
+    		size_t second_half = old_size > half_size ? old_size - half_size : 0;
+    		#pragma omp parallel for schedule(static)
+    		for (size_t i = 0; i < second_half; ++i)
+    			ptr[i] = ptr[half_size + i];
+
+    		// realloc
+    		ptr = (value_type*)realloc(ptr, second_half*sizeof(value_type));
+    		new_ptr = (value_type*)realloc(new_ptr, size_*sizeof(value_type));
+
+    		// copy the second part
+    		#pragma omp parallel for schedule(static)
+    		for (size_t i = 0; i < size_; ++i)
+    			if (i > half_size)
+    				if (i - half_size < second_half) {
+    					new_ptr[i] = ptr[i - half_size];
+    				} else
+    					volatile value_type _ = new_ptr[i]; // touch memory
+
+    		// free old buffer and swap them
+    		free(ptr);
+    		ptr = new_ptr;
     	}
     }
 

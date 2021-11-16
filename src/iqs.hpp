@@ -102,7 +102,7 @@ namespace iqs {
 
 		void inline resize(size_t num_object) const {
 			magnitude.resize(num_object);
-			num_childs.resize(num_object + 1);
+			num_childs.zero_resize(num_object + 1);
 			object_begin.resize(num_object + 1);
 		}
 		void inline allocate(size_t size) const {
@@ -217,9 +217,9 @@ namespace iqs {
 			next_oid.iota_resize(num_object);
 			size.zero_resize(num_object);
 			hash.zero_resize(num_object);
-			parent_oid.resize(num_object);
-			child_id.resize(num_object);
-			is_unique.resize(num_object);
+			parent_oid.zero_resize(num_object);
+			child_id.zero_resize(num_object);
+			is_unique.zero_resize(num_object);
 			random_selector.zero_resize(num_object);
 		}
 		void inline reserve(size_t max_size) {
