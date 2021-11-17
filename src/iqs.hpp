@@ -446,7 +446,7 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 
 		bool fast = false;
-		bool skip_test = (collision_test_proportion == 0) || (num_object < min_collision_size);
+		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || num_object < min_collision_size;
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
 
 		if (!skip_test) {
@@ -458,7 +458,10 @@ namespace iqs {
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
-				for (size_t i = modulo_offset[thread_id]; i < modulo_offset[thread_id + 1]; ++i)
+				size_t begin = modulo_offset[thread_id];
+				size_t end = modulo_offset[thread_id + 1];
+				elimination_maps[thread_id].reserve(end - begin);
+				for (size_t i = begin; i < end; ++i)
 					insert_key(next_oid[i], thread_id);
 
 				#pragma omp atomic
@@ -466,7 +469,7 @@ namespace iqs {
 			}
 
 			/* check if we should continue */
-			fast = test_size - size_after_insertion < test_size*collision_test_proportion;
+			fast = test_size - size_after_insertion < test_size*collision_tolerance;
 			if (fast)
 				/* get all unique graphs with a non zero probability */
 				#pragma omp parallel for schedule(static)
@@ -482,7 +485,10 @@ namespace iqs {
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
-				for (size_t i = modulo_offset[thread_id] + test_size; i < modulo_offset[thread_id + 1] + test_size; ++i)
+				size_t begin = modulo_offset[thread_id] + test_size;
+				size_t end = modulo_offset[thread_id + 1] + test_size;
+				elimination_maps[thread_id].reserve(end - begin);
+				for (size_t i = begin; i < end; ++i)
 					insert_key(next_oid[i], thread_id);
 			}
 		}

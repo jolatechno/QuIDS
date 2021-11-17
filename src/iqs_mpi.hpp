@@ -339,7 +339,7 @@ namespace iqs::mpi {
 
 		/* generate the interference table */
 		bool fast = false;
-		bool skip_test = global_num_object < iqs::utils::min_vector_size || collision_tolerance == 0;
+		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || global_num_object < iqs::utils::min_vector_size;
 		size_t test_size = skip_test ? 0 : global_num_object*collision_test_proportion;
 
 		/* first fast test */
@@ -348,7 +348,7 @@ namespace iqs::mpi {
 			for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
 				insert_key(oid);
 
-			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
+			fast = test_size - elimination_map.size() < test_size*collision_tolerance;
 			if (fast)
 				#pragma omp parallel for schedule(static)
 				for (size_t oid = test_size; oid < global_num_object; ++oid)
