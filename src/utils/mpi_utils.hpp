@@ -64,19 +64,19 @@ void make_equal_pairs(size_t *size_begin, size_t *size_end, int *pair_id) {
 /*
 get mpi type
 */
-MPI_Datatype get_mpi_datatype(float x) { return MPI::FLOAT; }
-MPI_Datatype get_mpi_datatype(double x) { return MPI::DOUBLE; }
-MPI_Datatype get_mpi_datatype(long double x) { return MPI::LONG_DOUBLE; }
-MPI_Datatype get_mpi_datatype(std::complex<float> x) { return MPI::COMPLEX; }
-MPI_Datatype get_mpi_datatype(std::complex<double> x) { return MPI::DOUBLE_COMPLEX; }
-MPI_Datatype get_mpi_datatype(std::complex<long double> x) { return MPI::LONG_DOUBLE_COMPLEX; }
-MPI_Datatype get_mpi_datatype(bool x) { return MPI::BOOL; }
-MPI_Datatype get_mpi_datatype(char x) { return MPI::CHAR; }
-MPI_Datatype get_mpi_datatype(signed char x) { return MPI::SIGNED_CHAR; }
-MPI_Datatype get_mpi_datatype(unsigned char x) { return MPI::UNSIGNED_CHAR; }
-MPI_Datatype get_mpi_datatype(short x) { return MPI::SHORT; }
-MPI_Datatype get_mpi_datatype(unsigned short x) { return MPI::UNSIGNED_SHORT; }
-MPI_Datatype get_mpi_datatype(int x) { return MPI::INT; }
-MPI_Datatype get_mpi_datatype(unsigned int x) { return MPI::UNSIGNED; }
-MPI_Datatype get_mpi_datatype(long x) { return MPI::LONG; }
-MPI_Datatype get_mpi_datatype(unsigned long x) { return MPI::UNSIGNED_LONG; }
+MPI_Datatype get_mpi_datatype(float x) { return MPI_FLOAT; }
+MPI_Datatype get_mpi_datatype(double x) { return MPI_DOUBLE; }
+MPI_Datatype get_mpi_datatype(long double x) { return MPI_LONG_DOUBLE; }
+MPI_Datatype get_mpi_datatype(std::complex<float> x) { return MPI_COMPLEX; }
+MPI_Datatype get_mpi_datatype(std::complex<double> x) { return MPI_DOUBLE_COMPLEX; }
+MPI_Datatype get_mpi_datatype(std::complex<long double> x) { return MPI_C_LONG_DOUBLE_COMPLEX; }
+MPI_Datatype get_mpi_datatype(bool x) { return MPI_CHAR; }
+MPI_Datatype get_mpi_datatype(char x) { return MPI_CHAR; }
+MPI_Datatype get_mpi_datatype(signed char x) { return MPI_SIGNED_CHAR; }
+MPI_Datatype get_mpi_datatype(unsigned char x) { return MPI_UNSIGNED_CHAR; }
+MPI_Datatype get_mpi_datatype(short x) { return MPI_SHORT; }
+MPI_Datatype get_mpi_datatype(unsigned short x) { return MPI_UNSIGNED_SHORT; }
+MPI_Datatype get_mpi_datatype(int x) { return MPI_INT; }
+MPI_Datatype get_mpi_datatype(unsigned int x) { return MPI_UNSIGNED; }
+MPI_Datatype get_mpi_datatype(long x) { return MPI_LONG; }
+MPI_Datatype get_mpi_datatype(unsigned long x) { return MPI_UNSIGNED_LONG; }

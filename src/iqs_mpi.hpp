@@ -49,7 +49,7 @@ namespace iqs::mpi {
 		size_t get_total_num_object(MPI_Comm communicator) const {
 			/* accumulate number of node */
 			size_t total_num_object;
-			MPI_Allreduce(&num_object, &total_num_object, 1, MPI::UNSIGNED_LONG, MPI_SUM, communicator);
+			MPI_Allreduce(&num_object, &total_num_object, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
 
 			return total_num_object;
 		}
@@ -75,7 +75,7 @@ namespace iqs::mpi {
 		}
 		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator) {
 			/* send size */
-			MPI_Send(&num_object_sent, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
+			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG, node, 0 /* tag */, communicator);
 
 			if (num_object_sent != 0) {
 				size_t begin = num_object - num_object_sent;
@@ -88,7 +88,7 @@ namespace iqs::mpi {
 
 				/* send properties */
 				MPI_Send(magnitude.begin() + begin, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator);
-				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator);
+				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG, node, 0 /* tag */, communicator);
 
 				/* send objects */
 				size_t send_object_size = object_begin[num_object];
@@ -101,7 +101,7 @@ namespace iqs::mpi {
 		void receive_objects(int node, MPI_Comm communicator) {
 			/* receive size */
 			size_t num_object_sent;
-			MPI_Recv(&num_object_sent, 1, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+			MPI_Recv(&num_object_sent, 1, MPI_UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
 
 			if (num_object_sent != 0) {
 				/* prepare state */
@@ -109,7 +109,7 @@ namespace iqs::mpi {
 
 				/* receive properties */
 				MPI_Recv(magnitude.begin() + num_object, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, &utils::global_status);
-				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI::UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
+				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG, node, 0 /* tag */, communicator, &utils::global_status);
 
 				/* prepare receive objects */
 				size_t send_object_begin = object_begin[num_object];
@@ -164,14 +164,14 @@ namespace iqs::mpi {
 		size_t get_total_num_object(MPI_Comm communicator) const {
 			/* accumulate number of node */
 			size_t total_num_object;
-			MPI_Allreduce(&num_object, &total_num_object, 1, MPI::UNSIGNED_LONG, MPI_SUM, communicator);
+			MPI_Allreduce(&num_object, &total_num_object, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
 
 			return total_num_object;
 		}
 		size_t get_total_num_object_after_interferences(MPI_Comm communicator) const {
 			/* accumulate number of node */
 			size_t total_num_object_after_interference;
-			MPI_Allreduce(&num_object_after_interferences, &total_num_object_after_interference, 1, MPI::UNSIGNED_LONG, MPI_SUM, communicator);
+			MPI_Allreduce(&num_object_after_interferences, &total_num_object_after_interference, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
 
 			return total_num_object_after_interference;
 		}
@@ -183,7 +183,7 @@ namespace iqs::mpi {
 	*/
 	float get_max_num_object_imbalance(mpi_it_t const &iteration, size_t const size_comp, MPI_Comm communicator) {
 		size_t total_imbalance, local_imbalance = (size_t)std::abs((long long int)iteration.num_object - (long long int)size_comp);
-		MPI_Allreduce(&local_imbalance, &total_imbalance, 1, MPI::UNSIGNED_LONG, MPI_MAX, communicator);
+		MPI_Allreduce(&local_imbalance, &total_imbalance, 1, MPI_UNSIGNED_LONG, MPI_MAX, communicator);
 		return ((float) total_imbalance) / ((float) size_comp);
 	}
 
@@ -310,7 +310,7 @@ namespace iqs::mpi {
 		__gnu_parallel::adjacent_difference(local_disp + 1, local_disp + size + 1, local_count, std::minus<size_t>());
 
 		/* get global count and disp */
-		MPI_Alltoall(local_count, 1, MPI::INT, global_count, 1, MPI::INT, communicator);
+		MPI_Alltoall(local_count, 1, MPI_INT, global_count, 1, MPI_INT, communicator);
 		global_disp[0] = 0;
 		__gnu_parallel::partial_sum(global_count, global_count + size, global_disp + 1);
 
@@ -332,8 +332,8 @@ namespace iqs::mpi {
 		}
 			
 		/* share hash and magnitude */
-		MPI_Alltoallv(partitioned_hash.begin(), local_count, local_disp, MPI::UNSIGNED_LONG,
-			hash_buffer.begin(), global_count, global_disp, MPI::UNSIGNED_LONG, communicator);
+		MPI_Alltoallv(partitioned_hash.begin(), local_count, local_disp, MPI_UNSIGNED_LONG,
+			hash_buffer.begin(), global_count, global_disp, MPI_UNSIGNED_LONG, communicator);
 		MPI_Alltoallv(partitioned_mag.begin(), local_count, local_disp, mag_MPI_Datatype,
 			mag_buffer.begin(), global_count, global_disp, mag_MPI_Datatype, communicator);
 
@@ -362,8 +362,8 @@ namespace iqs::mpi {
 				insert_key(oid);
 
 		/* share is_unique and magnitude */
-		MPI_Alltoallv(is_unique_buffer.begin(), global_count, global_disp, MPI::BOOL,
-			partitioned_is_unique.begin(), local_count, local_disp, MPI::BOOL, communicator);
+		MPI_Alltoallv(is_unique_buffer.begin(), global_count, global_disp, MPI_CHAR,
+			partitioned_is_unique.begin(), local_count, local_disp, MPI_CHAR, communicator);
 		MPI_Alltoallv(mag_buffer.begin(), global_count, global_disp, mag_MPI_Datatype,
 			partitioned_mag.begin(), local_count, local_disp, mag_MPI_Datatype, communicator);
 
@@ -431,7 +431,7 @@ namespace iqs::mpi {
 		size_t *sizes;
 		if (rank == 0)
 			sizes = (size_t*)calloc(size, sizeof(size_t));
-		MPI_Gather(&num_object, 1, MPI::LONG_LONG_INT, sizes, 1, MPI::LONG_LONG_INT, 0, communicator);
+		MPI_Gather(&num_object, 1, MPI_LONG_LONG_INT, sizes, 1, MPI_LONG_LONG_INT, 0, communicator);
 
 		/* compute pair_id*/
 		int this_pair_id;
@@ -440,7 +440,7 @@ namespace iqs::mpi {
 			utils::make_equal_pairs(sizes, sizes + size, pair_id);
 
 		/* scatter pair_id */
-		MPI_Scatter(pair_id, 1, MPI::INT, &this_pair_id, 1, MPI::INT, 0, communicator);
+		MPI_Scatter(pair_id, 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
 		if (rank == 0)
 			delete[] pair_id;
 
@@ -451,11 +451,11 @@ namespace iqs::mpi {
 		/* get the number of objects of the respective pairs */
 		size_t other_num_object;
 		if (rank < size / 2) {
-			MPI_Send(&num_object, 1, MPI::LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator);
-			MPI_Recv(&other_num_object, 1, MPI::LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator, &utils::global_status);
+			MPI_Send(&num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator);
+			MPI_Recv(&other_num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator, &utils::global_status);
 		} else {
-			MPI_Recv(&other_num_object, 1, MPI::LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator, &utils::global_status);
-			MPI_Send(&num_object, 1, MPI::LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator);
+			MPI_Recv(&other_num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator, &utils::global_status);
+			MPI_Send(&num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator);
 		}
 
 		/* equalize amoung pairs */
