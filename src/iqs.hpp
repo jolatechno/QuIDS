@@ -2,6 +2,7 @@
 
 #include <parallel/algorithm>
 #include <parallel/numeric>
+#include <execution>
 
 #include <complex>
 #include <cstddef>
@@ -17,6 +18,12 @@
 #ifndef SAFETY_MARGIN
 	#define SAFETY_MARGIN 0.2
 #endif
+#ifndef SIZE_AVERAGE_PROPORTION
+	#define SIZE_AVERAGE_PROPORTION 0.1
+#endif
+#ifndef MIN_COLLISION_SIZE
+	#define MIN_COLLISION_SIZE MIN_VECTOR_SIZE
+#endif
 #ifndef COLLISION_TEST_PROPORTION
 	#define COLLISION_TEST_PROPORTION 0.1
 #endif
@@ -30,7 +37,7 @@ defining openmp function's return values if openmp isn't installed or loaded
 #ifndef _OPENMP
 	#define omp_set_nested(i)
 	#define omp_get_thread_num() 0
-	#define omp_get_num_thread() 1
+	#define omp_get_num_threads() 1
 #else
 	#include <omp.h>
 #endif
@@ -48,8 +55,10 @@ namespace iqs {
 	*/
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
+	size_t min_collision_size = MIN_COLLISION_SIZE;
 	float collision_test_proportion = COLLISION_TEST_PROPORTION;
 	float collision_tolerance = COLLISION_TOLERANCE;
+	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
 
 	/*
 	number of threads
@@ -263,10 +272,11 @@ namespace iqs {
 		size_t iteration_size_per_object = 0;
 
 		// compute the average size of an object for the next iteration:
+		size_t test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.num_object_after_interferences));
 		#pragma omp parallel for reduction(+:iteration_size_per_object)
-		for (size_t oid = 0; oid < symbolic_iteration.num_object_after_interferences; ++oid)
+		for (size_t oid = 0; oid < test_size; ++oid)
 			iteration_size_per_object += symbolic_iteration.size[oid];
-		iteration_size_per_object /= symbolic_iteration.num_object_after_interferences;
+		iteration_size_per_object /= test_size;
 
 		// add the cost of the symbolic iteration in itself
 		iteration_size_per_object += symbolic_iteration.memory_size*symbolic_iteration.num_object/last_iteration.num_object/2; // size for symbolic iteration
@@ -433,7 +443,7 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 
 		bool fast = false;
-		bool skip_test = (collision_test_proportion == 0) || (num_object < utils::min_vector_size);
+		bool skip_test = (collision_test_proportion == 0) || (num_object < min_collision_size);
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
 
 		if (!skip_test) {
@@ -456,7 +466,8 @@ namespace iqs {
 				insert_key(oid);
 
 		/* get all unique graphs with a non zero probability */
-		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
+		auto partitioned_it = std::stable_partition(std::execution::par,
+			next_oid.begin(), next_oid.begin() + num_object, partitioner);
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 				
 		elimination_map.clear();
@@ -508,7 +519,9 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 
 		/* sort to make memory access more continuous */
-		__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
+		#ifdef SORT_OID
+			__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
+		#endif
 
 		/* resize new step variables */
 		next_iteration.resize(next_iteration.num_object);
