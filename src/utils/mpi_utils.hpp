@@ -56,7 +56,7 @@ void make_equal_pairs(size_t *size_begin, size_t *size_end, int *pair_id) {
 
 	#pragma omp parallel for
 	for (int i = 0; i < size; ++i)
-		pair_id[node_ids[i]] = pair_id[node_ids[size - i - 1]];
+		pair_id[node_ids[i]] = node_ids[size - i - 1];
 
 	delete[] node_ids;
 } 

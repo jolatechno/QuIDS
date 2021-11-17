@@ -450,7 +450,7 @@ namespace iqs::mpi {
 
 		/* get the number of objects of the respective pairs */
 		size_t other_num_object;
-		if (rank < size / 2) {
+		if (rank < this_pair_id) {
 			MPI_Send(&num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator);
 			MPI_Recv(&other_num_object, 1, MPI_LONG_LONG_INT, this_pair_id, 0 /* tag */, communicator, &utils::global_status);
 		} else {
