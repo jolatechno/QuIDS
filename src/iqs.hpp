@@ -413,35 +413,6 @@ namespace iqs {
 			return;
 		}
 
-		/*
-		function for partition
-		*/
-		auto static const partitioner = [&](size_t const &oid) {
-			/* check if graph is unique */
-			if (!is_unique[oid])
-				return false;
-
-			/* check for zero probability */
-			return std::norm(magnitude[oid]) > tolerance;
-		};
-
-		/*
-		function to add a key
-		*/
-		auto static const insert_key = [&](size_t oid, int thread_id) {
-			/* accessing key */
-			auto [it, unique] = elimination_maps[thread_id].insert({hash[oid], oid});
-			if (unique) {
-				is_unique[oid] = true; /* keep this graph */
-			} else {
-				/* if it exist add the probabilities */
-				magnitude[it->second] += magnitude[oid];
-
-				/* discard this graph */
-				is_unique[oid] = false;
-			}
-		};
-
 		/* !!!!!!!!!!!!!!!!
 		step (4)
 		 !!!!!!!!!!!!!!!! */
@@ -459,14 +430,31 @@ namespace iqs {
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
+
 				size_t begin = modulo_offset[thread_id];
 				size_t end = modulo_offset[thread_id + 1];
-				elimination_maps[thread_id].reserve(end - begin);
-				for (size_t i = begin; i < end; ++i)
-					insert_key(next_oid[i], thread_id);
+
+				auto &elimination_map = elimination_maps[thread_id];
+				elimination_map.reserve(end - begin);
+
+				for (size_t i = begin; i < end; ++i) {
+					size_t oid = next_oid[i];
+
+					/* accessing key */
+					auto [it, unique] = elimination_map.insert({hash[oid], oid});
+					if (unique) {
+						is_unique[oid] = true; /* keep this graph */
+					} else {
+						/* if it exist add the probabilities */
+						magnitude[it->second] += magnitude[oid];
+
+						/* discard this graph */
+						is_unique[oid] = false;
+					}
+				}
 
 				#pragma omp atomic
-				size_after_insertion += elimination_maps[thread_id].size();
+				size_after_insertion += elimination_map.size();
 			}
 
 			/* check if we should continue */
@@ -486,16 +474,41 @@ namespace iqs {
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
+
 				size_t begin = modulo_offset[thread_id] + test_size;
 				size_t end = modulo_offset[thread_id + 1] + test_size;
-				elimination_maps[thread_id].reserve(end - begin);
-				for (size_t i = begin; i < end; ++i)
-					insert_key(next_oid[i], thread_id);
+
+				auto &elimination_map = elimination_maps[thread_id];
+				elimination_map.reserve(end - begin);
+				
+				for (size_t i = begin; i < end; ++i) {
+					size_t oid = next_oid[i];
+					
+					/* accessing key */
+					auto [it, unique] = elimination_map.insert({hash[oid], oid});
+					if (unique) {
+						is_unique[oid] = true; /* keep this graph */
+					} else {
+						/* if it exist add the probabilities */
+						magnitude[it->second] += magnitude[oid];
+
+						/* discard this graph */
+						is_unique[oid] = false;
+					}
+				}
 			}
 		}
 
 		/* get all unique graphs with a non zero probability */
-		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
+		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object,
+			[&](size_t const &oid) {
+				/* check if graph is unique */
+				if (!is_unique[oid])
+					return false;
+
+				/* check for zero probability */
+				return std::norm(magnitude[oid]) > tolerance;
+			});
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 		
 		#pragma omp parallel	
