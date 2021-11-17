@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iterator>     // std::iterator, std::input_iterator_tag
+#include <algorithm>
 
 /* default variables preprocessor definition:
 	- "UPSIZE_POLICY" corresponds to "upsize_policy" (described in iteration_t resize operators).

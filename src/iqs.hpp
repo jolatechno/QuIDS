@@ -6,7 +6,8 @@
 #include <complex>
 #include <cstddef>
 #include <vector>
-#include <tbb/concurrent_hash_map.h> // For concurrent hash map.
+//#include <tbb/concurrent_hash_map.h> // For concurrent hash map.
+#include <unordered_map>
 
 #ifndef PROBA_TYPE
 	#define PROBA_TYPE double
@@ -209,7 +210,8 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function); 
 
 	protected:
-		tbb::concurrent_hash_map<size_t, size_t> elimination_map;
+		//tbb::concurrent_hash_map<size_t, size_t> elimination_map;
+		std::vector<std::unordered_map<size_t, size_t>> elimination_maps = std::vector<std::unordered_map<size_t, size_t>>(num_threads);
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 		int *modulo_offset = new int[num_threads + 1];
 
@@ -425,10 +427,10 @@ namespace iqs {
 		/*
 		function to add a key
 		*/
-		auto static const insert_key = [&](size_t oid) {
+		auto static const insert_key = [&](size_t oid, int thread_id) {
 			/* accessing key */
-			tbb::concurrent_hash_map<size_t, size_t>::accessor it;
-			if (elimination_map.insert(it, {hash[oid], oid})) {
+			auto [it, unique] = elimination_maps[thread_id].insert({hash[oid], oid});
+			if (unique) {
 				is_unique[oid] = true; /* keep this graph */
 			} else {
 				/* if it exist add the probabilities */
@@ -452,12 +454,19 @@ namespace iqs {
 			iqs::utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + test_size,
 				hash.begin(), modulo_offset, num_threads);
 
-			#pragma omp parallel for schedule(static)
-			for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
-				insert_key(oid);
+			size_t size_after_insertion = 0;
+			#pragma omp parallel
+			{
+				int thread_id = omp_get_thread_num();
+				for (size_t i = modulo_offset[thread_id]; i < modulo_offset[thread_id + 1]; ++i)
+					insert_key(next_oid[i], thread_id);
+
+				#pragma omp atomic
+				size_after_insertion += elimination_maps[thread_id].size();
+			}
 
 			/* check if we should continue */
-			fast = test_size - elimination_map.size() < test_size*collision_test_proportion;
+			fast = test_size - size_after_insertion < test_size*collision_test_proportion;
 			if (fast)
 				/* get all unique graphs with a non zero probability */
 				#pragma omp parallel for schedule(static)
@@ -470,16 +479,20 @@ namespace iqs {
 			iqs::utils::generalized_modulo_partition(next_oid.begin() + test_size, next_oid.begin() + num_object,
 				hash.begin(), modulo_offset, num_threads);
 
-			#pragma omp parallel for schedule(static)
-			for (size_t oid = test_size; oid < num_object; ++oid) //size_t oid = oid[i];
-				insert_key(oid);
+			#pragma omp parallel
+			{
+				int thread_id = omp_get_thread_num();
+				for (size_t i = modulo_offset[thread_id] + test_size; i < modulo_offset[thread_id + 1] + test_size; ++i)
+					insert_key(next_oid[i], thread_id);
+			}
 		}
 
 		/* get all unique graphs with a non zero probability */
 		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
-				
-		elimination_map.clear();
+		
+		#pragma omp parallel	
+		elimination_maps[omp_get_thread_num()].clear();
 	}
 
 	/*
