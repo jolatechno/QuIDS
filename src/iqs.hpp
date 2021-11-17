@@ -531,9 +531,8 @@ namespace iqs {
 		for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
 			size_t id = next_oid[oid];
 
+			/* assign magnitude and size */
 			next_iteration.object_begin[oid + 1] = size[id];
-
-			/* assign magnitude */
 			next_iteration.magnitude[oid] = magnitude[id];
 		}
 

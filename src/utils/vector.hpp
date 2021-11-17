@@ -90,7 +90,10 @@ public:
 
     		size_t old_size = size_;
     		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
-			size_t half_size = size_ / 2; // resize in two part to limit memory overhead
+
+#ifdef EFFICIENT_RESIZE
+    		
+    		size_t half_size = size_ / 2; // resize in two part to limit memory overhead
 
 			/*
 			copy the first half
@@ -134,7 +137,30 @@ public:
     		// free old buffer and swap them
     		free(ptr);
     		ptr = new_ptr;
-    	}
+
+#elif defined(STUPID_RESIZE)
+
+	    	ptr = (value_type*)realloc(ptr, size_*sizeof(value_type));
+	    	#pragma omp parallel for schedule(static)
+	    	for (size_t i = 0; i < size_; ++i)
+	    		volatile value_type _ = ptr[i]; // touch memory
+
+#else
+
+	    	value_type *new_ptr = (value_type *)malloc(size_*sizeof(value_type));
+	    	#pragma omp parallel for schedule(static)
+	    	for (size_t i = 0; i < size_; ++i)
+	    		if (i < old_size) {
+	    			new_ptr[i] = ptr[i];
+	    		} else
+	    			volatile value_type _ = new_ptr[i]; // touch memory
+
+	    	// free old buffer and swap them
+	    	free(ptr);
+	    	ptr = new_ptr;
+
+#endif
+	    }
     }
 
     void iota_resize(size_t n) {
