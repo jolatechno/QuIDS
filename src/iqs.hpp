@@ -7,7 +7,8 @@
 #include <cstddef>
 #include <vector>
 //#include <tbb/concurrent_hash_map.h> // For concurrent hash map.
-#include <unordered_map>
+//#include <unordered_map>
+#include "utils/libs/robin_hood.h"
 
 #ifndef PROBA_TYPE
 	#define PROBA_TYPE double
@@ -211,7 +212,7 @@ namespace iqs {
 
 	protected:
 		//tbb::concurrent_hash_map<size_t, size_t> elimination_map;
-		std::vector<std::unordered_map<size_t, size_t>> elimination_maps = std::vector<std::unordered_map<size_t, size_t>>(num_threads);
+		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps = std::vector<robin_hood::unordered_map<size_t, size_t>>(num_threads);
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 		int *modulo_offset = new int[num_threads + 1];
 
