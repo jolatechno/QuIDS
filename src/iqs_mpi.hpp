@@ -304,7 +304,7 @@ namespace iqs::mpi {
 		mpi_resize(num_object);
 
 		/* partition nodes */
-		utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + num_object,
+		iqs::utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + num_object,
 			hash.begin(), local_disp,
 			size);
 		__gnu_parallel::adjacent_difference(local_disp + 1, local_disp + size + 1, local_count, std::minus<size_t>());

@@ -2,7 +2,6 @@
 
 #include <parallel/algorithm>
 #include <parallel/numeric>
-#include <execution>
 
 #include <complex>
 #include <cstddef>
@@ -45,6 +44,7 @@ defining openmp function's return values if openmp isn't installed or loaded
 namespace iqs {
 	namespace utils {
 		//#include "utils/load_balancing.hpp"
+		#include "utils/algorithm.hpp"
 		#include "utils/memory.hpp"
 		#include "utils/random.hpp"
 		#include "utils/vector.hpp"
@@ -211,6 +211,7 @@ namespace iqs {
 	protected:
 		tbb::concurrent_hash_map<size_t, size_t> elimination_map;
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
+		int *modulo_offset = new int[num_threads + 1];
 
 		utils::numa_vector<mag_t> magnitude;
 		utils::numa_vector<size_t> next_oid;
@@ -447,6 +448,10 @@ namespace iqs {
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
 
 		if (!skip_test) {
+			/* partition to limit collisions */
+			iqs::utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + test_size,
+				hash.begin(), modulo_offset, num_threads);
+
 			#pragma omp parallel for schedule(static)
 			for (size_t oid = 0; oid < test_size; ++oid) //size_t oid = oid[i];
 				insert_key(oid);
@@ -460,14 +465,18 @@ namespace iqs {
 					is_unique[oid] = true;
 		}
 
-		if (!fast)
+		if (!fast) {
+			/* partition to limit collisions */
+			iqs::utils::generalized_modulo_partition(next_oid.begin() + test_size, next_oid.begin() + num_object,
+				hash.begin(), modulo_offset, num_threads);
+
 			#pragma omp parallel for schedule(static)
 			for (size_t oid = test_size; oid < num_object; ++oid) //size_t oid = oid[i];
 				insert_key(oid);
+		}
 
 		/* get all unique graphs with a non zero probability */
-		auto partitioned_it = std::stable_partition(std::execution::par,
-			next_oid.begin(), next_oid.begin() + num_object, partitioner);
+		auto partitioned_it = __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + num_object, partitioner);
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 				
 		elimination_map.clear();
@@ -519,9 +528,7 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 
 		/* sort to make memory access more continuous */
-		#ifdef SORT_OID
-			__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
-		#endif
+		__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
 
 		/* resize new step variables */
 		next_iteration.resize(next_iteration.num_object);
@@ -529,7 +536,7 @@ namespace iqs {
 		/* prepare for partial sum */
 		#pragma omp parallel for schedule(static)
 		for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
-			size_t id = next_oid[oid];
+			auto id = next_oid[oid];
 
 			/* assign magnitude and size */
 			next_iteration.object_begin[oid + 1] = size[id];
