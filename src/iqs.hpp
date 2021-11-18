@@ -421,7 +421,7 @@ namespace iqs {
 		bool fast = false;
 		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || num_object < min_collision_size;
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
-		const int num_bucket = load_balancing_bucket_per_thread*num_threads;
+		const int num_bucket = num_threads > 1 ? load_balancing_bucket_per_thread*num_threads : 1;
 
 		int *modulo_offset = new int[num_bucket + 1];
 		int *load_balancing_begin = new int[num_threads + 1];
@@ -572,8 +572,14 @@ namespace iqs {
 		/* sort to make memory access more continuous */
 		__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
 
+		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
+		mid_step_function(6);
+
 		/* resize new step variables */
 		next_iteration.resize(next_iteration.num_object);
+
+		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
+		mid_step_function(7);
 				
 		/* prepare for partial sum */
 		#pragma omp parallel for schedule(static)
@@ -585,13 +591,16 @@ namespace iqs {
 			next_iteration.magnitude[oid] = magnitude[id];
 		}
 
+		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
+		mid_step_function(8);
+
 		__gnu_parallel::partial_sum(next_iteration.object_begin.begin() + 1,
 			next_iteration.object_begin.begin() + next_iteration.num_object + 1,
 			next_iteration.object_begin.begin() + 1);
 
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
-		mid_step_function(6);
+		mid_step_function(9 /*6*/);
 
 		/* !!!!!!!!!!!!!!!!
 		step (7)
