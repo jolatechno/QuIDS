@@ -305,7 +305,7 @@ namespace iqs {
 		symbolic_iteration.finalize(rule, iteration, iteration_buffer, mid_step_function);
 		iteration_buffer.normalize();
 
-		mid_step_function(8 + 5);
+		mid_step_function(8 + 6);
 		
 		std::swap(iteration_buffer, iteration);
 	}
@@ -485,6 +485,17 @@ namespace iqs {
 			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket,
 				load_balancing_begin, load_balancing_begin + num_threads + 1);
 
+			#pragma omp parallel
+			{
+				int thread_id = omp_get_thread_num();
+
+				size_t begin = modulo_offset[load_balancing_begin[thread_id]] + test_size;
+				size_t end = modulo_offset[load_balancing_begin[thread_id + 1]] + test_size;
+
+				auto &elimination_map = elimination_maps[thread_id];
+				elimination_map.reserve(end - begin + elimination_map.size());
+			}
+
 			/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
 			mid_step_function(5);
 
@@ -496,7 +507,7 @@ namespace iqs {
 				size_t end = modulo_offset[load_balancing_begin[thread_id + 1]] + test_size;
 
 				auto &elimination_map = elimination_maps[thread_id];
-				elimination_map.reserve(end - begin + elimination_map.size());
+				//elimination_map.reserve(end - begin + elimination_map.size());
 				
 				for (size_t i = begin; i < end; ++i) {
 					size_t oid = next_oid[i];
@@ -528,6 +539,9 @@ namespace iqs {
 			});
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 		
+		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
+		mid_step_function(6);
+
 		#pragma omp parallel	
 		elimination_maps[omp_get_thread_num()].clear();
 	}
@@ -541,7 +555,7 @@ namespace iqs {
 			return;
 		}
 		
-		mid_step_function(4 + 2);
+		mid_step_function(4 + 3);
 
 		/* !!!!!!!!!!!!!!!!
 		step (5)
@@ -571,7 +585,7 @@ namespace iqs {
 		} else
 			next_iteration.num_object = num_object_after_interferences;
 
-		mid_step_function(5 + 2);
+		mid_step_function(5 + 3);
 
 		/* !!!!!!!!!!!!!!!!
 		step (6)
@@ -581,13 +595,13 @@ namespace iqs {
 		__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
 
 		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(8);
+		mid_step_function(9);
 
 		/* resize new step variables */
 		next_iteration.resize(next_iteration.num_object);
 
 		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(9);
+		mid_step_function(10);
 				
 		/* prepare for partial sum */
 		#pragma omp parallel for schedule(static)
@@ -600,7 +614,7 @@ namespace iqs {
 		}
 
 		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(10);
+		mid_step_function(11);
 
 		__gnu_parallel::partial_sum(next_iteration.object_begin.begin() + 1,
 			next_iteration.object_begin.begin() + next_iteration.num_object + 1,
@@ -608,7 +622,7 @@ namespace iqs {
 
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
-		mid_step_function(6 + 5);
+		mid_step_function(6 + 6);
 
 		/* !!!!!!!!!!!!!!!!
 		step (7)
@@ -633,7 +647,7 @@ namespace iqs {
 			}
 		}
 		
-		mid_step_function(7 + 5);
+		mid_step_function(7 + 6);
 	}
 
 	/*
