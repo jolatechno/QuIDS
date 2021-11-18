@@ -2,8 +2,8 @@
 closest power of two
 */
 int nearest_power_of_two(int n) {
-	for (int i = 0;; ++i)
-		if (n >> i == 0)
+	for (int i = 1;; i *= 2)
+		if (i >= n)
 			return i;
 }
 
