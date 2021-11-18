@@ -9,7 +9,7 @@ void inline load_balancing_from_prefix_sum(UnsignedIntIterator1 prefixSumLoadBeg
 	unsigned long int w_min = *(prefixSumLoadEnd - 1) / num_segments;
 	unsigned long int w_max = 2*w_min + 1;
 
-	unsigned long int *separators = new unsigned long int[num_segments - 1]();
+	unsigned long int separators[num_segments - 1] = { 0 };
 
 	/* probe function */
 	auto probe_load_sharing = [&](unsigned long int wprobe) {
@@ -60,7 +60,6 @@ void inline load_balancing_from_prefix_sum(UnsignedIntIterator1 prefixSumLoadBeg
 		}
 	}
 
-	delete[] separators;
 	*workSharingIndexesBegin = 0;
 	*(workSharingIndexesEnd - 1) = std::distance(prefixSumLoadBegin, prefixSumLoadEnd);
 }
