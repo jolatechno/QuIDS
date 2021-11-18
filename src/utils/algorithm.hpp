@@ -7,6 +7,12 @@ int nearest_power_of_two(int n) {
 			return i;
 }
 
+int modulo_2_upper_bound(int n) {
+	for (int i = 1;; ++i)
+		if (n >> i == 0)
+			return i;
+}
+
 /*
 function to partition into n section according to the modulo of an array element
 
@@ -18,32 +24,34 @@ void generalized_modulo_partition_power_of_two(size_t *idx_begin, size_t *idx_en
 	offset[0] = 0;
 	offset[n_segment] = n_element;
 
-	if (n_segment <= 1)
+	if (n_segment == 1)
 		return;
 
 	const size_t bitmask = n_segment - 1;
 
-	for (int n_partition = 1; n_partition < n_segment; n_partition *= 2)
-		for (int partition = 0; partition < n_partition; ++partition) {
-			/* calculate boundaries */
-			int lower = (n_segment * partition) / n_partition;
-			int upper = (n_segment * (partition + 1)) / n_partition;
-			int middle = (lower + upper) / 2;
+	std::function<void(int,int)> const recursions = [&](int lower, int upper) {
+		const int middle = (lower + upper) / 2;
 
-			/* actually partition */
-			size_t *partitioned_it;
-			if (shift == 0) {
-				partitioned_it = __gnu_parallel::partition(idx_begin + offset[lower], idx_begin + offset[upper],
-					[&](const size_t oid) {
-						return begin[oid] & bitmask < middle;
-					});
-			} else
-				partitioned_it = __gnu_parallel::partition(idx_begin + offset[lower], idx_begin + offset[upper],
-					[&](const size_t oid) {
-						return (begin[oid] << shift) & bitmask < middle;
-					});
-			offset[middle] = std::distance(idx_begin, partitioned_it);
+		auto partitioned_it = __gnu_parallel::partition(idx_begin + offset[lower], idx_begin + offset[upper],
+			[&](const size_t oid) {
+				return begin[oid] & bitmask < middle;
+			});
+		offset[middle] = std::distance(idx_begin, partitioned_it);
+		
+		if (upper - lower > 2) {
+			#pragma omp task
+			recursions(lower, middle);
+
+			#pragma omp task
+			recursions(middle, upper);
 		}
+	};
+
+	omp_set_nested(1);
+
+	#pragma omp parallel
+	#pragma omp single
+	recursions(0, n_segment);
 }
 
 	/* count occurences */
