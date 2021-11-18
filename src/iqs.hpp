@@ -213,7 +213,6 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function); 
 
 	protected:
-		//tbb::concurrent_hash_map<size_t, size_t> elimination_map;
 		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps = std::vector<robin_hood::unordered_map<size_t, size_t>>(num_threads);
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 
@@ -247,7 +246,7 @@ namespace iqs {
 			}
 		}
 
-		void compute_collisions();
+		void compute_collisions(debug_t mid_step_function /* for testing !!!!!!!!!!!!!!!!!!! */ );
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function);
 
 		long long int memory_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
@@ -300,11 +299,13 @@ namespace iqs {
 	*/
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) {
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
-		symbolic_iteration.compute_collisions();
+		symbolic_iteration.compute_collisions(
+			mid_step_function // for testing
+			);
 		symbolic_iteration.finalize(rule, iteration, iteration_buffer, mid_step_function);
 		iteration_buffer.normalize();
 
-		mid_step_function(8);
+		mid_step_function(8 + 5);
 		
 		std::swap(iteration_buffer, iteration);
 	}
@@ -408,7 +409,7 @@ namespace iqs {
 	/*
 	compute interferences
 	*/
-	void symbolic_iteration::compute_collisions() {
+	void symbolic_iteration::compute_collisions( debug_t mid_step_function=[](int){} /* for testing !!!!!!!!!!!!!!!!!!! */ ) {
 		if (num_object == 0) {
 			num_object_after_interferences = 0;
 			return;
@@ -477,8 +478,15 @@ namespace iqs {
 			/* partition to limit collisions */
 			utils::generalized_modulo_partition(next_oid.begin() + test_size, next_oid.begin() + num_object,
 				hash.begin(), modulo_offset, num_bucket);
+
+			/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
+			mid_step_function(4);
+
 			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket,
 				load_balancing_begin, load_balancing_begin + num_threads + 1);
+
+			/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
+			mid_step_function(5);
 
 			#pragma omp parallel
 			{
@@ -533,7 +541,7 @@ namespace iqs {
 			return;
 		}
 		
-		mid_step_function(4);
+		mid_step_function(4 + 2);
 
 		/* !!!!!!!!!!!!!!!!
 		step (5)
@@ -563,7 +571,7 @@ namespace iqs {
 		} else
 			next_iteration.num_object = num_object_after_interferences;
 
-		mid_step_function(5);
+		mid_step_function(5 + 2);
 
 		/* !!!!!!!!!!!!!!!!
 		step (6)
@@ -573,13 +581,13 @@ namespace iqs {
 		__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
 
 		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(6);
+		mid_step_function(8);
 
 		/* resize new step variables */
 		next_iteration.resize(next_iteration.num_object);
 
 		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(7);
+		mid_step_function(9);
 				
 		/* prepare for partial sum */
 		#pragma omp parallel for schedule(static)
@@ -592,7 +600,7 @@ namespace iqs {
 		}
 
 		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(8);
+		mid_step_function(10);
 
 		__gnu_parallel::partial_sum(next_iteration.object_begin.begin() + 1,
 			next_iteration.object_begin.begin() + next_iteration.num_object + 1,
@@ -600,7 +608,7 @@ namespace iqs {
 
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
-		mid_step_function(9 /*6*/);
+		mid_step_function(6 + 5);
 
 		/* !!!!!!!!!!!!!!!!
 		step (7)
@@ -625,7 +633,7 @@ namespace iqs {
 			}
 		}
 		
-		mid_step_function(7);
+		mid_step_function(7 + 5);
 	}
 
 	/*
