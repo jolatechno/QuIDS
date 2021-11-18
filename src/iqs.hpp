@@ -6,8 +6,6 @@
 #include <complex>
 #include <cstddef>
 #include <vector>
-//#include <tbb/concurrent_hash_map.h> // For concurrent hash map.
-//#include <unordered_map>
 #include "utils/libs/robin_hood.h"
 
 #ifndef PROBA_TYPE
@@ -31,6 +29,9 @@
 #ifndef COLLISION_TOLERANCE
 	#define COLLISION_TOLERANCE 0.05
 #endif
+#ifndef LOAD_BALANCING_BUCKET_PER_THREAD
+	#define LOAD_BALANCING_BUCKET_PER_THREAD 10
+#endif
 
 /*
 defining openmp function's return values if openmp isn't installed or loaded
@@ -45,7 +46,7 @@ defining openmp function's return values if openmp isn't installed or loaded
 
 namespace iqs {
 	namespace utils {
-		//#include "utils/load_balancing.hpp"
+		#include "utils/load_balancing.hpp"
 		#include "utils/algorithm.hpp"
 		#include "utils/memory.hpp"
 		#include "utils/random.hpp"
@@ -61,6 +62,7 @@ namespace iqs {
 	float collision_test_proportion = COLLISION_TEST_PROPORTION;
 	float collision_tolerance = COLLISION_TOLERANCE;
 	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
+	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
 
 	/*
 	number of threads
@@ -214,7 +216,6 @@ namespace iqs {
 		//tbb::concurrent_hash_map<size_t, size_t> elimination_map;
 		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps = std::vector<robin_hood::unordered_map<size_t, size_t>>(num_threads);
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
-		int *modulo_offset = new int[num_threads + 1];
 
 		utils::numa_vector<mag_t> magnitude;
 		utils::numa_vector<size_t> next_oid;
@@ -420,19 +421,25 @@ namespace iqs {
 		bool fast = false;
 		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || num_object < min_collision_size;
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
+		const int num_bucket = load_balancing_bucket_per_thread*num_threads;
+
+		int *modulo_offset = new int[num_bucket + 1];
+		int *load_balancing_begin = new int[num_threads + 1];
 
 		if (!skip_test) {
 			/* partition to limit collisions */
-			iqs::utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + test_size,
-				hash.begin(), modulo_offset, num_threads);
+			utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + test_size,
+				hash.begin(), modulo_offset, num_bucket);
+			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket,
+				load_balancing_begin, load_balancing_begin + num_threads + 1);
 
 			size_t size_after_insertion = 0;
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
 
-				size_t begin = modulo_offset[thread_id];
-				size_t end = modulo_offset[thread_id + 1];
+				size_t begin = modulo_offset[load_balancing_begin[thread_id]];
+				size_t end = modulo_offset[load_balancing_begin[thread_id + 1]];
 
 				auto &elimination_map = elimination_maps[thread_id];
 				elimination_map.reserve(end - begin);
@@ -468,15 +475,17 @@ namespace iqs {
 
 		if (!fast) {
 			/* partition to limit collisions */
-			iqs::utils::generalized_modulo_partition(next_oid.begin() + test_size, next_oid.begin() + num_object,
-				hash.begin(), modulo_offset, num_threads);
+			utils::generalized_modulo_partition(next_oid.begin() + test_size, next_oid.begin() + num_object,
+				hash.begin(), modulo_offset, num_bucket);
+			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket,
+				load_balancing_begin, load_balancing_begin + num_threads + 1);
 
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
 
-				size_t begin = modulo_offset[thread_id] + test_size;
-				size_t end = modulo_offset[thread_id + 1] + test_size;
+				size_t begin = modulo_offset[load_balancing_begin[thread_id]] + test_size;
+				size_t end = modulo_offset[load_balancing_begin[thread_id + 1]] + test_size;
 
 				auto &elimination_map = elimination_maps[thread_id];
 				elimination_map.reserve(end - begin);
