@@ -15,7 +15,8 @@ void generalized_modulo_partition(size_t *idx_begin, size_t *idx_end, size_t con
 
 		/* nested for loop */
 		int num_threads = std::min(n_partition, omp_get_num_threads());
-		#pragma omp parallel for num_threads(num_threads)
+		#pragma omp parallel
+		#pragma omp single
 		for (int i = 0; i < n_partition; ++i) {
 			
 			/* compute limits */
@@ -24,13 +25,15 @@ void generalized_modulo_partition(size_t *idx_begin, size_t *idx_end, size_t con
 			size_t upper = (n_segment * (i + 1)) / n_partition; 
 
 			/* actually partition */
-			if (lower < middle && middle < upper) {
-				auto partitioned_it = __gnu_parallel::partition(idx_begin + offset[lower], idx_begin + offset[upper],
-				[&](size_t const idx){
-					return (begin[idx] / multiplier) % n_segment < middle;
-				});
-				offset[middle] = std::distance(idx_begin, partitioned_it);
-			}
+			if (lower < middle && middle < upper)
+				#pragma omp task
+				{
+					auto partitioned_it = __gnu_parallel::partition(idx_begin + offset[lower], idx_begin + offset[upper],
+					[&](size_t const idx){
+						return (begin[idx] / multiplier) % n_segment < middle;
+					});
+					offset[middle] = std::distance(idx_begin, partitioned_it);
+				}
 		}
 	}
 }
