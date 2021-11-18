@@ -422,14 +422,14 @@ namespace iqs {
 		bool fast = false;
 		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || num_object < min_collision_size;
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
-		const int num_bucket = num_threads > 1 ? load_balancing_bucket_per_thread*num_threads : 1;
+		const int num_bucket = num_threads > 1 ? utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
 
 		int *modulo_offset = new int[num_bucket + 1];
 		int *load_balancing_begin = new int[num_threads + 1];
 
 		if (!skip_test) {
 			/* partition to limit collisions */
-			utils::generalized_modulo_partition(next_oid.begin(), next_oid.begin() + test_size,
+			utils::generalized_modulo_partition_power_of_two(next_oid.begin(), next_oid.begin() + test_size,
 				hash.begin(), modulo_offset, num_bucket);
 			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket,
 				load_balancing_begin, load_balancing_begin + num_threads + 1);
@@ -476,7 +476,7 @@ namespace iqs {
 
 		if (!fast) {
 			/* partition to limit collisions */
-			utils::generalized_modulo_partition(next_oid.begin() + test_size, next_oid.begin() + num_object,
+			utils::generalized_modulo_partition_power_of_two(next_oid.begin() + test_size, next_oid.begin() + num_object,
 				hash.begin(), modulo_offset, num_bucket);
 
 			/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
