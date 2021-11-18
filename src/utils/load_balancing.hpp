@@ -37,7 +37,7 @@ void inline load_balancing_from_prefix_sum(UnsignedIntIterator1 prefixSumLoadBeg
 
 		/* copy separators over */
 		for (unsigned long int i = 0; i < num_segments - 1; ++i)
-			workSharingIndexesBegin[i + 1] = separators[i];
+			workSharingIndexesBegin[i + 1] = separators[i] - 1;
 
 		return true;
 	};
@@ -62,7 +62,7 @@ void inline load_balancing_from_prefix_sum(UnsignedIntIterator1 prefixSumLoadBeg
 
 	delete[] separators;
 	*workSharingIndexesBegin = 0;
-	*(workSharingIndexesEnd - 1) = std::distance(prefixSumLoadBegin, prefixSumLoadEnd);
+	*(workSharingIndexesEnd - 1) = std::distance(prefixSumLoadBegin, prefixSumLoadEnd) - 1;
 }
 
 template <class UnsignedIntIterator1, class UnsignedIntIterator2>
@@ -74,5 +74,5 @@ void inline indexed_load_balancing_from_prefix_sum(UnsignedIntIterator1 prefixSu
 
 	/* de-index limits from prefix sum */
 	for (auto workSharingIt = workSharingIndexesBegin; workSharingIt != workSharingIndexesEnd; ++workSharingIt)
-		*workSharingIt = *workSharingIt == 0 ? 0 : prefixSumLoadBegin[*workSharingIt - 1];
+		*workSharingIt = prefixSumLoadBegin[*workSharingIt];
 }

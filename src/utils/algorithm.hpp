@@ -27,6 +27,7 @@ void generalized_modulo_partition_power_of_two(size_t *idx_begin, size_t *idx_en
 	if (n_segment == 1)
 		return;
 
+
 	const size_t bitmask = n_segment - 1;
 
 	std::function<void(int,int)> const recursions = [&](int lower, int upper) {
@@ -34,7 +35,7 @@ void generalized_modulo_partition_power_of_two(size_t *idx_begin, size_t *idx_en
 
 		auto partitioned_it = __gnu_parallel::partition(idx_begin + offset[lower], idx_begin + offset[upper],
 			[&](const size_t oid) {
-				return begin[oid] & bitmask < middle;
+				return (begin[oid] & bitmask) < middle;
 			});
 		offset[middle] = std::distance(idx_begin, partitioned_it);
 		
