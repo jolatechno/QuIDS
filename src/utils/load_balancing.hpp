@@ -24,10 +24,10 @@ void inline load_balancing_from_prefix_sum(UnsignedIntIterator1 prefixSumLoadBeg
 
 			/* dichotomie search of separator */
 			last_separator = std::distance(prefixSumLoadBegin,
-				std::upper_bound(prefixSumLoadBegin + last_separator, prefixSumLoadEnd, wprobe + last_separator_value));
+				std::upper_bound(prefixSumLoadBegin + last_separator, prefixSumLoadEnd, wprobe + last_separator_value)) - 1;
 
 			/* prepare next iteration */
-			last_separator_value = last_separator == 0 ? 0 : prefixSumLoadBegin[last_separator - 1];
+			last_separator_value = prefixSumLoadBegin[last_separator];
 			separators[separator] = last_separator;
 		}
 

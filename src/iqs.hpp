@@ -436,8 +436,9 @@ namespace iqs {
 
 		if (!skip_test) {
 			/* partition to limit collisions */
-			utils::generalized_modulo_partition_power_of_two(next_oid.begin(), next_oid.begin() + test_size,
-				hash.begin(), modulo_offset, num_bucket);
+			utils::generalized_modulo_partition_power_of_two(0, test_size,
+				next_oid.begin(), hash.begin(),
+				modulo_offset, num_bucket);
 			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket + 1,
 				load_balancing_begin, load_balancing_begin + num_threads + 1);
 
@@ -487,8 +488,9 @@ namespace iqs {
 
 		if (!fast) {
 			/* partition to limit collisions */
-			utils::generalized_modulo_partition_power_of_two(next_oid.begin() + test_size, next_oid.begin() + num_object,
-				hash.begin(), modulo_offset, num_bucket);
+			utils::generalized_modulo_partition_power_of_two(test_size, num_object,
+				next_oid.begin() + test_size, hash.begin(),
+				modulo_offset, num_bucket);
 
 			/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
 			mid_step_function(4);
