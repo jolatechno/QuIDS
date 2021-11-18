@@ -30,7 +30,7 @@
 	#define COLLISION_TOLERANCE 0.05
 #endif
 #ifndef LOAD_BALANCING_BUCKET_PER_THREAD
-	#define LOAD_BALANCING_BUCKET_PER_THREAD 10
+	#define LOAD_BALANCING_BUCKET_PER_THREAD 8
 #endif
 
 /*
@@ -488,7 +488,7 @@ namespace iqs {
 				size_t end = modulo_offset[load_balancing_begin[thread_id + 1]] + test_size;
 
 				auto &elimination_map = elimination_maps[thread_id];
-				elimination_map.reserve(end - begin);
+				elimination_map.reserve(end - begin + elimination_map.size());
 				
 				for (size_t i = begin; i < end; ++i) {
 					size_t oid = next_oid[i];
