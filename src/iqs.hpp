@@ -6,7 +6,14 @@
 #include <complex>
 #include <cstddef>
 #include <vector>
-#include "utils/libs/robin_hood.h"
+
+#ifdef USE_ROBIN
+	#include "utils/libs/robin_hood.h"
+	namespace hmap = robin_hood;
+#else
+	#include <unordered_map>
+	namespace hmap = std;
+#endif
 
 #ifndef PROBA_TYPE
 	#define PROBA_TYPE double
@@ -213,7 +220,7 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function); 
 
 	protected:
-		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps = std::vector<robin_hood::unordered_map<size_t, size_t>>(num_threads);
+		std::vector<hmap::unordered_map<size_t, size_t>> elimination_maps = std::vector<hmap::unordered_map<size_t, size_t>>(num_threads);
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 
 		utils::numa_vector<mag_t> magnitude;
@@ -305,7 +312,7 @@ namespace iqs {
 		symbolic_iteration.finalize(rule, iteration, iteration_buffer, mid_step_function);
 		iteration_buffer.normalize();
 
-		mid_step_function(8 + 6);
+		mid_step_function(8 + 5);
 		
 		std::swap(iteration_buffer, iteration);
 	}
@@ -438,31 +445,35 @@ namespace iqs {
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
-
-				size_t begin = modulo_offset[load_balancing_begin[thread_id]];
-				size_t end = modulo_offset[load_balancing_begin[thread_id + 1]];
-
 				auto &elimination_map = elimination_maps[thread_id];
-				elimination_map.reserve(end - begin);
 
-				for (size_t i = begin; i < end; ++i) {
-					size_t oid = next_oid[i];
+				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
+					size_t begin = modulo_offset[partition];
+					size_t end = modulo_offset[partition + 1];
 
-					/* accessing key */
-					auto [it, unique] = elimination_map.insert({hash[oid], oid});
-					if (unique) {
-						is_unique[oid] = true; /* keep this graph */
-					} else {
-						/* if it exist add the probabilities */
-						magnitude[it->second] += magnitude[oid];
+					elimination_map.reserve(end - begin);
 
-						/* discard this graph */
-						is_unique[oid] = false;
+					for (size_t i = begin; i < end; ++i) {
+						size_t oid = next_oid[i];
+
+						/* accessing key */
+						auto [it, unique] = elimination_map.insert({hash[oid], oid});
+						if (unique) {
+							is_unique[oid] = true; /* keep this graph */
+						} else {
+							/* if it exist add the probabilities */
+							magnitude[it->second] += magnitude[oid];
+
+							/* discard this graph */
+							is_unique[oid] = false;
+						}
 					}
-				}
 
-				#pragma omp atomic
-				size_after_insertion += elimination_map.size();
+					#pragma omp atomic
+					size_after_insertion += elimination_map.size();
+
+					elimination_map.clear();
+				}
 			}
 
 			/* check if we should continue */
@@ -485,44 +496,37 @@ namespace iqs {
 			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket,
 				load_balancing_begin, load_balancing_begin + num_threads + 1);
 
-			#pragma omp parallel
-			{
-				int thread_id = omp_get_thread_num();
-
-				size_t begin = modulo_offset[load_balancing_begin[thread_id]] + test_size;
-				size_t end = modulo_offset[load_balancing_begin[thread_id + 1]] + test_size;
-
-				auto &elimination_map = elimination_maps[thread_id];
-				elimination_map.reserve(end - begin + elimination_map.size());
-			}
-
 			/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
 			mid_step_function(5);
 
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
-
-				size_t begin = modulo_offset[load_balancing_begin[thread_id]] + test_size;
-				size_t end = modulo_offset[load_balancing_begin[thread_id + 1]] + test_size;
-
 				auto &elimination_map = elimination_maps[thread_id];
-				//elimination_map.reserve(end - begin + elimination_map.size());
-				
-				for (size_t i = begin; i < end; ++i) {
-					size_t oid = next_oid[i];
-					
-					/* accessing key */
-					auto [it, unique] = elimination_map.insert({hash[oid], oid});
-					if (unique) {
-						is_unique[oid] = true; /* keep this graph */
-					} else {
-						/* if it exist add the probabilities */
-						magnitude[it->second] += magnitude[oid];
 
-						/* discard this graph */
-						is_unique[oid] = false;
+				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
+					size_t begin = modulo_offset[partition];
+					size_t end = modulo_offset[partition + 1];
+
+					elimination_map.reserve(end - begin);
+				
+					for (size_t i = begin; i < end; ++i) {
+						size_t oid = next_oid[i];
+						
+						/* accessing key */
+						auto [it, unique] = elimination_map.insert({hash[oid], oid});
+						if (unique) {
+							is_unique[oid] = true; /* keep this graph */
+						} else {
+							/* if it exist add the probabilities */
+							magnitude[it->second] += magnitude[oid];
+
+							/* discard this graph */
+							is_unique[oid] = false;
+						}
 					}
+
+					elimination_map.clear();
 				}
 			}
 		}
@@ -538,12 +542,6 @@ namespace iqs {
 				return std::norm(magnitude[oid]) > tolerance;
 			});
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
-		
-		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(6);
-
-		#pragma omp parallel	
-		elimination_maps[omp_get_thread_num()].clear();
 	}
 
 	/*
@@ -555,7 +553,7 @@ namespace iqs {
 			return;
 		}
 		
-		mid_step_function(4 + 3);
+		mid_step_function(4 + 2);
 
 		/* !!!!!!!!!!!!!!!!
 		step (5)
@@ -585,7 +583,7 @@ namespace iqs {
 		} else
 			next_iteration.num_object = num_object_after_interferences;
 
-		mid_step_function(5 + 3);
+		mid_step_function(5 + 2);
 
 		/* !!!!!!!!!!!!!!!!
 		step (6)
@@ -595,13 +593,13 @@ namespace iqs {
 		__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
 
 		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(9);
+		mid_step_function(8);
 
 		/* resize new step variables */
 		next_iteration.resize(next_iteration.num_object);
 
 		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(10);
+		mid_step_function(9);
 				
 		/* prepare for partial sum */
 		#pragma omp parallel for schedule(static)
@@ -614,7 +612,7 @@ namespace iqs {
 		}
 
 		/* !!!!!!!!!!!!!!!!!!!! debug !!!!!!!!!!!!!!!!!!!! */
-		mid_step_function(11);
+		mid_step_function(10);
 
 		__gnu_parallel::partial_sum(next_iteration.object_begin.begin() + 1,
 			next_iteration.object_begin.begin() + next_iteration.num_object + 1,
@@ -622,7 +620,7 @@ namespace iqs {
 
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
-		mid_step_function(6 + 6);
+		mid_step_function(6 + 5);
 
 		/* !!!!!!!!!!!!!!!!
 		step (7)
@@ -647,7 +645,7 @@ namespace iqs {
 			}
 		}
 		
-		mid_step_function(7 + 6);
+		mid_step_function(7 + 5);
 	}
 
 	/*
