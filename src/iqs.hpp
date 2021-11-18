@@ -505,8 +505,8 @@ namespace iqs {
 				auto &elimination_map = elimination_maps[thread_id];
 
 				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
-					size_t begin = modulo_offset[partition];
-					size_t end = modulo_offset[partition + 1];
+					size_t begin = modulo_offset[partition] + test_size;
+					size_t end = modulo_offset[partition + 1] + test_size;
 
 					elimination_map.reserve(end - begin);
 				
