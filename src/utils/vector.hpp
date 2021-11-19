@@ -154,7 +154,7 @@ public:
 	    		if (i < old_size) {
 	    			new_ptr[i] = ptr[i];
 	    		} else
-	    			volatile value_type _ = new_ptr[i]; // touch memory
+	    			new_ptr[i] = 0; // touch memory
 
 	    	// free old buffer and swap them
 	    	free(ptr);

@@ -299,6 +299,7 @@ namespace iqs::mpi {
 
 		const int local_num_bucket = num_threads > 1 ? iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
 		const int global_num_bucket = size > 1 ? iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*size) : 1;
+		const int local_shift = iqs::utils::modulo_2_upper_bound(global_num_bucket);
 
 		/* prepare buffers */
 		local_disp = new int[global_num_bucket + 1];
@@ -374,9 +375,9 @@ namespace iqs::mpi {
 
 		if (!skip_test) {
 			/* partition to limit collisions */
-			iqs::utils::generalized_modulo_partition_power_of_two(0, test_size,
+			iqs::utils::generalized_shifted_modulo_partition_power_of_two(0, test_size,
 				oid_buffer.begin(), hash_buffer.begin(),
-				local_modulo_offset, local_num_bucket);
+				local_modulo_offset, local_num_bucket, local_shift);
 			iqs::utils::load_balancing_from_prefix_sum(local_modulo_offset, local_modulo_offset + local_num_bucket + 1,
 				local_load_balancing_begin, local_load_balancing_begin + num_threads + 1);
 
@@ -413,9 +414,9 @@ namespace iqs::mpi {
 
 		if (!fast) {
 			/* partition to limit collisions */
-			iqs::utils::generalized_modulo_partition_power_of_two(test_size, global_num_object,
+			iqs::utils::generalized_shifted_modulo_partition_power_of_two(test_size, global_num_object,
 				oid_buffer.begin() + test_size, hash_buffer.begin(),
-				local_modulo_offset, local_num_bucket);
+				local_modulo_offset, local_num_bucket, local_shift);
 			iqs::utils::load_balancing_from_prefix_sum(local_modulo_offset, local_modulo_offset + local_num_bucket + 1,
 				local_load_balancing_begin, local_load_balancing_begin + iqs::num_threads + 1);
 
@@ -463,6 +464,11 @@ namespace iqs::mpi {
 		delete[] global_disp;
 		delete[] global_count;
 		delete[] global_num_object_after_interferences;
+		delete[] global_load_balancing_begin;
+		delete[] local_modulo_offset;
+		delete[] local_load_balancing_begin;
+		if (rank == 0)
+			delete[] global_modulo_offset;
 	}
 
 	/*
