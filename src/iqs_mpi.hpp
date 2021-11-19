@@ -5,7 +5,7 @@
 #include <mpi.h>
 
 #ifndef MIN_EQUALIZE_SIZE
-	#define MIN_EQUALIZE_SIZE MIN_VECTOR_SIZE
+	#define MIN_EQUALIZE_SIZE 1000
 #endif
 #ifndef EQUALIZE_IMBALANCE
 	#define EQUALIZE_IMBALANCE 0.2
@@ -35,7 +35,7 @@ namespace iqs::mpi {
 	*/
 	class mpi_iteration : public iqs::iteration {
 		friend mpi_symbolic_iteration;
-		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, iqs::debug_t mid_step_function);
+		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, const int n_shared_memory, iqs::debug_t mid_step_function);
 
 	protected:
 		void normalize(MPI_Comm communicator);
@@ -133,7 +133,7 @@ namespace iqs::mpi {
 
 	class mpi_symbolic_iteration : public iqs::symbolic_iteration {
 		friend mpi_iteration;
-		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, iqs::debug_t mid_step_function); 
+		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, const int n_shared_memory, iqs::debug_t mid_step_function); 
 
 	protected:
 		iqs::utils::numa_vector<mag_t> partitioned_mag;
@@ -192,19 +192,21 @@ namespace iqs::mpi {
 	/*
 	simulation function
 	*/
-	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, iqs::debug_t mid_step_function=[](int){}) {
+	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, const int n_shared_memory=1, iqs::debug_t mid_step_function=[](int){}) {
 		int size;
 		MPI_Comm_size(communicator, &size);
 
 		/* actual simulation */
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(communicator);
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, mid_step_function, n_shared_memory);
 		std::swap(iteration_buffer, iteration);
 
 		/* equalize and/or normalize */
 		size_t average_num_object = iteration.get_total_num_object(communicator) / size;
-		if (average_num_object > min_equalize_size) {
+		size_t max_num_object;
+		MPI_Allreduce(&iteration.num_object, &max_num_object, 1, MPI_UNSIGNED_LONG, MPI_MAX, communicator);
+		if (max_num_object > min_equalize_size) {
 
 			/* if both condition are met equalize */
 			float max_imbalance = get_max_num_object_imbalance(iteration, average_num_object, communicator);

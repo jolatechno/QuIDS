@@ -310,13 +310,19 @@ The default value of any of those variable can be altered at compilation, by pas
 
 `collision_test_proportion` has a default of  `0.1` and `collision_tolerance` has a default of `0.05`.
 
+#### load balancing bucket per thread
+
+`load_balancing_bucket_per_thread` represent the number of partition par thread (or MPI node), which allows load balancing by then having a variable number of partition per thread according to each partition's size.
+
+`load_balancing_bucket_per_thread` has a default of `8`.
+
 #### minimum equalize size and equalize imbalance.
 
 `mpi::min_equalize_size` represents the minimum per node average size required to automaticly call `equalize(...)` after a call to `iqs::mpi::simulate(...)`.
 
 If this first condition is met, `equalize(...)` if the maximum relative imbalance in the number of object accross the nodes is greater than `mpi::equalize_imablance`.
 
-`mpi::min_equalize_size` has the same default as `utils::min_vector_size` by default, and `mpi::equalize_imablance` has a default of `0.2`.
+`mpi::min_equalize_size` is equal to `1000` by default, and `mpi::equalize_imablance` has a default of `0.2`.
 
 #### min vector size
 

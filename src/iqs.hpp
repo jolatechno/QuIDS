@@ -104,7 +104,7 @@ namespace iqs {
 	*/
 	class iteration {
 		friend symbolic_iteration;
-		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
+		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration, const int n_shared_memory);
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function);  
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
@@ -123,7 +123,7 @@ namespace iqs {
 			objects.resize(size);
 		}
 
-		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const;
+		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) const;
 		void apply_modifier(modifier_t const rule);
 		void normalize();
 
@@ -210,7 +210,7 @@ namespace iqs {
 	*/
 	class symbolic_iteration {
 		friend iteration;
-		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
+		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration, const int n_shared_memory);
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, debug_t mid_step_function); 
 
 	protected:
@@ -248,7 +248,7 @@ namespace iqs {
 		}
 
 		void compute_collisions();
-		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function);
+		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](int){}, const int n_shared_memory=1);
 
 		long long int memory_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 
@@ -262,7 +262,7 @@ namespace iqs {
 	/*
 	for memory managment
 	*/
-	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
+	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration, const int n_shared_memory = 1) {
 		// get the free memory and the total amount of memory...
 		size_t free_mem;
 		utils::get_free_mem(free_mem);
@@ -271,7 +271,7 @@ namespace iqs {
 		size_t total_useable_memory = next_iteration.objects.size() + last_iteration.objects.size() + // size of objects
 			last_iteration.magnitude.size()*last_iteration.memory_size + next_iteration.magnitude.size()*next_iteration.memory_size + // size of properties
 			symbolic_iteration.magnitude.size()*symbolic_iteration.memory_size + // size of symbolic properties
-			free_mem; // free memory
+			free_mem / n_shared_memory; // free memory per shared memory simulation
 
 		// compute average object size
 		size_t iteration_size_per_object = 0;
@@ -327,7 +327,7 @@ namespace iqs {
 	/*
 	generate symbolic iteration
 	*/
-	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) const {
+	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const {
 		if (num_object == 0) {
 			symbolic_iteration.num_object = 0;
 			return;
@@ -525,7 +525,7 @@ namespace iqs {
 	/*
 	finalize iteration
 	*/
-	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](int){}) {
+	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function, const int n_shared_memory) {
 		if (num_object_after_interferences == 0) {
 			next_iteration.num_object = 0;
 			return;
@@ -537,7 +537,7 @@ namespace iqs {
 		step (5)
 		 !!!!!!!!!!!!!!!! */
 
-		long long int max_num_object = get_max_num_object(next_iteration, last_iteration, *this) / 2;
+		long long int max_num_object = get_max_num_object(next_iteration, last_iteration, *this, 1) / 2;
 		max_num_object = std::max(max_num_object, (long long int)utils::min_vector_size);
 
 		if (num_object_after_interferences > max_num_object) {
