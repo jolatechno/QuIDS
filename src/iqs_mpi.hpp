@@ -299,6 +299,9 @@ namespace iqs::mpi {
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 
+		if (size == 1)
+			return iqs::symbolic_iteration::compute_collisions();
+
 		const int local_num_bucket = num_threads > 1 ? iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
 		const int global_num_bucket = size > 1 ? iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*size) : 1;
 		const int local_shift = iqs::utils::modulo_2_upper_bound(global_num_bucket);
@@ -321,6 +324,8 @@ namespace iqs::mpi {
 			local_disp, global_num_bucket);
 		__gnu_parallel::adjacent_difference(local_disp + 1, local_disp + global_num_bucket + 1, local_count, std::minus<size_t>());
 
+		if (rank == 0) std::cout << "a\n";
+
 		/* get node list */
 		if (rank == 0) global_modulo_offset = new int[global_num_bucket + 1]();
 		MPI_Reduce(local_disp, global_modulo_offset + 1, global_num_bucket, MPI_INT, MPI_SUM, 0, communicator);
@@ -329,6 +334,12 @@ namespace iqs::mpi {
 		if (rank == 0)
 			iqs::utils::load_balancing_from_prefix_sum(global_modulo_offset, global_modulo_offset + global_num_bucket + 1,
 				global_load_balancing_begin, global_load_balancing_begin + size + 1);
+
+		if (rank == 0) {
+			for (int i = 0; i <= size; ++i)
+				std::cout << global_load_balancing_begin[i] << ", ";
+			std::cout << global_num_bucket << "=num_bucket\nb\n"; 
+		}
 
 		/* broadcast load sharing */
 		MPI_Bcast(global_load_balancing_begin, size + 1, MPI_INT, 0, communicator);
@@ -342,10 +353,18 @@ namespace iqs::mpi {
 			local_count[i] = local_disp[i + 1] - local_disp[i];
 		}
 
+		for (int i = 0; i < size; ++i)
+			std::cout << "(" << local_count[i] << "," << local_disp[i] << "), ";
+		std::cout << num_object << "=num_objects, " << rank << "=rank\n"; 
+
+		if (rank == 0) std::cout << "c\n";
+
 		/* get global count and disp */
 		MPI_Alltoall(local_count, 1, MPI_INT, global_count, 1, MPI_INT, communicator);
 		global_disp[0] = 0;
 		__gnu_parallel::partial_sum(global_count, global_count + size, global_disp + 1);
+
+		if (rank == 0) std::cout << "d\n";
 
 		/* resize and prepare node_id buffer */
 		size_t global_num_object = global_disp[size];
@@ -369,6 +388,8 @@ namespace iqs::mpi {
 			hash_buffer.begin(), global_count, global_disp, MPI_UNSIGNED_LONG, communicator);
 		MPI_Alltoallv(partitioned_mag.begin(), local_count, local_disp, mag_MPI_Datatype,
 			mag_buffer.begin(), global_count, global_disp, mag_MPI_Datatype, communicator);
+
+		if (rank == 0) std::cout << "e\n";
 
 		/* generate the interference table */
 		bool fast = false;
@@ -441,11 +462,15 @@ namespace iqs::mpi {
 			}
 		}
 
+		if (rank == 0) std::cout << "f\n";
+
 		/* share is_unique and magnitude */
 		MPI_Alltoallv(is_unique_buffer.begin(), global_count, global_disp, MPI_CHAR,
 			partitioned_is_unique.begin(), local_count, local_disp, MPI_CHAR, communicator);
 		MPI_Alltoallv(mag_buffer.begin(), global_count, global_disp, mag_MPI_Datatype,
 			partitioned_mag.begin(), local_count, local_disp, mag_MPI_Datatype, communicator);
+
+		if (rank == 0) std::cout << "g\n\n";
 
 		/* regenerate real, imag and is_unique */
 		#pragma omp parallel for schedule(static)
