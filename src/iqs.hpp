@@ -442,7 +442,7 @@ namespace iqs {
 
 		if (!skip_test) {
 			/* partition to limit collisions */
-			utils::generalized_modulo_partition_power_of_two(0, test_size,
+			utils::generalized_modulo_partition_power_of_two((size_t)0, test_size,
 				next_oid.begin(), hash.begin(),
 				modulo_offset, num_bucket);
 			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket + 1,

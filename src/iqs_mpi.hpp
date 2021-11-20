@@ -74,10 +74,6 @@ namespace iqs::mpi {
 			return avg;
 		}
 		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator) {
-			int rank;
-			MPI_Comm_rank(communicator, &rank);
-			std::cout << num_object_sent << "," << (object_begin[num_object] - object_begin[num_object - num_object_sent]) << ", " << node << "->" << rank << ", send...\n";
-
 			/* send size */
 			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG, node, 0 /* tag */, communicator);
 
@@ -107,8 +103,6 @@ namespace iqs::mpi {
 				/* pop */
 				pop(num_object_sent, false);
 			}
-
-			std::cout << num_object_sent << ", " << node << ", " << rank << ", sent...\n";
 		}
 		void receive_objects(int node, MPI_Comm communicator) {
 			/* receive size */
@@ -247,8 +241,8 @@ namespace iqs::mpi {
 	*/
 	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator) {
 		int *local_disp, *local_count, *global_disp, *global_count;
-		size_t *global_num_object_after_interferences;
-		int *global_load_balancing_begin, *local_load_balancing_begin, *global_modulo_offset, *local_modulo_offset;
+		size_t *global_num_object_after_interferences, *global_modulo_offset;
+		int *global_load_balancing_begin, *local_load_balancing_begin, *local_modulo_offset;
 		int size, rank;
 
 		/*
@@ -330,6 +324,7 @@ namespace iqs::mpi {
 		global_disp = new int[size + 1];
 		global_count = new int[size];
 		global_num_object_after_interferences = new size_t[size]();
+		global_modulo_offset = new size_t[global_num_bucket + 1]();
 		global_load_balancing_begin = new int[size + 1];
 		local_modulo_offset = new int[local_num_bucket + 1];
 		local_load_balancing_begin = new int[num_threads + 1];
@@ -337,14 +332,15 @@ namespace iqs::mpi {
 		mpi_resize(num_object);
 
 		/* partition nodes */
-		iqs::utils::generalized_modulo_partition_power_of_two(0, num_object,
+		iqs::utils::generalized_modulo_partition_power_of_two((size_t)0, num_object,
 			next_oid.begin(), hash.begin(),
 			local_disp, global_num_bucket);
 		__gnu_parallel::adjacent_difference(local_disp + 1, local_disp + global_num_bucket + 1, local_count, std::minus<size_t>());
 
 		/* get node list */
-		if (rank == 0) global_modulo_offset = new int[global_num_bucket + 1]();
-		MPI_Reduce(local_disp, global_modulo_offset + 1, global_num_bucket, MPI_INT, MPI_SUM, 0, communicator);
+		for (int i = 0; i <= global_num_bucket; ++i)
+			global_modulo_offset[i] = local_disp[i];
+		MPI_Reduce(rank == 0 ? MPI_IN_PLACE : global_modulo_offset + 1, global_modulo_offset + 1, global_num_bucket, MPI_UNSIGNED_LONG, MPI_SUM, 0, communicator);
 
 		/* compute load sharing */
 		if (rank == 0)
@@ -490,8 +486,7 @@ namespace iqs::mpi {
 		delete[] global_load_balancing_begin;
 		delete[] local_modulo_offset;
 		delete[] local_load_balancing_begin;
-		if (rank == 0)
-			delete[] global_modulo_offset;
+		delete[] global_modulo_offset;
 	}
 
 	/*
