@@ -842,14 +842,14 @@ namespace iqs::rules::qcgd {
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						previous_result(it, buffer, sy_it);
 						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, mid_step_function);
+							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, 0, mid_step_function);
 					};
 
 					split_merge reversed_rule(theta, phi, -xi);
 					simulator_t previous_reversed_result = reversed_result;
 					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, mid_step_function);
+							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, 0, mid_step_function);
 						previous_reversed_result(it, buffer, sy_it);
 					};
 
@@ -859,14 +859,14 @@ namespace iqs::rules::qcgd {
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						previous_result(it, buffer, sy_it);
 						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, mid_step_function);
+							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, 0, mid_step_function);
 					};
 
 					erase_create reversed_rule(theta, phi, -xi);
 					simulator_t previous_reversed_result = reversed_result;
 					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, mid_step_function);
+							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, 0, mid_step_function);
 						previous_reversed_result(it, buffer, sy_it);
 					};
 
@@ -876,14 +876,14 @@ namespace iqs::rules::qcgd {
 					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						previous_result(it, buffer, sy_it);
 						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, mid_step_function);
+							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, 0, mid_step_function);
 					};
 
 					coin reversed_rule(theta, phi, -xi);
 					simulator_t previous_reversed_result = reversed_result;
 					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
 						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, mid_step_function);
+							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, 0, mid_step_function);
 						previous_reversed_result(it, buffer, sy_it);
 					};
 

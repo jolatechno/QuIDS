@@ -35,7 +35,8 @@ namespace iqs::mpi {
 	*/
 	class mpi_iteration : public iqs::iteration {
 		friend mpi_symbolic_iteration;
-		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, const int n_shared_memory, iqs::debug_t mid_step_function);
+		friend size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm communicator);
+		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function);
 
 	protected:
 		void normalize(MPI_Comm communicator);
@@ -145,7 +146,8 @@ namespace iqs::mpi {
 
 	class mpi_symbolic_iteration : public iqs::symbolic_iteration {
 		friend mpi_iteration;
-		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, const int n_shared_memory, iqs::debug_t mid_step_function); 
+		friend size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm communicator);
+		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function); 
 
 	protected:
 		iqs::utils::fast_vector/*numa_vector*/<mag_t> partitioned_mag;
@@ -193,6 +195,73 @@ namespace iqs::mpi {
 	};
 
 	/*
+	for memory managment
+	*/
+	size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm communicator) {
+		// get the shared memory communicator
+		MPI_Comm localComm;
+		int rank, local_rank, local_size;
+		MPI_Comm_rank(communicator, &rank);
+		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
+		MPI_Comm_size(localComm, &local_size);
+		MPI_Comm_rank(localComm, &local_rank);
+
+		// get the free memory and the total amount of memory...
+		size_t free_mem;
+		iqs::utils::get_free_mem(free_mem);
+
+		// get each size
+		size_t next_iteration_object_size = next_iteration.objects.size();
+		size_t last_iteration_object_size = last_iteration.objects.size();
+		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_object_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_object_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
+
+		size_t next_iteration_property_size = next_iteration.magnitude.size();
+		size_t last_iteration_property_size = last_iteration.magnitude.size();
+		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_property_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_property_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
+
+		size_t symbolic_iteration_size = symbolic_iteration.magnitude.size();
+		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
+
+		size_t last_iteration_num_object = last_iteration.num_object;
+		size_t symbolic_iteration_num_object = symbolic_iteration.num_object;
+		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_num_object, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_num_object, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
+
+		// get the total memory
+		size_t total_useable_memory = next_iteration_object_size + last_iteration_object_size + // size of objects
+			last_iteration_property_size*last_iteration.memory_size + next_iteration_property_size*next_iteration.memory_size + // size of properties
+			symbolic_iteration_size*symbolic_iteration.memory_size + // size of symbolic properties
+			free_mem; // free memory per shared memory simulation
+
+		// compute average object size
+		size_t iteration_size_per_object = 0;
+
+		// compute the average size of an object for the next iteration:
+		size_t test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.num_object_after_interferences));
+		#pragma omp parallel for reduction(+:iteration_size_per_object)
+		for (size_t oid = 0; oid < test_size; ++oid)
+			iteration_size_per_object += symbolic_iteration.size[oid];
+
+		// get total average
+		size_t total_test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.get_total_num_object_after_interferences(localComm)));
+		MPI_Allreduce(MPI_IN_PLACE, &iteration_size_per_object, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
+		iteration_size_per_object /= total_test_size;
+
+		// add the cost of the symbolic iteration in itself
+		iteration_size_per_object += symbolic_iteration.memory_size*symbolic_iteration_num_object/last_iteration_num_object/2; // size for symbolic iteration
+		
+		// and the constant size per object
+		iteration_size_per_object += next_iteration.memory_size;
+
+		// and the cost of unused space
+		iteration_size_per_object *= iqs::utils::upsize_policy;
+
+		return total_useable_memory / iteration_size_per_object * (1 - safety_margin) / local_size;
+	}
+
+	/*
 	function to compute the maximum per node size imbablance
 	*/
 	float get_max_num_object_imbalance(mpi_it_t const &iteration, size_t const size_comp, MPI_Comm communicator) {
@@ -204,21 +273,25 @@ namespace iqs::mpi {
 	/*
 	simulation function
 	*/
-	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, const int n_shared_memory=1, iqs::debug_t mid_step_function=[](int){}) {
+	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](int){}) {
 		int size;
 		MPI_Comm_size(communicator, &size);
 
 		/* actual simulation */
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(communicator);
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, mid_step_function, n_shared_memory);
+
+		if (max_num_object == 0)
+			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration, communicator)/2;
+
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object, mid_step_function);
 		std::swap(iteration_buffer, iteration);
 
 		/* equalize and/or normalize */
-		size_t average_num_object = iteration.get_total_num_object(communicator) / size;
-		size_t max_num_object;
-		MPI_Allreduce(&iteration.num_object, &max_num_object, 1, MPI_UNSIGNED_LONG, MPI_MAX, communicator);
-		if (max_num_object > min_equalize_size) {
+		size_t average_num_object = iteration.get_total_num_object(communicator)/size;
+		size_t max_num_object_per_node;
+		MPI_Allreduce(&iteration.num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG, MPI_MAX, communicator);
+		if (max_num_object_per_node > min_equalize_size) {
 
 			/* if both condition are met equalize */
 			float max_imbalance = get_max_num_object_imbalance(iteration, average_num_object, communicator);
