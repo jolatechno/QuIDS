@@ -111,7 +111,7 @@ void generalized_shifted_modulo_partition_power_of_two(size_t const id_begin, si
 
 		#pragma omp for schedule(static)
 		for (auto i = id_begin; i < id_end; ++i) {
-			auto key = (begin[i] << shift) & bitmask;
+			auto key = (begin[i] >> shift) & bitmask;
 			++count[key*num_threads + thread_id];
 		}
 	}
@@ -128,7 +128,7 @@ void generalized_shifted_modulo_partition_power_of_two(size_t const id_begin, si
 		
 		#pragma omp for schedule(static)
 		for (auto i = id_begin; i < id_end; ++i) {
-			auto key = (begin[i] << shift) & bitmask;
+			auto key = (begin[i] >> shift) & bitmask;
 			idx_out[--count[key*num_threads + thread_id]] = i;
 		}
 	}
