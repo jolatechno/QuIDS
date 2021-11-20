@@ -448,77 +448,34 @@ namespace iqs {
 		step (4)
 		 !!!!!!!!!!!!!!!! */
 
-		bool fast = false;
-		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || num_object < min_collision_size;
-		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
 		const int num_bucket = num_threads > 1 ? utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
 
 		int *modulo_offset = new int[num_bucket + 1];
 		int *load_balancing_begin = new int[num_threads + 1];
 
-		if (!skip_test) {
-			/* partition to limit collisions */
-			utils::generalized_modulo_partition_power_of_two((size_t)0, test_size,
-				next_oid.begin(), hash.begin(),
-				modulo_offset, num_bucket);
-			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket + 1,
-				load_balancing_begin, load_balancing_begin + num_threads + 1);
+		
+		/* partition to limit collisions */
+		utils::generalized_modulo_partition_power_of_two((size_t)0, num_object,
+			next_oid.begin(), hash.begin(),
+			modulo_offset, num_bucket);
+		utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket + 1,
+			load_balancing_begin, load_balancing_begin + num_threads + 1);
 
-			size_t size_after_insertion = 0;
-			#pragma omp parallel
-			{
-				int thread_id = omp_get_thread_num();
-				auto &elimination_map = elimination_maps[thread_id];
+		#pragma omp parallel
+		{
+			int thread_id = omp_get_thread_num();
+			auto &elimination_map = elimination_maps[thread_id];
 
-				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
-					size_t begin = modulo_offset[partition];
-					size_t end = modulo_offset[partition + 1];
+			for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
+				size_t begin = modulo_offset[partition];
+				size_t end = modulo_offset[partition + 1];
 
-					elimination_map.reserve(end - begin);
+				elimination_map.reserve(end - begin);
+			
+				for (size_t i = begin; i < end; ++i)
+					insert_key(next_oid[i], elimination_map);
 
-					for (size_t i = begin; i < end; ++i)
-						insert_key(next_oid[i], elimination_map);
-
-					#pragma omp atomic
-					size_after_insertion += elimination_map.size();
-
-					elimination_map.clear();
-				}
-			}
-
-			/* check if we should continue */
-			fast = test_size - size_after_insertion < test_size*collision_tolerance;
-			if (fast)
-				/* get all unique graphs with a non zero probability */
-				#pragma omp parallel for schedule(static)
-				for (size_t oid = test_size; oid < num_object; ++oid)
-					is_unique[oid] = true;
-		}
-
-		if (!fast) {
-			/* partition to limit collisions */
-			utils::generalized_modulo_partition_power_of_two(test_size, num_object,
-				next_oid.begin() + test_size, hash.begin(),
-				modulo_offset, num_bucket);
-			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket + 1,
-				load_balancing_begin, load_balancing_begin + num_threads + 1);
-
-			#pragma omp parallel
-			{
-				int thread_id = omp_get_thread_num();
-				auto &elimination_map = elimination_maps[thread_id];
-
-				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
-					size_t begin = modulo_offset[partition] + test_size;
-					size_t end = modulo_offset[partition + 1] + test_size;
-
-					elimination_map.reserve(end - begin);
-				
-					for (size_t i = begin; i < end; ++i)
-						insert_key(next_oid[i], elimination_map);
-
-					elimination_map.clear();
-				}
+				elimination_map.clear();
 			}
 		}
 
