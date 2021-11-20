@@ -95,7 +95,13 @@ namespace iqs::mpi {
 				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG, node, 0 /* tag */, communicator);
 
 				/* send objects */
+				const size_t max_int = 0x7FFFFFFF;
 				size_t send_object_size = object_begin[num_object];
+				while (send_object_size > max_int) {
+					MPI_Send(objects.begin() + send_object_begin, max_int, MPI_CHAR, node, 0 /* tag */, communicator);
+					send_object_size -= max_int;
+					send_object_begin += max_int;
+				}
 				MPI_Send(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator);
 
 				/* pop */
@@ -123,6 +129,12 @@ namespace iqs::mpi {
 				allocate(send_object_begin + send_object_size);
 
 				/* receive objects */
+				const size_t max_int = 0x7FFFFFFF;
+				while (send_object_size > max_int) {
+					MPI_Recv(objects.begin() + send_object_begin, max_int, MPI_CHAR, node, 0 /* tag */, communicator, &utils::global_status);
+					send_object_size -= max_int;
+					send_object_begin += max_int;
+				}
 				MPI_Recv(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator, &utils::global_status);
 
 				/* correct values */
