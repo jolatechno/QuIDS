@@ -76,7 +76,7 @@ namespace iqs::mpi {
 		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator) {
 			int rank;
 			MPI_Comm_rank(communicator, &rank);
-			std::cout << num_object_sent << ", " << node << ", " << rank << ", send...\n";
+			std::cout << num_object_sent << "," << (object_begin[num_object] - object_begin[num_object - num_object_sent]) << ", " << node << "->" << rank << ", send...\n";
 
 			/* send size */
 			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG, node, 0 /* tag */, communicator);
