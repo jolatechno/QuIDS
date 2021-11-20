@@ -109,10 +109,10 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
 	protected:
-		utils::numa_vector<mag_t> magnitude;
-		utils::numa_vector<char> objects;
-		utils::numa_vector<size_t> object_begin;
-		mutable utils::numa_vector<uint32_t> num_childs;
+		utils::fast_vector/*numa_vector*/<mag_t> magnitude;
+		utils::fast_vector/*numa_vector*/<char> objects;
+		utils::fast_vector/*numa_vector*/<size_t> object_begin;
+		mutable utils::fast_vector/*numa_vector*/<uint32_t> num_childs;
 
 		void inline resize(size_t num_object) const {
 			magnitude.resize(num_object);
@@ -217,14 +217,14 @@ namespace iqs {
 		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps = std::vector<robin_hood::unordered_map<size_t, size_t>>(num_threads);
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 
-		utils::numa_vector<mag_t> magnitude;
-		utils::numa_vector<size_t> next_oid;
-		utils::numa_vector<size_t> size;
-		utils::numa_vector<size_t> hash;
-		utils::numa_vector<size_t> parent_oid;
-		utils::numa_vector<uint32_t> child_id;
-		utils::numa_vector<bool> is_unique;
-		utils::numa_vector<double> random_selector;
+		utils::fast_vector/*numa_vector*/<mag_t> magnitude;
+		utils::fast_vector/*numa_vector*/<size_t> next_oid;
+		utils::fast_vector/*numa_vector*/<size_t> size;
+		utils::fast_vector/*numa_vector*/<size_t> hash;
+		utils::fast_vector/*numa_vector*/<size_t> parent_oid;
+		utils::fast_vector/*numa_vector*/<uint32_t> child_id;
+		utils::fast_vector/*numa_vector*/<bool> is_unique;
+		utils::fast_vector/*numa_vector*/<double> random_selector;
 
 		void inline resize(size_t num_object) {
 			magnitude.resize(num_object);

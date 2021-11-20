@@ -136,15 +136,15 @@ namespace iqs::mpi {
 		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, const int n_shared_memory, iqs::debug_t mid_step_function); 
 
 	protected:
-		iqs::utils::numa_vector<mag_t> partitioned_mag;
-		iqs::utils::numa_vector<size_t> partitioned_hash;
-		iqs::utils::numa_vector<bool> partitioned_is_unique;
+		iqs::utils::fast_vector/*numa_vector*/<mag_t> partitioned_mag;
+		iqs::utils::fast_vector/*numa_vector*/<size_t> partitioned_hash;
+		iqs::utils::fast_vector/*numa_vector*/<bool> partitioned_is_unique;
 
-		iqs::utils::numa_vector<size_t> oid_buffer;
-		iqs::utils::numa_vector<mag_t> mag_buffer;
-		iqs::utils::numa_vector<size_t> hash_buffer;
-		iqs::utils::numa_vector<bool> is_unique_buffer;
-		iqs::utils::numa_vector<int> node_id_buffer;
+		iqs::utils::fast_vector/*numa_vector*/<size_t> oid_buffer;
+		iqs::utils::fast_vector/*numa_vector*/<mag_t> mag_buffer;
+		iqs::utils::fast_vector/*numa_vector*/<size_t> hash_buffer;
+		iqs::utils::fast_vector/*numa_vector*/<bool> is_unique_buffer;
+		iqs::utils::fast_vector/*numa_vector*/<int> node_id_buffer;
 
 		void compute_collisions(MPI_Comm communicator);
 		void mpi_resize(size_t size) {

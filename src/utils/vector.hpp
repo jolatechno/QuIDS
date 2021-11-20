@@ -24,13 +24,13 @@ float downsize_policy = DOWNSIZE_POLICY;
 size_t min_vector_size = MIN_VECTOR_SIZE;
 
 template <typename value_type>
-class numa_vector {
+class fast_vector/*numa_vector*/ {
 private:
     mutable value_type* ptr = NULL;
     mutable size_t size_ = 0;
  
 public:
-    explicit numa_vector(size_t n = 0) {
+    explicit fast_vector/*numa_vector*/(size_t n = 0) {
     	resize(n);
 	}
  
@@ -75,7 +75,13 @@ public:
     void resize(size_t n) const {
     	n = std::max(min_vector_size, n); // never resize under min_vector_size
 
-    	if (ptr == NULL) { // just alloc if the vector is empty
+    	if (size_ < n || // resize if we absolutely have to because the state won't fit
+    		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
+    		size_ = n*upsize_policy;
+    		ptr = (value_type*)realloc(ptr, size_*sizeof(value_type));
+    	}
+
+    	/*if (ptr == NULL) { // just alloc if the vector is empty
     		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
     		ptr = (value_type *)malloc(size_*sizeof(value_type));
 
@@ -103,13 +109,20 @@ public:
 	    	// free old buffer and swap them
 	    	free(ptr);
 	    	ptr = new_ptr;
-	    }
+	    }*/
     }
 
     void iota_resize(size_t n) {
+    	resize(n);
+
+    	#pragma omp parallel for schedule(static)
+		for (size_t i = 0; i < size_; ++i)
+			ptr[i] = i;
+
+    	/*
     	n = std::max(min_vector_size, n); // never resize under min_vector_size
 
-    	if (size_ < n || // resize if we absolutely have to because the state won't fit
+		if (size_ < n || // resize if we absolutely have to because the state won't fit
     		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
 
     		if (ptr != NULL)
@@ -126,11 +139,13 @@ public:
     		// iota anyway
     		#pragma omp parallel for schedule(static)
 			for (size_t i = 0; i < size_; ++i)
-				ptr[i] = i;
+				ptr[i] = i;*/
     }
 
     void zero_resize(size_t n) {
-    	static value_type zero;
+    	resize(n);
+    	
+    	/*static value_type zero;
 
     	n = std::max(min_vector_size, n); // never resize under min_vector_size
 
@@ -151,7 +166,7 @@ public:
     		// iota anyway
     		#pragma omp parallel for schedule(static)
 			for (size_t i = 0; i < size_; ++i)
-				ptr[i] = 0;
+				ptr[i] = 0;*/
     }
  
     // Begin iterator
