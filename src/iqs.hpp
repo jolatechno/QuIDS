@@ -463,36 +463,66 @@ namespace iqs {
 		utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket + 1,
 			load_balancing_begin, load_balancing_begin + num_threads + 1);
 
+		bool fast = false;
+		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || num_object < min_collision_size;
+		size_t total_test_size = 0;
+		size_t total_inserted_size = 0;
+
 		#pragma omp parallel
 		{
 			int thread_id = omp_get_thread_num();
 			auto &elimination_map = elimination_maps[thread_id];
 
+			size_t total_size = 0;
 			for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
 				size_t begin = modulo_offset[partition];
 				size_t end = modulo_offset[partition + 1];
+				total_size += end - begin;
+			}
 
-				elimination_map.reserve(end - begin);
+			if (!skip_test) {
+				/* reserve hashmap */
+				elimination_map.reserve(total_size*collision_test_proportion);
+				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
+					size_t begin = modulo_offset[partition];
+					size_t end = modulo_offset[partition + 1];
 
-				bool fast = false;
-				bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || end - begin < min_collision_size;
-				size_t test_size = skip_test ? 0 : (end - begin)*collision_test_proportion;
-				size_t test_end = begin + test_size;
-				
-				if (!skip_test) {
+					size_t test_size = skip_test ? 0 : (end - begin)*collision_test_proportion;
+					size_t test_end = begin + test_size;
+
+					#pragma omp atomic
+					total_test_size += test_size;
+
 					for (size_t i = begin; i < test_end; ++i)
 						insert_key(next_oid[i], elimination_map);
-					fast = test_size - elimination_map.size() < test_size*collision_tolerance;
 				}
-				if (fast) {
-					for (size_t i = test_end; i < end; ++i)
-						is_unique[next_oid[i]] = true;
-				} else
-					for (size_t i = test_end; i < end; ++i)
-						insert_key(next_oid[i], elimination_map);
-
-				elimination_map.clear();
 			}
+
+			#pragma omp atomic 
+			total_inserted_size += elimination_map.size();
+
+			#pragma omp barrier
+			#pragma omp single
+			fast = total_test_size - total_inserted_size < total_test_size*collision_tolerance;
+
+			if (!fast)
+				elimination_map.reserve(total_size); // reserve hashmap
+			for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
+					size_t begin = modulo_offset[partition];
+					size_t end = modulo_offset[partition + 1];
+
+					size_t test_size = skip_test ? 0 : (end - begin)*collision_test_proportion;
+					size_t test_end = begin + test_size;
+
+					if (fast) {
+						for (size_t i = test_end; i < end; ++i)
+							is_unique[next_oid[i]] = true;
+					} else
+						for (size_t i = test_end; i < end; ++i)
+							insert_key(next_oid[i], elimination_map);
+			}
+
+			elimination_map.clear();
 		}
 
 		/* get all unique graphs with a non zero probability */
