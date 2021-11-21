@@ -346,6 +346,8 @@ namespace iqs {
 	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const {
 		if (num_object == 0) {
 			symbolic_iteration.num_object = 0;
+			for (int i = 0; i <= 3; ++i)
+				mid_step_function(i);
 			return;
 		}
 
@@ -501,6 +503,8 @@ namespace iqs {
 	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object, debug_t mid_step_function) {
 		if (num_object_after_interferences == 0) {
 			next_iteration.num_object = 0;
+			for (int i = 4; i <= 7; ++i)
+				mid_step_function(i);
 			return;
 		}
 		

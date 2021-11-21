@@ -311,9 +311,6 @@ namespace iqs::mpi {
 	distributed interference function
 	*/
 	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator) {
-		int *local_count, *send_disp, *send_count, *receive_disp, *receive_count;
-		size_t *global_num_object_after_interferences, *local_disp, *total_disp;
-		int *partition_begin, *load_balancing_begin, *send_partition_count;
 		int size, rank;
 
 		/*
@@ -330,7 +327,7 @@ namespace iqs::mpi {
 		/*
 		function to add a key
 		*/
-		auto static const insert_key = [&](size_t oid, robin_hood::unordered_map<size_t, size_t> &elimination_map) {
+		auto static const insert_key = [&](size_t oid, robin_hood::unordered_map<size_t, size_t> &elimination_map, int *global_num_object_after_interferences) {
 			int node_id = node_id_buffer[oid];
 
 			/* accessing key */
@@ -340,7 +337,6 @@ namespace iqs::mpi {
 				is_unique_buffer[oid] = true;
 
 				/* increment values */
-				#pragma omp atomic 
 				++global_num_object_after_interferences[node_id];
 			} else {
 				auto other_oid = it->second;
@@ -365,9 +361,7 @@ namespace iqs::mpi {
 					is_unique_buffer[other_oid] = false;
 
 					/* increment values */
-					#pragma omp atomic 
 					++global_num_object_after_interferences[node_id];
-					#pragma omp atomic 
 					--global_num_object_after_interferences[other_node_id];
 				}
 			}
@@ -388,18 +382,16 @@ namespace iqs::mpi {
 		const int num_bucket = num_threads*size > 1 ? iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads*size) : 1;
 
 		/* prepare buffers */
-		global_num_object_after_interferences = new size_t[size]();
-		local_disp = new size_t[num_bucket + 1]();
-		local_count = new int[num_bucket];
-		send_disp = new int [size + 1]();
-		send_count = new int [size];
-		receive_disp = new int[size + 1]();
-		receive_count = new int[size];
-		partition_begin = new int[num_threads*size + 1]();
-		send_partition_count = new int[num_threads*size + 1]();
-		load_balancing_begin = new int[size*num_threads + 1]();
-		if (rank == 0)
-			total_disp = new size_t[num_bucket + 1]();
+		size_t *local_disp = new size_t[num_bucket + 1]();
+		int *local_count = new int[num_bucket];
+		int *send_disp = new int [size + 1]();
+		int *send_count = new int [size];
+		int *receive_disp = new int[size + 1]();
+		int *receive_count = new int[size];
+		int *partition_begin = new int[num_threads*size + 1]();
+		int *send_partition_count = new int[num_threads*size + 1]();
+		int *load_balancing_begin = new int[size*num_threads + 1]();
+		size_t *total_disp = rank == 0 ? new size_t[num_bucket + 1]() : NULL;
 
 		mpi_resize(num_object);
 
@@ -471,6 +463,8 @@ namespace iqs::mpi {
 
 		#pragma omp parallel
 		{
+			int *global_num_object_after_interferences = new int[size]();
+
 			int thread_id = omp_get_thread_num();
 			auto &elimination_map = elimination_maps[thread_id];
 
@@ -494,11 +488,12 @@ namespace iqs::mpi {
 
 				/* insert into hashmap */
 				for (size_t oid = begin; oid < end; ++oid)
-					insert_key(oid, elimination_map);
+					insert_key(oid, elimination_map, global_num_object_after_interferences);
 			}
 
 			/* clear hashmap */
 			elimination_map.clear();
+			delete[] global_num_object_after_interferences;
 		}
 
 		/* share is_unique and magnitude */
@@ -521,7 +516,6 @@ namespace iqs::mpi {
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 
 		/* free objects */
-		delete[] global_num_object_after_interferences;
 		delete[] local_disp;
 		delete[] local_count;
 		delete[] send_disp;
