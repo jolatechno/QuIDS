@@ -480,29 +480,40 @@ namespace iqs::mpi {
 			/* reserve hashmap */
 			elimination_map.reserve(total_size);
 
-			for (int i = 0; i < size; ++i) {
-				int partition = i*num_threads + thread_id;
+			bool fast = false;
+			bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || total_size < min_collision_size;
+			size_t total_test_size = 0;
 
-				size_t begin = partition_begin[partition];
-				size_t end = partition_begin[partition + 1];
+			if (!skip_test)
+				for (int i = 0; i < size; ++i) {
+					int partition = i*num_threads + thread_id;
 
-				bool fast = false;
-				bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || end - begin < min_collision_size;
-				size_t test_size = skip_test ? 0 : (end - begin)*collision_test_proportion;
-				size_t test_end = begin + test_size;
-				
-				size_t initial_map_size = elimination_map.size();
-				if (!skip_test) {
+					size_t begin = partition_begin[partition];
+					size_t end = partition_begin[partition + 1];
+
+					size_t test_size = skip_test ? 0 : (end - begin)*collision_test_proportion;
+					size_t test_end = begin + test_size;
+					total_test_size += test_size;
+
 					for (size_t oid = begin; oid < test_end; ++oid)
 						insert_key(oid, elimination_map, global_num_object_after_interferences);
-					fast = test_size - (elimination_map.size() - initial_map_size) < test_size*collision_tolerance;
 				}
-				if (fast) {
-					for (size_t oid = test_end; oid < end; ++oid)
-						is_unique_buffer[oid] = true;
-				} else
-					for (size_t oid = test_end; oid < end; ++oid)
-						insert_key(oid, elimination_map, global_num_object_after_interferences);
+			fast = total_test_size - elimination_map.size() < total_test_size*collision_tolerance;
+			for (int i = 0; i < size; ++i) {
+					int partition = i*num_threads + thread_id;
+
+					size_t begin = partition_begin[partition];
+					size_t end = partition_begin[partition + 1];
+
+					size_t test_size = skip_test ? 0 : (end - begin)*collision_test_proportion;
+					size_t test_end = begin + test_size;
+
+					if (fast) {
+						for (size_t oid = test_end; oid < end; ++oid)
+							is_unique_buffer[oid] = true;
+					} else
+						for (size_t oid = test_end; oid < end; ++oid)
+							insert_key(oid, elimination_map, global_num_object_after_interferences);
 			}
 
 			/* clear hashmap */
