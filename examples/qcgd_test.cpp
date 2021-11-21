@@ -12,38 +12,38 @@ int main(int argc, char* argv[]) {
 	iqs::rules::qcgd::flags::read_n_iter("1");
 	iqs::it_t state = iqs::rules::qcgd::flags::read_state("6");//;3,imag=1,real=0");
 
-	auto [erase_create, reversed_erase_create] = iqs::rules::qcgd::flags::read_rule("erase_create,theta=0.3333");
-	auto [coin, reversed_coin] = iqs::rules::qcgd::flags::read_rule("coin,theta=0.25,phi=0.25");
-	auto [split_merge, reversed_split_merge] = iqs::rules::qcgd::flags::read_rule("split_merge,theta=0.25,phi=0.25");
-	auto [step, reversed_step] = iqs::rules::qcgd::flags::read_rule("step");
+	iqs::rule_t *erase_create = new iqs::rules::qcgd::erase_create(0.3333);
+	iqs::rule_t *coin = new iqs::rules::qcgd::erase_create(0.25, 0.25);
+	iqs::rule_t *split_merge = new iqs::rules::qcgd::split_merge(0.25, 0.25, 0.25);
+	iqs::rule_t *reversed_split_merge = new iqs::rules::qcgd::split_merge(0.25, 0.25, -0.25);
 	
 	iqs::sy_it_t sy_it; iqs::it_t buffer;
 
 	std::cout << "initial state:\n"; iqs::rules::qcgd::utils::print(state);
 
-	step(state, buffer, sy_it);
+	iqs::simulate(state, iqs::rules::qcgd::step);
 	std::cout << "\nafter step:\n"; iqs::rules::qcgd::utils::print(state);
 
-	coin(state, buffer, sy_it);
+	iqs::simulate(state, coin, buffer, sy_it);
 	std::cout << "\nafter coin (P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 
-	reversed_coin(state, buffer, sy_it);
-	erase_create(state, buffer, sy_it);
+	iqs::simulate(state, coin, buffer, sy_it);
+	iqs::simulate(state, erase_create, buffer, sy_it);
 	std::cout << "\nafter coin + erase_create (P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 
-	split_merge(state, buffer, sy_it);
+	iqs::simulate(state, split_merge, buffer, sy_it);
 	std::cout << "\nafter split_merge(P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 
-	step(state, buffer, sy_it);
-	split_merge(state, buffer, sy_it);
+	iqs::simulate(state, iqs::rules::qcgd::step);
+	iqs::simulate(state, split_merge, buffer, sy_it);
 	std::cout << "\nafter step + split_merge(P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 
 	iqs::rules::qcgd::utils::max_print_num_graphs = 10;
 
-	reversed_split_merge(state, buffer, sy_it);
-	reversed_step(state, buffer, sy_it);
-	reversed_split_merge(state, buffer, sy_it);
-	reversed_erase_create(state, buffer, sy_it);
-	reversed_step(state, buffer, sy_it);
+	iqs::simulate(state, reversed_split_merge, buffer, sy_it);
+	iqs::simulate(state, iqs::rules::qcgd::reversed_step);
+	iqs::simulate(state, reversed_split_merge, buffer, sy_it);
+	iqs::simulate(state, erase_create, buffer, sy_it);
+	iqs::simulate(state, iqs::rules::qcgd::reversed_step);
 	std::cout << "\napplied all previous gates in reverse order (P=" << state.total_proba << "):\n"; iqs::rules::qcgd::utils::print(state);
 }

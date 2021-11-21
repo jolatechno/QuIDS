@@ -728,7 +728,7 @@ namespace iqs::rules::qcgd {
 	};
 
 	namespace flags {
-		typedef std::function<void(iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it)> simulator_t;
+		typedef std::vector<std::tuple<int, bool, iqs::modifier_t, iqs::rule_t*, iqs::modifier_t, iqs::rule_t*>> simulator_t;
 
 		namespace {
 			std::string strip(std::string &input, std::string const separator) {
@@ -786,7 +786,7 @@ namespace iqs::rules::qcgd {
 			} else
 				std::srand(std::time(0));
 
-			int reversed_n_iters = parse_int_with_default(string_arg, "reversed_n_iter=", ",", n_iters);
+			int reversed_n_iters = parse_int_with_default(string_arg, "reversed_n_iter=", ",", 0);
 
 			utils::max_print_num_graphs = parse_int_with_default(string_arg, "max_print_num_graphs=", ",", utils::max_print_num_graphs);
 
@@ -822,11 +822,10 @@ namespace iqs::rules::qcgd {
 			return state;
 		}
 
-		std::tuple<simulator_t, simulator_t> read_rule(const char* argv, debug_t mid_step_function=[](int){}) {
+		simulator_t read_rule(const char* argv, debug_t mid_step_function=[](int){}) {
 			std::string string_args = argv;
 
-			simulator_t result = [](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it){};
-			simulator_t reversed_result = [](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it){};
+			simulator_t simulator;
 
 			std::string string_arg;
 			while ((string_arg = strip(string_args, ";")) != "") {
@@ -837,99 +836,29 @@ namespace iqs::rules::qcgd {
 				int n_iter = parse_int_with_default(string_arg, "n_iter=", ",", 1);
 
 				if (rule_name == "split_merge") {
-					simulator_t previous_result = result;
-					split_merge rule(theta, phi, xi);
-					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						previous_result(it, buffer, sy_it);
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, 0, mid_step_function);
-					};
-
-					split_merge reversed_rule(theta, phi, -xi);
-					simulator_t previous_reversed_result = reversed_result;
-					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, 0, mid_step_function);
-						previous_reversed_result(it, buffer, sy_it);
-					};
-
+					simulator.push_back({n_iter, true, NULL, new split_merge(theta, phi, xi), NULL, new split_merge(theta, phi, -xi)});
 				} else if (rule_name == "erase_create") {
-					erase_create rule(theta, phi, xi);
-					simulator_t previous_result = result;
-					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						previous_result(it, buffer, sy_it);
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, 0, mid_step_function);
-					};
-
-					erase_create reversed_rule(theta, phi, -xi);
-					simulator_t previous_reversed_result = reversed_result;
-					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, 0, mid_step_function);
-						previous_reversed_result(it, buffer, sy_it);
-					};
-
+					simulator.push_back({n_iter, true, NULL, new erase_create(theta, phi, xi), NULL, new erase_create(theta, phi, -xi)});
 				} else if (rule_name == "coin") {
-					coin rule(theta, phi, xi);
-					simulator_t previous_result = result;
-					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						previous_result(it, buffer, sy_it);
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&rule), buffer, sy_it, 0, mid_step_function);
-					};
-
-					coin reversed_rule(theta, phi, -xi);
-					simulator_t previous_reversed_result = reversed_result;
-					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, (rule_t*)(&reversed_rule), buffer, sy_it, 0, mid_step_function);
-						previous_reversed_result(it, buffer, sy_it);
-					};
-
+					simulator.push_back({n_iter, true, NULL, new coin(theta, phi, xi), NULL, new coin(theta, phi, -xi)});
 				} else if (rule_name == "step") {
-					simulator_t previous_result = result;
-					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						previous_result(it, buffer, sy_it);
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, step);
-					};
-
-					simulator_t previous_reversed_result = reversed_result;
-					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, reversed_step);
-						previous_reversed_result(it, buffer, sy_it);
-					};
-
+					simulator.push_back({n_iter, false, step, NULL, reversed_step, NULL});
 				} else if (rule_name == "reversed_step") {
-					simulator_t previous_result = result;
-					result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						previous_result(it, buffer, sy_it);
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, reversed_step);
-					};
-
-					simulator_t previous_reversed_result = reversed_result;
-					reversed_result = [=](iqs::it_t &it, iqs::it_t &buffer, iqs::sy_it_t &sy_it) {
-						for (auto i = 0; i < n_iter; ++i)
-							iqs::simulate(it, step);
-						previous_reversed_result(it, buffer, sy_it);
-					};
+					simulator.push_back({n_iter, false, reversed_step, NULL, step, NULL});
 				}
 			}
 			
-			return {result, reversed_result};
+			return simulator;
 		}
 
-		std::tuple<uint, uint, it_t, simulator_t, simulator_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
+		std::tuple<uint, uint, it_t, simulator_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
 			std::string string_args = argv;
 
 			auto [n_iter, reversed_n_iters] = read_n_iter(strip(string_args, "|").c_str());
 			it_t state = read_state(strip(string_args, "|").c_str());
-			auto [rule, reversed_rule] = read_rule(string_args.c_str(), mid_step_function);
+			auto simulator = read_rule(string_args.c_str(), mid_step_function);
 
-			return {n_iter, reversed_n_iters, state, rule, reversed_rule};
+			return {n_iter, reversed_n_iters, state, simulator};
 		}
 	}
 }
