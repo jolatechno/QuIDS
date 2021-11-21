@@ -486,9 +486,23 @@ namespace iqs::mpi {
 				size_t begin = partition_begin[partition];
 				size_t end = partition_begin[partition + 1];
 
-				/* insert into hashmap */
-				for (size_t oid = begin; oid < end; ++oid)
-					insert_key(oid, elimination_map, global_num_object_after_interferences);
+				bool fast = false;
+				bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || end - begin < min_collision_size;
+				size_t test_size = skip_test ? 0 : (end - begin)*collision_test_proportion;
+				size_t test_end = begin + test_size;
+				
+				size_t initial_map_size = elimination_map.size();
+				if (!skip_test) {
+					for (size_t oid = begin; oid < test_end; ++oid)
+						insert_key(oid, elimination_map, global_num_object_after_interferences);
+					fast = test_size - (elimination_map.size() - initial_map_size) < test_size*collision_tolerance;
+				}
+				if (fast) {
+					for (size_t oid = test_end; oid < end; ++oid)
+						is_unique_buffer[oid] = true;
+				} else
+					for (size_t oid = test_end; oid < end; ++oid)
+						insert_key(oid, elimination_map, global_num_object_after_interferences);
 			}
 
 			/* clear hashmap */

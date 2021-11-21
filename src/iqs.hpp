@@ -473,9 +473,23 @@ namespace iqs {
 				size_t end = modulo_offset[partition + 1];
 
 				elimination_map.reserve(end - begin);
-			
-				for (size_t i = begin; i < end; ++i)
-					insert_key(next_oid[i], elimination_map);
+
+				bool fast = false;
+				bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || end - begin < min_collision_size;
+				size_t test_size = skip_test ? 0 : (end - begin)*collision_test_proportion;
+				size_t test_end = begin + test_size;
+				
+				if (!skip_test) {
+					for (size_t i = begin; i < test_end; ++i)
+						insert_key(next_oid[i], elimination_map);
+					fast = test_size - elimination_map.size() < test_size*collision_tolerance;
+				}
+				if (fast) {
+					for (size_t i = test_end; i < end; ++i)
+						is_unique[next_oid[i]] = true;
+				} else
+					for (size_t i = test_end; i < end; ++i)
+						insert_key(next_oid[i], elimination_map);
 
 				elimination_map.clear();
 			}
