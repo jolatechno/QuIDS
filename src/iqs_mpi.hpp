@@ -461,7 +461,8 @@ namespace iqs::mpi {
 		__gnu_parallel::partial_sum(partition_begin + 1, partition_begin + size*num_threads + 1, partition_begin + 1);
 
 		bool fast = false;
-		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || global_num_object < min_collision_size;
+		size_t total_num_object = get_total_num_object(communicator);
+		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || total_num_object < min_collision_size;
 		size_t total_test_size = 0;
 		size_t total_inserted_size = 0;
 
@@ -506,7 +507,11 @@ namespace iqs::mpi {
 
 			#pragma omp barrier
 			#pragma omp single
-			fast = total_test_size - total_inserted_size < total_test_size*collision_tolerance;
+			{
+				MPI_Allreduce(MPI_IN_PLACE, &total_inserted_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
+				MPI_Allreduce(MPI_IN_PLACE, &total_test_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
+				fast = total_test_size - total_inserted_size < total_test_size*collision_tolerance;
+			}
 
 			if (!fast)
 				elimination_map.reserve(total_size); // reserve hashmap
