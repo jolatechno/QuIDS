@@ -215,8 +215,7 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function); 
 
 	protected:
-		const int num_bucket = num_threads > 1 ? utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
-		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps = std::vector<robin_hood::unordered_map<size_t, size_t>>(num_bucket);
+		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
 		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
 
 		utils::fast_vector/*numa_vector*/<mag_t> magnitude;
@@ -434,6 +433,9 @@ namespace iqs {
 			return;
 		}
 
+		const int num_bucket = num_threads > 1 ? utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
+		elimination_maps.resize(num_bucket);
+
 		const auto insert_key = [&](size_t oid, robin_hood::unordered_map<size_t, size_t> &elimination_map) {
 			/* accessing key */
 			auto [it, unique] = elimination_map.insert({hash[oid], oid});
@@ -448,7 +450,7 @@ namespace iqs {
 			}
 		};
 
-		auto compute_interferences = [&](size_t const oid_begin, size_t const oid_end) {
+		auto const compute_interferences = [&](size_t const oid_begin, size_t const oid_end) {
 			int *load_balancing_begin = new int[num_threads + 1]();
 			int *modulo_offset = new int[num_bucket + 1]();
 			
