@@ -511,6 +511,9 @@ namespace iqs::mpi {
 				MPI_Allreduce(MPI_IN_PLACE, &total_inserted_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
 				MPI_Allreduce(MPI_IN_PLACE, &total_test_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
 				fast = total_test_size - total_inserted_size < total_test_size*collision_tolerance;
+
+				if (fast)
+					std::cout << rank << " fast\n";
 			}
 
 			if (!fast)
