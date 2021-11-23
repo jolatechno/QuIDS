@@ -446,8 +446,16 @@ namespace iqs::mpi {
 				int *global_num_object_after_interferences = new int[size]();
 				int thread_id = omp_get_thread_num();
 				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
+					size_t total_size = 0;
+					for (int i = 0; i < size; ++i) {
+						size_t begin = global_disp[i*num_bucket + partition];
+						size_t end = global_disp[i*num_bucket + partition + 1];
+
+						total_size += end - begin;
+					}
 
 					auto &elimination_map = elimination_maps[partition];
+					elimination_map.reserve(total_size);
 
 					for (int i = 0; i < size; ++i) {
 						size_t begin = global_disp[i*num_bucket + partition];
