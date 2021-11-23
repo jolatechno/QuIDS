@@ -436,10 +436,11 @@ namespace iqs {
 		const int num_bucket = num_threads > 1 ? utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
 		elimination_maps.resize(num_bucket);
 
-		const auto insert_key = [&](size_t oid, robin_hood::unordered_map<size_t, size_t> &elimination_map) {
+		const auto insert_key = [&](size_t const oid, robin_hood::unordered_map<size_t, size_t> &elimination_map, size_t &number_inserted) {
 			/* accessing key */
 			auto [it, unique] = elimination_map.insert({hash[oid], oid});
 			if (unique) {
+				++number_inserted;
 				is_unique[oid] = true; /* keep this graph */
 			} else {
 				/* if it exist add the probabilities */
@@ -450,7 +451,7 @@ namespace iqs {
 			}
 		};
 
-		auto const compute_interferences = [&](size_t const oid_begin, size_t const oid_end) {
+		const auto compute_interferences = [&](size_t const oid_begin, size_t const oid_end) {
 			int *load_balancing_begin = new int[num_threads + 1]();
 			int *modulo_offset = new int[num_bucket + 1]();
 			
@@ -461,9 +462,11 @@ namespace iqs {
 			utils::load_balancing_from_prefix_sum(modulo_offset, modulo_offset + num_bucket + 1,
 				load_balancing_begin, load_balancing_begin + num_threads + 1);
 
+			size_t total_number_inserted = 0;
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
+				size_t number_inserted = 0;
 				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
 					size_t begin = modulo_offset[partition] + oid_begin;
 					size_t end = modulo_offset[partition + 1] + oid_begin;
@@ -472,14 +475,21 @@ namespace iqs {
 					elimination_map.reserve(end - begin);
 
 					for (size_t i = begin; i < end; ++i)
-						insert_key(next_oid[i], elimination_map);
+						insert_key(next_oid[i], elimination_map, number_inserted);
 				}
+
+				#pragma omp atomic
+				total_number_inserted += number_inserted;
 			}
 
 			delete[] load_balancing_begin;
 			delete[] modulo_offset;
 
-			return __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + oid_end,
+			return total_number_inserted;
+		};
+
+		const auto partition = [&](size_t const oid_begin, size_t const oid_end) {
+			return __gnu_parallel::partition(next_oid.begin() + oid_begin, next_oid.begin() + oid_end,
 				[&](size_t const &oid) {
 					/* check if graph is unique */
 					if (!is_unique[oid])
@@ -499,15 +509,18 @@ namespace iqs {
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
 
 		/* get all unique graphs with a non zero probability */
-		size_t *test_partitioned_it, *partitioned_it = next_oid.begin() + num_object;
+		size_t *partitioned_it;
 		if (!skip_test) {
-			test_partitioned_it = compute_interferences(0, test_size);
-			fast = std::distance(test_partitioned_it, next_oid.begin() + test_size) < test_size*collision_tolerance;
+			size_t number_inserted = compute_interferences(0, test_size);
+			fast = test_size - number_inserted < test_size*collision_tolerance;
 		}
 		if (fast) {
-			partitioned_it = std::rotate(test_partitioned_it, next_oid.begin() + test_size, partitioned_it);
-		} else
-			partitioned_it = compute_interferences(test_size, num_object);
+			auto test_partitioned_it = partition(0, test_size);
+			partitioned_it = std::rotate(test_partitioned_it, next_oid.begin() + test_size, next_oid.begin() + num_object);
+		} else {
+			compute_interferences(test_size, num_object);
+			partitioned_it = partition(0, num_object);
+		}
 			
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 
