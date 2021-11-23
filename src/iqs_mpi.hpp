@@ -330,7 +330,7 @@ namespace iqs::mpi {
 		/*
 		function to add a key
 		*/
-		auto static const insert_key = [&](size_t oid, robin_hood::unordered_map<size_t, size_t> &elimination_map, int *global_num_object_after_interferences) {
+		const auto insert_key = [&](size_t const oid, robin_hood::unordered_map<size_t, size_t> &elimination_map, int *global_num_object_after_interferences) {
 			int node_id = node_id_buffer[oid];
 
 			/* accessing key */
@@ -372,7 +372,7 @@ namespace iqs::mpi {
 			}
 		};
 
-		auto const compute_interferences = [&](size_t const oid_end) {
+		const auto compute_interferences = [&](size_t const oid_end) {
 			/* prepare buffers */
 			int *global_bucket_count = new int[num_bucket]();
 			int *global_bucket_disp = new int[num_bucket + 1]();
@@ -441,6 +441,7 @@ namespace iqs::mpi {
 			MPI_Alltoallv(partitioned_mag.begin(), send_count, send_disp, mag_MPI_Datatype,
 				mag_buffer.begin(), receive_count, receive_disp, mag_MPI_Datatype, communicator);
 
+			size_t total_number_inserted = 0;
 			#pragma omp parallel
 			{
 				int *global_num_object_after_interferences = new int[size]();
@@ -467,6 +468,10 @@ namespace iqs::mpi {
 
 					elimination_map.clear();
 				}
+
+				size_t number_inserted = std::accumulate(global_num_object_after_interferences, global_num_object_after_interferences + size, 0);
+				#pragma omp atomic
+				total_number_inserted += number_inserted;
 				
 				delete[] global_num_object_after_interferences;
 			}
@@ -477,14 +482,8 @@ namespace iqs::mpi {
 			MPI_Alltoallv(mag_buffer.begin(), receive_count, receive_disp, mag_MPI_Datatype,
 				partitioned_mag.begin(), send_count, send_disp, mag_MPI_Datatype, communicator);
 
-			/* regenerate real, imag and is_unique */
-			#pragma omp parallel for schedule(static)
-			for (size_t id = 0; id < oid_end; ++id) {
-				size_t oid = next_oid[id];
-
-				magnitude[oid] = partitioned_mag[id];
-				is_unique[oid] = partitioned_is_unique[id];
-			}
+			/* compute number of inserted object */
+			MPI_Allreduce(MPI_IN_PLACE, &total_number_inserted, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
 
 			/* free objects */
 			delete[] global_bucket_count;
@@ -498,6 +497,19 @@ namespace iqs::mpi {
 			delete[] receive_disp;
 			delete[] receive_count;
 			delete[] load_balancing_begin;
+
+			return total_number_inserted;
+		};
+
+		const auto partition = [&](size_t const oid_end) {
+			/* regenerate real, imag and is_unique */
+			#pragma omp parallel for schedule(static)
+			for (size_t id = 0; id < oid_end; ++id) {
+				size_t oid = next_oid[id];
+
+				magnitude[oid] = partitioned_mag[id];
+				is_unique[oid] = partitioned_is_unique[id];
+			}
 
 			/* keep only unique objects */
 			return __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + oid_end,
@@ -519,20 +531,20 @@ namespace iqs::mpi {
 		size_t test_size = skip_test ? 0 : num_object*collision_test_proportion;
 
 		/* get all unique graphs with a non zero probability */
-		size_t *test_partitioned_it, *partitioned_it = next_oid.begin() + num_object;
+		size_t *partitioned_it = next_oid.begin() + num_object;
 		if (!skip_test) {
-			test_partitioned_it = compute_interferences(test_size);
-
 			/* get total size and num_ber of collisions */
-			size_t total_test_size, total_collisions, collisions = std::distance(test_partitioned_it, next_oid.begin() + test_size);
+			size_t total_test_size, number_inserted = compute_interferences(test_size);
 			MPI_Allreduce(&test_size, &total_test_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
-			MPI_Allreduce(&collisions, &total_collisions, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
-			fast = total_collisions < total_test_size*collision_tolerance;
+			fast = total_test_size - number_inserted < total_test_size*collision_tolerance;
 		}
 		if (fast) {
-			partitioned_it = std::rotate(test_partitioned_it, next_oid.begin() + test_size, partitioned_it);
-		} else
-			partitioned_it = compute_interferences(num_object);
+			size_t * test_partitioned_it = partition(test_size);
+			partitioned_it = std::rotate(test_partitioned_it, next_oid.begin() + test_size, next_oid.begin() + num_object);
+		} else {
+			compute_interferences(num_object);
+			partitioned_it = partition(num_object);
+		}
 			
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 	}
