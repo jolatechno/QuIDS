@@ -796,7 +796,6 @@ namespace iqs::rules::qcgd {
 			iqs::collision_tolerance = parse_float_with_default(string_arg, "collision_tolerance=", ",", iqs::collision_tolerance);
 
 			size_t max_num_object = parse_int_with_default(string_arg, "max_num_object=", ",", 0);
-			std::cout << max_num_object << "=max_num_object\n";
 
 			return {n_iters, reversed_n_iters, max_num_object};
 		}
