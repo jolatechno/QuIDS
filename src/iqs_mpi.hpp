@@ -172,8 +172,6 @@ namespace iqs::mpi {
 			node_id_buffer.zero_resize(size);
 		}
 
-		long long int memory_size = (1 + 3) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
-
 	public:
 		size_t get_total_num_object(MPI_Comm communicator) const {
 			/* accumulate number of node */
@@ -196,6 +194,9 @@ namespace iqs::mpi {
 	for memory managment
 	*/
 	size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm communicator) {
+		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
+		static const size_t symbolic_iteration_memory_size = (1 + 3) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
+
 		// get the shared memory communicator
 		MPI_Comm localComm;
 		int rank, local_rank, local_size;
@@ -229,8 +230,8 @@ namespace iqs::mpi {
 
 		// get the total memory
 		size_t total_useable_memory = next_iteration_object_size + last_iteration_object_size + // size of objects
-			last_iteration_property_size*last_iteration.memory_size + next_iteration_property_size*next_iteration.memory_size + // size of properties
-			symbolic_iteration_size*symbolic_iteration.memory_size + // size of symbolic properties
+			(last_iteration_property_size + next_iteration_property_size)*iteration_memory_size + // size of properties
+			symbolic_iteration_size*symbolic_iteration_memory_size + // size of symbolic properties
 			free_mem; // free memory per shared memory simulation
 
 		// compute average object size
@@ -248,10 +249,10 @@ namespace iqs::mpi {
 		iteration_size_per_object /= total_test_size;
 
 		// add the cost of the symbolic iteration in itself
-		iteration_size_per_object += symbolic_iteration.memory_size*symbolic_iteration_num_object/last_iteration_num_object/2; // size for symbolic iteration
+		iteration_size_per_object += symbolic_iteration_memory_size*symbolic_iteration_num_object/last_iteration_num_object/2; // size for symbolic iteration
 		
 		// and the constant size per object
-		iteration_size_per_object += next_iteration.memory_size;
+		iteration_size_per_object += iteration_memory_size;
 
 		// and the cost of unused space
 		iteration_size_per_object *= iqs::utils::upsize_policy;

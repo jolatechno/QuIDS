@@ -775,7 +775,7 @@ namespace iqs::rules::qcgd {
 			}
 		}
 
-		std::tuple<uint, uint> read_n_iter(const char* argv) {
+		std::tuple<uint, uint, size_t> read_n_iter(const char* argv) {
 			std::string string_arg = argv;
 			
 			int n_iters = std::atoi(strip(string_arg, ",").c_str());
@@ -795,7 +795,10 @@ namespace iqs::rules::qcgd {
 			iqs::collision_test_proportion = parse_float_with_default(string_arg, "collision_test_proportion=", ",", iqs::collision_test_proportion);
 			iqs::collision_tolerance = parse_float_with_default(string_arg, "collision_tolerance=", ",", iqs::collision_tolerance);
 
-			return {n_iters, reversed_n_iters};
+			size_t max_num_object = parse_int_with_default(string_arg, "max_num_object=", ",", 0);
+			std::cout << max_num_object << "=max_num_object\n";
+
+			return {n_iters, reversed_n_iters, max_num_object};
 		}
 
 		iqs::it_t read_state(const char* argv) {
@@ -851,14 +854,14 @@ namespace iqs::rules::qcgd {
 			return simulator;
 		}
 
-		std::tuple<uint, uint, it_t, simulator_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
+		std::tuple<uint, uint, it_t, simulator_t, size_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
 			std::string string_args = argv;
 
-			auto [n_iter, reversed_n_iters] = read_n_iter(strip(string_args, "|").c_str());
+			auto [n_iter, reversed_n_iters, max_num_object] = read_n_iter(strip(string_args, "|").c_str());
 			it_t state = read_state(strip(string_args, "|").c_str());
 			auto simulator = read_rule(string_args.c_str(), mid_step_function);
 
-			return {n_iter, reversed_n_iters, state, simulator};
+			return {n_iter, reversed_n_iters, state, simulator, max_num_object};
 		}
 	}
 }

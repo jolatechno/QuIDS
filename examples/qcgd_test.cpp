@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
 	iqs::tolerance = 1e-8;
 
 	iqs::rules::qcgd::flags::read_n_iter("1");
-	iqs::it_t state = iqs::rules::qcgd::flags::read_state("6");//;3,imag=1,real=0");
+	iqs::it_t state = iqs::rules::qcgd::flags::read_state("6");
 
 	iqs::rule_t *erase_create = new iqs::rules::qcgd::erase_create(0.3333);
 	iqs::rule_t *coin = new iqs::rules::qcgd::erase_create(0.25, 0.25);

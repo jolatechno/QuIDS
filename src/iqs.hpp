@@ -128,8 +128,6 @@ namespace iqs {
 		void apply_modifier(modifier_t const rule);
 		void normalize();
 
-		long long int memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-
 	public:
 		size_t num_object = 0;
 		PROBA_TYPE total_proba = 1;
@@ -251,8 +249,6 @@ namespace iqs {
 		void compute_collisions();
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object=0xffffffff, debug_t mid_step_function=[](int){});
 
-		long long int memory_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
-
 	public:
 		size_t num_object = 0;
 		size_t num_object_after_interferences = 0;
@@ -264,6 +260,9 @@ namespace iqs {
 	for memory managment
 	*/
 	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
+		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
+		static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+
 		// get the free memory and the total amount of memory...
 		size_t free_mem;
 		utils::get_free_mem(free_mem);
@@ -282,8 +281,8 @@ namespace iqs {
 
 		// get the total memory
 		size_t total_useable_memory = next_iteration_object_size + last_iteration_object_size + // size of objects
-			last_iteration_property_size*last_iteration.memory_size + next_iteration_property_size*next_iteration.memory_size + // size of properties
-			symbolic_iteration_size*symbolic_iteration.memory_size + // size of symbolic properties
+			(last_iteration_property_size + next_iteration_property_size)*iteration_memory_size + // size of properties
+			symbolic_iteration_size*symbolic_iteration_memory_size + // size of symbolic properties
 			free_mem; // free memory per shared memory simulation
 
 		// compute average object size
@@ -297,10 +296,10 @@ namespace iqs {
 		iteration_size_per_object /= test_size;
 
 		// add the cost of the symbolic iteration in itself
-		iteration_size_per_object += symbolic_iteration.memory_size*symbolic_iteration_num_object/last_iteration_num_object/2; // size for symbolic iteration
+		iteration_size_per_object += symbolic_iteration_memory_size*symbolic_iteration_num_object/last_iteration_num_object/2; // size for symbolic iteration
 		
 		// and the constant size per object
-		iteration_size_per_object += next_iteration.memory_size;
+		iteration_size_per_object += iteration_memory_size;
 
 		// and the cost of unused space
 		iteration_size_per_object *= utils::upsize_policy;
