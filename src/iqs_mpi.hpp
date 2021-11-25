@@ -257,7 +257,7 @@ namespace iqs::mpi {
 		// and the cost of unused space
 		iteration_size_per_object *= iqs::utils::upsize_policy;
 
-		return total_useable_memory / iteration_size_per_object * (1 - safety_margin) / local_size;
+		return total_useable_memory / iteration_size_per_object * (1 - safety_margin);
 	}
 
 	/*
@@ -276,6 +276,13 @@ namespace iqs::mpi {
 		int size;
 		MPI_Comm_size(communicator, &size);
 
+		/* get local size */
+		MPI_Comm localComm;
+		int rank, local_size;
+		MPI_Comm_rank(communicator, &rank);
+		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
+		MPI_Comm_size(localComm, &local_size);
+
 		/* actual simulation */
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(communicator);
@@ -283,7 +290,7 @@ namespace iqs::mpi {
 		if (max_num_object == 0)
 			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration, communicator)/2;
 
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object, mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object / local_size, mid_step_function);
 		std::swap(iteration_buffer, iteration);
 
 		/* equalize and/or normalize */
