@@ -8,8 +8,6 @@
 #include <cstddef>
 #include <vector>
 
-#include "utils/libs/robin_hood.h"
-
 #ifndef PROBA_TYPE
 	#define PROBA_TYPE double
 #endif
@@ -33,6 +31,9 @@
 #endif
 #ifndef LOAD_BALANCING_BUCKET_PER_THREAD
 	#define LOAD_BALANCING_BUCKET_PER_THREAD 8
+#endif
+#ifndef LOAD_FACTOR
+	#define LOAD_FACTOR 0.75
 #endif
 
 /*
@@ -65,6 +66,7 @@ namespace iqs {
 	float collision_tolerance = COLLISION_TOLERANCE;
 	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
+	float load_factor = LOAD_FACTOR;
 
 	/* forward typedef */
 	typedef std::complex<PROBA_TYPE> mag_t;
@@ -200,7 +202,6 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function); 
 
 	protected:
-		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
 		std::vector<char*> placeholder;
 
 		utils::fast_vector/*numa_vector*/<mag_t> magnitude;
@@ -209,8 +210,13 @@ namespace iqs {
 		utils::fast_vector/*numa_vector*/<size_t> hash;
 		utils::fast_vector/*numa_vector*/<size_t> parent_oid;
 		utils::fast_vector/*numa_vector*/<uint32_t> child_id;
-		utils::fast_vector/*numa_vector*/<bool> is_unique;
 		utils::fast_vector/*numa_vector*/<double> random_selector;
+
+		utils::fast_vector/*numa_vector*/<size_t> bucket_begin;
+		/* !!!!!
+		tmporary !
+		!!!!!!!! */
+		utils::fast_vector/*numa_vector*/<bool> is_unique;
 
 		void inline resize(size_t num_object) {
 			magnitude.resize(num_object);
@@ -430,38 +436,23 @@ namespace iqs {
 		#pragma omp parallel
 		#pragma omp single
 		num_threads = omp_get_num_threads();
-		
-		const int num_bucket = num_threads > 1 ? utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
-		elimination_maps.resize(num_bucket);
 
-		const auto insert_key = [&](size_t const oid, robin_hood::unordered_map<size_t, size_t> &elimination_map, size_t &number_inserted) {
-			/* accessing key */
-			auto [it, unique] = elimination_map.insert({hash[oid], oid});
-			if (unique) {
-				++number_inserted;
-				is_unique[oid] = true; /* keep this graph */
-			} else {
-				/* if it exist add the probabilities */
-				magnitude[it->second] += magnitude[oid];
+		const int num_bucket = std::max(num_object / load_factor, (float)1);
+		bucket_begin.zero_resize(num_bucket);
 
-				/* discard this graph */
-				is_unique[oid] = false;
-			}
-		};
-
-		const int bit_offset = utils::modulo_2_upper_bound(num_object / num_bucket) + 2;
-		const auto compute_interferences = [&](size_t const oid_begin, size_t const oid_end) {
-			std::vector<int> load_balancing_begin(num_threads + 1, 0);
-			std::vector<int> modulo_offset(num_bucket + 1, 0);
+		const auto compute_interferences = [&](size_t const oid_end) {
+			std::vector<size_t> load_balancing_begin(num_threads + 1, 0);
 			
 			/* partition to limit collisions */
 			const size_t bitmask = num_bucket - 1;
-			utils::generalized_partition(oid_begin, oid_end,
-				next_oid.begin() + oid_begin, modulo_offset.begin(), num_bucket,
+			utils::generalized_partition((size_t)0, oid_end,
+				next_oid.begin(), bucket_begin.begin(), num_bucket,
 				[&](size_t const oid) {
-					return (hash[oid] >> bit_offset) & bitmask;
+					return hash[oid] & bitmask;
 				});
-			utils::load_balancing_from_prefix_sum(modulo_offset.begin(), modulo_offset.begin() + num_bucket + 1,
+			
+			/* compute load balancing */
+			utils::load_balancing_from_prefix_sum(bucket_begin.begin(), bucket_begin.begin() + num_bucket + 1,
 				load_balancing_begin.begin(), load_balancing_begin.begin() + num_threads + 1);
 
 			size_t total_number_inserted = 0;
@@ -469,15 +460,27 @@ namespace iqs {
 			{
 				int thread_id = omp_get_thread_num();
 				size_t number_inserted = 0;
+
 				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
-					size_t begin = modulo_offset[partition] + oid_begin;
-					size_t end = modulo_offset[partition + 1] + oid_begin;
+					size_t begin = bucket_begin[partition];
+					size_t end = bucket_begin[partition + 1];
 
-					auto &elimination_map = elimination_maps[partition];
-					elimination_map.reserve(end - begin);
+					number_inserted += end - begin;
 
-					for (size_t i = begin; i < end; ++i)
-						insert_key(next_oid[i], elimination_map, number_inserted);
+					if (end != 0)
+						for (size_t i = begin; i < end - 1; ++i)
+							for (size_t j = i + 1; j < end; ++j) {
+								size_t oid_i = next_oid[i];
+								size_t oid_j = next_oid[j];
+
+								if (hash[oid_i] == hash[oid_j]) {
+									magnitude[oid_j] += magnitude[oid_i];
+									magnitude[oid_i] = 0;
+
+									--number_inserted;
+									break;
+								}
+							}
 				}
 
 				#pragma omp atomic
@@ -487,14 +490,10 @@ namespace iqs {
 			return total_number_inserted;
 		};
 
-		const auto partition = [&](size_t const oid_begin, size_t const oid_end) {
-			return __gnu_parallel::partition(next_oid.begin() + oid_begin, next_oid.begin() + oid_end,
+		const auto partition = [&](size_t const oid_end) {
+			/* check for zero probability */
+			return __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + oid_end,
 				[&](size_t const &oid) {
-					/* check if graph is unique */
-					if (!is_unique[oid])
-						return false;
-
-					/* check for zero probability */
 					return std::norm(magnitude[oid]) > tolerance;
 				});
 		};
@@ -510,25 +509,18 @@ namespace iqs {
 		/* get all unique graphs with a non zero probability */
 		size_t *partitioned_it;
 		if (!skip_test) {
-			size_t number_inserted = compute_interferences(0, test_size);
+			size_t number_inserted = compute_interferences(test_size);
 			fast = test_size - number_inserted < test_size*collision_tolerance;
 		}
 		if (fast) {
-			auto test_partitioned_it = partition(0, test_size);
+			auto test_partitioned_it = partition(test_size);
 			partitioned_it = std::rotate(test_partitioned_it, next_oid.begin() + test_size, next_oid.begin() + num_object);
 		} else {
-			compute_interferences(test_size, num_object);
-			partitioned_it = partition(0, num_object);
+			compute_interferences(num_object);
+			partitioned_it = partition(num_object);
 		}
 			
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
-
-		/* clear maps */
-		#pragma omp parallel for
-		for (int partition = 0; partition < num_bucket; ++partition) {
-			auto &elimination_map = elimination_maps[partition];
-			elimination_map.clear();
-		}
 	}
 
 	/*

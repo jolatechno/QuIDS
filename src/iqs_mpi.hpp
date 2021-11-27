@@ -4,6 +4,12 @@
 
 #include <mpi.h>
 
+/* !!!!!
+tmporary !
+!!!!!!!! */
+#include "utils/libs/robin_hood.h"
+
+
 #ifndef MIN_EQUALIZE_SIZE
 	#define MIN_EQUALIZE_SIZE 1000
 #endif
@@ -150,6 +156,11 @@ namespace iqs::mpi {
 		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function); 
 
 	protected:
+		/* !!!!!
+		tmporary !
+		!!!!!!!! */
+		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
+
 		iqs::utils::fast_vector/*numa_vector*/<mag_t> partitioned_mag;
 		iqs::utils::fast_vector/*numa_vector*/<size_t> partitioned_hash;
 		iqs::utils::fast_vector/*numa_vector*/<bool> partitioned_is_unique;
