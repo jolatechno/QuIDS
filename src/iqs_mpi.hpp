@@ -193,17 +193,14 @@ namespace iqs::mpi {
 	/*
 	for memory managment
 	*/
-	size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm communicator) {
+	size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm localComm) {
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
 		static const size_t symbolic_iteration_memory_size = (1 + 3) + (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
 		// get the shared memory communicator
-		MPI_Comm localComm;
-		int rank, local_rank, local_size;
-		MPI_Comm_rank(communicator, &rank);
-		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
+		/*int local_rank, local_size;
 		MPI_Comm_size(localComm, &local_size);
-		MPI_Comm_rank(localComm, &local_rank);
+		MPI_Comm_rank(localComm, &local_rank);*/
 
 		// get the free memory and the total amount of memory...
 		size_t free_mem;
@@ -288,7 +285,7 @@ namespace iqs::mpi {
 		symbolic_iteration.compute_collisions(communicator);
 
 		if (max_num_object == 0)
-			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration, communicator)/2;
+			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration, localComm)/2;
 
 		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object / local_size, mid_step_function);
 		std::swap(iteration_buffer, iteration);
@@ -300,11 +297,8 @@ namespace iqs::mpi {
 		if (max_num_object_per_node > min_equalize_size) {
 
 			/* if both condition are met equalize */
-			float max_imbalance = get_max_num_object_imbalance(iteration, average_num_object, communicator);
-			if (max_imbalance > equalize_imablance)
-				do {
-					iteration.equalize(communicator);
-				} while(get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance);
+			while(get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance)
+				iteration.equalize(communicator); 
 		}
 			
 		mid_step_function(8);
@@ -330,15 +324,10 @@ namespace iqs::mpi {
 		const int global_num_bucket = num_bucket*size;
 		elimination_maps.resize(num_bucket);
 
-		int *old_send_disp = new int [size + 1]();
-		int *old_send_count = new int [size];
-		int *old_receive_disp = new int[size + 1]();
-		int *old_receive_count = new int[size];
-
 		/*
 		function to add a key
 		*/
-		const auto insert_key = [&](size_t const oid, robin_hood::unordered_map<size_t, size_t> &elimination_map, int *global_num_object_after_interferences) {
+		const auto insert_key = [&](size_t const oid, robin_hood::unordered_map<size_t, size_t> &elimination_map, std::vector<int> &global_num_object_after_interferences) {
 			int node_id = node_id_buffer[oid];
 
 			/* accessing key */
@@ -380,31 +369,34 @@ namespace iqs::mpi {
 			}
 		};
 
+		const int bit_offset = iqs::utils::modulo_2_upper_bound(get_total_num_object(communicator)) + 2;
 		const auto compute_interferences = [&](size_t const oid_end) {
 			/* prepare buffers */
-			int *global_bucket_count = new int[num_bucket]();
-			int *global_bucket_disp = new int[num_bucket + 1]();
-			int *local_disp = new int[global_num_bucket + 1]();
-			int *local_count = new int[global_num_bucket];
-			int *global_disp = new int [global_num_bucket + 1]();
-			int *global_count = new int [global_num_bucket];
-			int *send_disp = new int [size + 1]();
-			int *send_count = new int [size];
-			int *receive_disp = new int[size + 1]();
-			int *receive_count = new int[size];
-			int *load_balancing_begin = new int[num_threads + 1]();
+			std::vector<int> global_bucket_count(num_bucket, 0);
+			std::vector<int> global_bucket_disp(num_bucket + 1, 0);
+			std::vector<int> local_disp(global_num_bucket + 1, 0);
+			std::vector<int> local_count(global_num_bucket, 0);
+			std::vector<int> global_disp(global_num_bucket + 1, 0);
+			std::vector<int> global_count(global_num_bucket, 0);
+			std::vector<int> send_disp(size + 1, 0);
+			std::vector<int> send_count(size, 0);
+			std::vector<int> receive_disp(size + 1, 0);
+			std::vector<int> receive_count(size, 0);
+			std::vector<int> load_balancing_begin(num_threads + 1, 0);
 
 			mpi_resize(oid_end);
 
 			/* partition nodes */
-			iqs::utils::generalized_modulo_partition((size_t)0, oid_end,
-				next_oid.begin(), hash.begin(),
-				local_disp, global_num_bucket);
-			__gnu_parallel::adjacent_difference(local_disp + 1, local_disp + global_num_bucket + 1, local_count, std::minus<int>());
+			iqs::utils::generalized_partition((size_t)0, oid_end,
+				next_oid.begin(), local_disp.begin(), global_num_bucket,
+				[&](size_t const oid) {
+					return (hash[oid] << bit_offset) % global_num_bucket;
+				});
+			__gnu_parallel::adjacent_difference(local_disp.begin() + 1, local_disp.begin() + global_num_bucket + 1, local_count.begin(), std::minus<int>());
 
 			/* get global count and disp */
-			MPI_Alltoall(local_count, num_bucket, MPI_INT, global_count, num_bucket, MPI_INT, communicator);
-			__gnu_parallel::partial_sum(global_count, global_count + global_num_bucket, global_disp + 1);
+			MPI_Alltoall(&local_count[0], num_bucket, MPI_INT, &global_count[0], num_bucket, MPI_INT, communicator);
+			__gnu_parallel::partial_sum(global_count.begin(), global_count.begin() + global_num_bucket, global_disp.begin() + 1);
 
 			/* rework counts */
 			for (int i = 0; i < size; ++i) {
@@ -420,11 +412,11 @@ namespace iqs::mpi {
 				for (int j = 0; j < num_bucket; ++j)
 					global_bucket_count[j] += global_disp[i*num_bucket + j + 1] - global_disp[i*num_bucket + j];
 			}
-			__gnu_parallel::partial_sum(global_bucket_count, global_bucket_count + num_bucket, global_bucket_disp + 1);
+			__gnu_parallel::partial_sum(global_bucket_count.begin(), global_bucket_count.begin() + num_bucket, global_bucket_disp.begin() + 1);
 
 			/* compute load balancing */
-			iqs::utils::load_balancing_from_prefix_sum(global_bucket_disp, global_bucket_disp + num_bucket + 1,
-				load_balancing_begin, load_balancing_begin + num_threads + 1);
+			iqs::utils::load_balancing_from_prefix_sum(global_bucket_disp.begin(), global_bucket_disp.begin() + num_bucket + 1,
+				load_balancing_begin.begin(), load_balancing_begin.begin() + num_threads + 1);
 
 			/* resize and prepare node_id buffer */
 			size_t global_num_object = receive_disp[size];
@@ -444,15 +436,15 @@ namespace iqs::mpi {
 			}
 
 			/* share hash and magnitude */
-			MPI_Alltoallv(partitioned_hash.begin(), send_count, send_disp, MPI_UNSIGNED_LONG,
-				hash_buffer.begin(), receive_count, receive_disp, MPI_UNSIGNED_LONG, communicator);
-			MPI_Alltoallv(partitioned_mag.begin(), send_count, send_disp, mag_MPI_Datatype,
-				mag_buffer.begin(), receive_count, receive_disp, mag_MPI_Datatype, communicator);
+			MPI_Alltoallv(partitioned_hash.begin(), &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG,
+				hash_buffer.begin(), &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG, communicator);
+			MPI_Alltoallv(partitioned_mag.begin(), &send_count[0], &send_disp[0], mag_MPI_Datatype,
+				mag_buffer.begin(), &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
 
 			size_t total_number_inserted = 0;
 			#pragma omp parallel
 			{
-				int *global_num_object_after_interferences = new int[size]();
+				std::vector<int> global_num_object_after_interferences(size, 0);
 				int thread_id = omp_get_thread_num();
 				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
 					size_t total_size = 0;
@@ -477,34 +469,19 @@ namespace iqs::mpi {
 					elimination_map.clear();
 				}
 
-				size_t number_inserted = std::accumulate(global_num_object_after_interferences, global_num_object_after_interferences + size, 0);
+				size_t number_inserted = std::accumulate(global_num_object_after_interferences.begin(), global_num_object_after_interferences.begin() + size, 0);
 				#pragma omp atomic
 				total_number_inserted += number_inserted;
-				
-				delete[] global_num_object_after_interferences;
 			}
 
 			/* share is_unique and magnitude */
-			MPI_Alltoallv(is_unique_buffer.begin(), receive_count, receive_disp, MPI_CHAR,
-				partitioned_is_unique.begin(), send_count, send_disp, MPI_CHAR, communicator);
-			MPI_Alltoallv(mag_buffer.begin(), receive_count, receive_disp, mag_MPI_Datatype,
-				partitioned_mag.begin(), send_count, send_disp, mag_MPI_Datatype, communicator);
+			MPI_Alltoallv(is_unique_buffer.begin(), &receive_count[0], &receive_disp[0], MPI_CHAR,
+				partitioned_is_unique.begin(), &send_count[0], &send_disp[0], MPI_CHAR, communicator);
+			MPI_Alltoallv(mag_buffer.begin(), &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
+				partitioned_mag.begin(), &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
 
 			/* compute number of inserted object */
 			MPI_Allreduce(MPI_IN_PLACE, &total_number_inserted, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
-
-			/* free objects */
-			delete[] global_bucket_count;
-			delete[] global_bucket_disp;
-			delete[] local_disp;
-			delete[] local_count;
-			delete[] global_disp;
-			delete[] global_count;
-			delete[] send_disp;
-			delete[] send_count;
-			delete[] receive_disp;
-			delete[] receive_count;
-			delete[] load_balancing_begin;
 
 			return total_number_inserted;
 		};

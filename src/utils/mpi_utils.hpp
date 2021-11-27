@@ -8,11 +8,11 @@ function to partition into pair of almost equal sum
 void make_equal_pairs(size_t *size_begin, size_t *size_end, int *pair_id) {
 	size_t size = std::distance(size_begin, size_end);
 
-	int *node_ids = new int[size];
-	std::iota(node_ids, node_ids + size, 0);
+	std::vector<int> node_ids(size, 0);
+	std::iota(node_ids.begin(), node_ids.begin() + size, 0);
 
 	/* compute average value */
-	__gnu_parallel::sort(node_ids, node_ids + size,
+	__gnu_parallel::sort(node_ids.begin(), node_ids.begin() + size,
 		[&](int const node_id1, int const node_id2) {
 			return size_begin[node_id1] > size_begin[node_id2];
 		});
@@ -20,8 +20,6 @@ void make_equal_pairs(size_t *size_begin, size_t *size_end, int *pair_id) {
 	#pragma omp parallel for
 	for (int i = 0; i < size; ++i)
 		pair_id[node_ids[i]] = node_ids[size - i - 1];
-
-	delete[] node_ids;
 } 
 
 /*
