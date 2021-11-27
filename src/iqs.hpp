@@ -66,19 +66,6 @@ namespace iqs {
 	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
 
-	/*
-	number of threads
-	*/
-	const size_t num_threads = []() {
-		/* get num thread */
-		int num_threads;
-		#pragma omp parallel
-		#pragma omp single
-		num_threads = omp_get_num_threads();
-
-		return num_threads;
-	}();
-
 	/* forward typedef */
 	typedef std::complex<PROBA_TYPE> mag_t;
 	typedef class iteration it_t;
@@ -214,7 +201,7 @@ namespace iqs {
 
 	protected:
 		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
-		std::vector<char*> placeholder = std::vector<char*>(num_threads, NULL);
+		std::vector<char*> placeholder;
 
 		utils::fast_vector/*numa_vector*/<mag_t> magnitude;
 		utils::fast_vector/*numa_vector*/<size_t> next_oid;
@@ -236,6 +223,13 @@ namespace iqs {
 			random_selector.zero_resize(num_object);
 		}
 		void inline reserve(size_t max_size) {
+			int num_threads;
+			#pragma omp parallel
+			#pragma omp single
+			num_threads = omp_get_num_threads();
+
+			placeholder.resize(num_threads);
+
 			#pragma omp parallel
 			{
 				auto &buffer = placeholder[omp_get_thread_num()];
@@ -432,6 +426,11 @@ namespace iqs {
 			return;
 		}
 
+		int num_threads;
+		#pragma omp parallel
+		#pragma omp single
+		num_threads = omp_get_num_threads();
+		
 		const int num_bucket = num_threads > 1 ? utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
 		elimination_maps.resize(num_bucket);
 

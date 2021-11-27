@@ -320,6 +320,12 @@ namespace iqs::mpi {
 		if (size == 1)
 			return iqs::symbolic_iteration::compute_collisions();
 
+		int num_threads;
+		#pragma omp parallel
+		#pragma omp single
+		num_threads = omp_get_num_threads();
+
+
 		const int num_bucket = num_threads > 1 ? iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
 		const int global_num_bucket = num_bucket*size;
 		elimination_maps.resize(num_bucket);
