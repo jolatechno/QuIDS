@@ -450,17 +450,17 @@ namespace iqs {
 			}
 		};
 
+		const int bit_offset = utils::modulo_2_upper_bound(num_object / num_bucket) + 2;
 		const auto compute_interferences = [&](size_t const oid_begin, size_t const oid_end) {
 			std::vector<int> load_balancing_begin(num_threads + 1, 0);
 			std::vector<int> modulo_offset(num_bucket + 1, 0);
 			
 			/* partition to limit collisions */
 			const size_t bitmask = num_bucket - 1;
-			const int bit_offset = utils::modulo_2_upper_bound(num_object) + 2;
 			utils::generalized_partition(oid_begin, oid_end,
 				next_oid.begin() + oid_begin, modulo_offset.begin(), num_bucket,
 				[&](size_t const oid) {
-					return (hash[oid] << bit_offset) & bitmask;
+					return (hash[oid] >> bit_offset) & bitmask;
 				});
 			utils::load_balancing_from_prefix_sum(modulo_offset.begin(), modulo_offset.begin() + num_bucket + 1,
 				load_balancing_begin.begin(), load_balancing_begin.begin() + num_threads + 1);

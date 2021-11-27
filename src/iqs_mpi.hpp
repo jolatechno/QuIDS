@@ -369,7 +369,7 @@ namespace iqs::mpi {
 			}
 		};
 
-		const int bit_offset = iqs::utils::modulo_2_upper_bound(get_total_num_object(communicator)) + 2;
+		const int bit_offset = iqs::utils::modulo_2_upper_bound(get_total_num_object(communicator) / global_num_bucket) + 2;
 		const auto compute_interferences = [&](size_t const oid_end) {
 			/* prepare buffers */
 			std::vector<int> global_bucket_count(num_bucket, 0);
@@ -390,7 +390,7 @@ namespace iqs::mpi {
 			iqs::utils::generalized_partition((size_t)0, oid_end,
 				next_oid.begin(), local_disp.begin(), global_num_bucket,
 				[&](size_t const oid) {
-					return (hash[oid] << bit_offset) % global_num_bucket;
+					return (hash[oid] >> bit_offset) % global_num_bucket;
 				});
 			__gnu_parallel::adjacent_difference(local_disp.begin() + 1, local_disp.begin() + global_num_bucket + 1, local_count.begin(), std::minus<int>());
 
