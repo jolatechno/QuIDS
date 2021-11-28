@@ -160,6 +160,7 @@ namespace iqs::mpi {
 		tmporary !
 		!!!!!!!! */
 		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
+		iqs::utils::fast_vector/*numa_vector*/<bool> is_unique;
 
 		iqs::utils::fast_vector/*numa_vector*/<mag_t> partitioned_mag;
 		iqs::utils::fast_vector/*numa_vector*/<size_t> partitioned_hash;
@@ -172,6 +173,7 @@ namespace iqs::mpi {
 
 		void compute_collisions(MPI_Comm communicator);
 		void mpi_resize(size_t size) {
+			is_unique.zero_resize(size);
 			partitioned_mag.zero_resize(size);
 			partitioned_hash.zero_resize(size);
 			partitioned_is_unique.zero_resize(size);
@@ -386,12 +388,12 @@ namespace iqs::mpi {
 			}
 		};
 
+		std::vector<int> local_disp(global_num_bucket + 1, 0);
 		const int bit_offset = iqs::utils::modulo_2_upper_bound(get_total_num_object(communicator) / global_num_bucket) + 2;
 		const auto compute_interferences = [&](size_t const oid_end) {
 			/* prepare buffers */
 			std::vector<int> global_bucket_count(num_bucket, 0);
 			std::vector<int> global_bucket_disp(num_bucket + 1, 0);
-			std::vector<int> local_disp(global_num_bucket + 1, 0);
 			std::vector<int> local_count(global_num_bucket, 0);
 			std::vector<int> global_disp(global_num_bucket + 1, 0);
 			std::vector<int> global_count(global_num_bucket, 0);
@@ -404,7 +406,7 @@ namespace iqs::mpi {
 			mpi_resize(oid_end);
 
 			/* partition nodes */
-			iqs::utils::generalized_partition((size_t)0, oid_end,
+			iqs::utils::complete_generalized_partition(oid_end,
 				next_oid.begin(), local_disp.begin(), global_num_bucket,
 				[&](size_t const oid) {
 					return (hash[oid] >> bit_offset) % global_num_bucket;

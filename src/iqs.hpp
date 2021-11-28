@@ -211,12 +211,7 @@ namespace iqs {
 		utils::fast_vector/*numa_vector*/<size_t> parent_oid;
 		utils::fast_vector/*numa_vector*/<uint32_t> child_id;
 		utils::fast_vector/*numa_vector*/<double> random_selector;
-
 		utils::fast_vector/*numa_vector*/<size_t> bucket_begin;
-		/* !!!!!
-		tmporary !
-		!!!!!!!! */
-		utils::fast_vector/*numa_vector*/<bool> is_unique;
 
 		void inline resize(size_t num_object) {
 			magnitude.resize(num_object);
@@ -225,7 +220,6 @@ namespace iqs {
 			hash.zero_resize(num_object);
 			parent_oid.zero_resize(num_object);
 			child_id.zero_resize(num_object);
-			is_unique.zero_resize(num_object);
 			random_selector.zero_resize(num_object);
 		}
 		void inline reserve(size_t max_size) {
@@ -261,7 +255,7 @@ namespace iqs {
 	*/
 	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-		static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+		static const size_t symbolic_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 
 		// get the free memory and the total amount of memory...
 		size_t free_mem;
@@ -437,18 +431,18 @@ namespace iqs {
 		#pragma omp single
 		num_threads = omp_get_num_threads();
 
-		const int num_bucket = std::max(num_object / load_factor, (float)1);
+		const int num_bucket = utils::nearest_power_of_two(std::max(num_object / load_factor, (float)1));
 		bucket_begin.zero_resize(num_bucket);
+		std::fill(bucket_begin.begin(), bucket_begin.begin() + num_bucket + 1, 0);
 
 		const auto compute_interferences = [&](size_t const oid_end) {
 			std::vector<size_t> load_balancing_begin(num_threads + 1, 0);
 			
 			/* partition to limit collisions */
 			const size_t bitmask = num_bucket - 1;
-			utils::generalized_partition((size_t)0, oid_end,
-				next_oid.begin(), bucket_begin.begin(), num_bucket,
+			utils::complete_generalized_partition(oid_end, next_oid.begin(), bucket_begin.begin(), num_bucket,
 				[&](size_t const oid) {
-					return hash[oid] & bitmask;
+					return (int)(hash[oid] & bitmask);
 				});
 			
 			/* compute load balancing */
