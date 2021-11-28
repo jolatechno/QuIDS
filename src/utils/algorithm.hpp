@@ -84,8 +84,6 @@ void complete_generalized_partition(idType const id_end, idIteratorType idx_out,
 	num_threads = omp_get_num_threads();
 
 	/* get old count */
-	std::vector<size_t> old_count(n_segment, 0);
-	__gnu_parallel::adjacent_difference(offset + 1, offset + n_segment + 1, old_count.begin(), std::minus<size_t>());
 
 	std::vector<size_t> count(n_segment*num_threads, 0);
 	size_t id_begin = offset[n_segment];
@@ -99,24 +97,34 @@ void complete_generalized_partition(idType const id_end, idIteratorType idx_out,
 			auto key = partitioner(i);
 			++count[key*num_threads + thread_id];
 		}
+
+		/* add initial count to this count */
+		#pragma omp for schedule(static)
+		for (int i = 0; i < n_segment; ++i)
+			count[i*num_threads + num_threads - 1] += offset[i + 1] - offset[i];
 	}
-	
-	/* add initial count to this count */
-	#pragma omp parallel for schedule(static)
-	for (int i = 0; i < n_segment; ++i)
-		count[i*num_threads + num_threads - 1] += old_count[i];
 
 	__gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment*num_threads, count.begin());
 
-	/* copy old value into the gaps */
+	/* get copy of the first indexes */
+	std::vector<size_t> old_idx(id_begin, 0);
+	#pragma omp parallel for schedule(static)
+	for (auto i = 0; i < id_begin; ++i)
+		old_idx[i] = idx_out[i];
+
+	/* copy old indexes into the gaps */
 	for (int i = n_segment - 1; i >= 0; --i) {
 		long long int begin = offset[i];
 		long long int end = offset[i + 1];
 
 		offset[i + 1] = count[i*num_threads + num_threads - 1];
 
+		long long int j_offset = count[i*num_threads + num_threads - 1] - end;
+		count[i*num_threads + num_threads - 1] -= end - begin;
+
+		#pragma omp parallel for schedule(static)
 		for (long long int j = end - 1; j >= begin; --j)
-			idx_out[--count[i*num_threads + num_threads - 1]] = idx_out[j];
+			idx_out[j + j_offset] = old_idx[j];
 	}
 
 	#pragma omp parallel
@@ -129,10 +137,4 @@ void complete_generalized_partition(idType const id_end, idIteratorType idx_out,
 			idx_out[--count[key*num_threads + thread_id]] = i;
 		}
 	}
-
-	for (int i = 0; i < n_segment; ++i)
-		for (int j = offset[i]; j < offset[i + 1]; ++j)
-			if (partitioner(idx_out[j]) != i) {
-				std::cout << "(3) fail at " << j << "/" << offset[i] << "," << offset[i + 1] << " (" << i << "!=" << partitioner(idx_out[j]) << ")\n";
-			}
 }

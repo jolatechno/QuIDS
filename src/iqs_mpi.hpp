@@ -375,7 +375,6 @@ namespace iqs::mpi {
 				[&](size_t const oid) {
 					return (hash_buffer[oid] >> bit_offset) & bitmask;
 				});
-
 			
 			/* compute load balancing */
 			iqs::utils::load_balancing_from_prefix_sum(bucket_begin.begin(), bucket_begin.begin() + num_bucket + 1,
