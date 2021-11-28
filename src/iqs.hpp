@@ -255,7 +255,7 @@ namespace iqs {
 	*/
 	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-		static const size_t symbolic_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+		static const size_t symbolic_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 
 		// get the free memory and the total amount of memory...
 		size_t free_mem;
