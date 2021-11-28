@@ -432,18 +432,23 @@ namespace iqs {
 		num_threads = omp_get_num_threads();
 
 		const int num_bucket = utils::nearest_power_of_two(std::max(num_object / load_factor, (float)1));
-		bucket_begin.zero_resize(num_bucket);
-		std::fill(bucket_begin.begin(), bucket_begin.begin() + num_bucket + 1, 0);
+		bucket_begin.zero_resize(num_bucket + 1);
 
-		const auto compute_interferences = [&](size_t const oid_end) {
+		const auto compute_interferences = [&](size_t const oid_end, bool first_) {
 			std::vector<size_t> load_balancing_begin(num_threads + 1, 0);
 			
 			/* partition to limit collisions */
 			const size_t bitmask = num_bucket - 1;
-			utils::complete_generalized_partition(oid_end, next_oid.begin(), bucket_begin.begin(), num_bucket,
-				[&](size_t const oid) {
-					return (int)(hash[oid] & bitmask);
-				});
+			if (first_) {
+				utils::generalized_partition(oid_end, next_oid.begin(), bucket_begin.begin(), num_bucket,
+					[&](size_t const oid) {
+						return hash[oid] & bitmask;
+					});
+			} else
+				utils::complete_generalized_partition(oid_end, next_oid.begin(), bucket_begin.begin(), num_bucket,
+					[&](size_t const oid) {
+						return hash[oid] & bitmask;
+					});
 			
 			/* compute load balancing */
 			utils::load_balancing_from_prefix_sum(bucket_begin.begin(), bucket_begin.begin() + num_bucket + 1,
@@ -456,25 +461,26 @@ namespace iqs {
 				size_t number_inserted = 0;
 
 				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
-					size_t begin = bucket_begin[partition];
-					size_t end = bucket_begin[partition + 1];
+					long long int begin = bucket_begin[partition];
+					long long int end = bucket_begin[partition + 1];
 
 					number_inserted += end - begin;
 
-					if (end != 0)
-						for (size_t i = begin; i < end - 1; ++i)
-							for (size_t j = i + 1; j < end; ++j) {
-								size_t oid_i = next_oid[i];
-								size_t oid_j = next_oid[j];
+					for (long long int i = begin; i < end - 1; ++i) {
+						size_t oid_i = next_oid[i];
 
-								if (hash[oid_i] == hash[oid_j]) {
-									magnitude[oid_j] += magnitude[oid_i];
-									magnitude[oid_i] = 0;
+						for (long long int j = i + 1; j < end; ++j) {
+							size_t oid_j = next_oid[j];
 
-									--number_inserted;
-									break;
-								}
+							if (hash[oid_i] == hash[oid_j]) {
+								magnitude[oid_j] += magnitude[oid_i];
+								magnitude[oid_i] = 0;
+
+								--number_inserted;
+								break;
 							}
+						}
+					}
 				}
 
 				#pragma omp atomic
@@ -503,14 +509,14 @@ namespace iqs {
 		/* get all unique graphs with a non zero probability */
 		size_t *partitioned_it;
 		if (!skip_test) {
-			size_t number_inserted = compute_interferences(test_size);
+			size_t number_inserted = compute_interferences(test_size, true);
 			fast = test_size - number_inserted < test_size*collision_tolerance;
 		}
 		if (fast) {
 			auto test_partitioned_it = partition(test_size);
 			partitioned_it = std::rotate(test_partitioned_it, next_oid.begin() + test_size, next_oid.begin() + num_object);
 		} else {
-			compute_interferences(num_object);
+			compute_interferences(num_object, skip_test);
 			partitioned_it = partition(num_object);
 		}
 			

@@ -402,7 +402,7 @@ namespace iqs::mpi {
 						int global_num_object_after_interferences_i = ++global_num_object_after_interferences[node_id_i];
 
 						if (std::norm(mag_buffer[oid_i]) > 0) {
-							for (size_t j = i + 1; j < end; ++j) {
+							for (long long int j = i + 1; j < end; ++j) {
 								size_t oid_j = next_oid_buffer[j];
 								int node_id_j = node_id_buffer[oid_j];
 

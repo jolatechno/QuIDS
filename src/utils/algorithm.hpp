@@ -62,14 +62,6 @@ void generalized_partition(idType const id_end, idIteratorType idx_out, countIte
 			idx_out[--count[key*num_threads + thread_id]] = i;
 		}
 	}
-
-	#pragma omp parallel for schedule(static)
-	for (int i = 0; i < n_segment; ++i)
-		for (int j = offset[i]; j < offset[i + 1]; ++j)
-			if (partitioner(idx_out[j]) != i) {
-				std::cout << "fail at " << i << "\n";
-				break;
-			}
 }
 
 /*
@@ -93,7 +85,7 @@ void complete_generalized_partition(idType const id_end, idIteratorType idx_out,
 
 	/* get old count */
 	std::vector<size_t> old_count(n_segment, 0);
-	__gnu_parallel::adjacent_difference(offset + 1, offset + n_segment + 1, old_count.begin(), std::minus<int>());
+	__gnu_parallel::adjacent_difference(offset + 1, offset + n_segment + 1, old_count.begin(), std::minus<size_t>());
 
 	std::vector<size_t> count(n_segment*num_threads, 0);
 	size_t id_begin = offset[n_segment];
@@ -122,11 +114,9 @@ void complete_generalized_partition(idType const id_end, idIteratorType idx_out,
 		long long int end = offset[i + 1];
 
 		offset[i + 1] = count[i*num_threads + num_threads - 1];
-		long long int this_offset = offset[i + 1] - end;
-		count[i*num_threads + num_threads - 1] -= end - begin;
 
 		for (long long int j = end - 1; j >= begin; --j)
-			idx_out[j + this_offset] = idx_out[j];
+			idx_out[--count[i*num_threads + num_threads - 1]] = idx_out[j];
 	}
 
 	#pragma omp parallel
@@ -140,10 +130,9 @@ void complete_generalized_partition(idType const id_end, idIteratorType idx_out,
 		}
 	}
 
-	#pragma omp parallel for schedule(static)
 	for (int i = 0; i < n_segment; ++i)
 		for (int j = offset[i]; j < offset[i + 1]; ++j)
 			if (partitioner(idx_out[j]) != i) {
-				std::cout << "fail at " << j << "/" << offset[i] << "," << offset[i + 1] << " (" << i << "!=" << partitioner(idx_out[j]) << ")\n";
+				std::cout << "(3) fail at " << j << "/" << offset[i] << "," << offset[i + 1] << " (" << i << "!=" << partitioner(idx_out[j]) << ")\n";
 			}
 }
