@@ -33,35 +33,54 @@ void generalized_partition(idType const id_end, idIteratorType idx_out, countIte
 	#pragma omp single
 	num_threads = omp_get_num_threads();
 
-	std::vector<size_t> count(n_segment*num_threads, 0);
+	if (n_segment <= num_threads) {
+		std::vector<size_t> count(n_segment*num_threads, 0);
 
-	#pragma omp parallel
-	{
-		int thread_id = omp_get_thread_num();
+		#pragma omp parallel
+		{
+			int thread_id = omp_get_thread_num();
 
-		#pragma omp for schedule(static)
+			#pragma omp for schedule(static)
+			for (auto i = 0; i < id_end; ++i) {
+				auto key = partitioner(i);
+				++count[key*num_threads + thread_id];
+			}
+		}
+		
+		__gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment*num_threads, count.begin());
+
+		#pragma omp parallel
+		{
+			int thread_id = omp_get_thread_num();
+			
+			#pragma omp for schedule(static)
+			for (auto i = 0; i < id_end; ++i) {
+				auto key = partitioner(i);
+				idx_out[--count[key*num_threads + thread_id]] = i;
+			}
+		}
+
+		#pragma omp parallel for schedule(static)
+		for (int i = 1; i < n_segment; ++i)
+			offset[i] = count[i*num_threads];
+	} else {
+		std::fill(offset, offset + n_segment, 0);
+
 		for (auto i = 0; i < id_end; ++i) {
 			auto key = partitioner(i);
-			++count[key*num_threads + thread_id];
+			++offset[key];
 		}
+		
+		__gnu_parallel::partial_sum(offset, offset + n_segment, offset);
+
+		for (auto i = 0; i < id_end; ++i) {
+			auto key = partitioner(i);
+			idx_out[--offset[key]] = i;
+		}
+
+		offset[n_segment] = id_end;
 	}
 	
-	__gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment*num_threads, count.begin());
-
-	#pragma omp parallel for schedule(static)
-	for (int i = 0; i < n_segment; ++i)
-		offset[i + 1] = count[i*num_threads + num_threads - 1];
-
-	#pragma omp parallel
-	{
-		int thread_id = omp_get_thread_num();
-		
-		#pragma omp for schedule(static)
-		for (auto i = 0; i < id_end; ++i) {
-			auto key = partitioner(i);
-			idx_out[--count[key*num_threads + thread_id]] = i;
-		}
-	}
 }
 
 /*
@@ -83,58 +102,96 @@ void complete_generalized_partition(idType const id_end, idIteratorType idx_out,
 	#pragma omp single
 	num_threads = omp_get_num_threads();
 
-	/* get old count */
-
-	std::vector<size_t> count(n_segment*num_threads, 0);
-	size_t id_begin = offset[n_segment];
-
-	#pragma omp parallel
-	{
-		int thread_id = omp_get_thread_num();
-
-		#pragma omp for schedule(static)
-		for (auto i = id_begin; i < id_end; ++i) {
-			auto key = partitioner(i);
-			++count[key*num_threads + thread_id];
-		}
-
-		/* add initial count to this count */
-		#pragma omp for schedule(static)
-		for (int i = 0; i < n_segment; ++i)
-			count[i*num_threads + num_threads - 1] += offset[i + 1] - offset[i];
-	}
-
-	__gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment*num_threads, count.begin());
-
 	/* get copy of the first indexes */
+	auto id_begin = offset[n_segment];
 	std::vector<size_t> old_idx(id_begin, 0);
 	#pragma omp parallel for schedule(static)
 	for (auto i = 0; i < id_begin; ++i)
 		old_idx[i] = idx_out[i];
 
-	/* copy old indexes into the gaps */
-	for (int i = n_segment - 1; i >= 0; --i) {
-		long long int begin = offset[i];
-		long long int end = offset[i + 1];
+	if (n_segment <= num_threads) {
+		std::vector<size_t> count(n_segment*num_threads, 0);
 
-		offset[i + 1] = count[i*num_threads + num_threads - 1];
+		#pragma omp parallel
+		{
+			int thread_id = omp_get_thread_num();
 
-		long long int j_offset = count[i*num_threads + num_threads - 1] - end;
-		count[i*num_threads + num_threads - 1] -= end - begin;
+			#pragma omp for schedule(static)
+			for (auto i = id_begin; i < id_end; ++i) {
+				auto key = partitioner(i);
+				++count[key*num_threads + thread_id];
+			}
+
+			/* add initial count to this count */
+			#pragma omp for schedule(static)
+			for (int i = 0; i < n_segment; ++i)
+				count[(i + 1)*num_threads] += offset[i + 1] - offset[i];
+		}
+
+		__gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment*num_threads, count.begin());
+
+		/* copy old indexes into the gaps */
+		for (int i = 0; i < n_segment; ++i) {
+			long long int begin = offset[i];
+			long long int end = offset[i + 1];
+			long long int j_offset = count[i*num_threads + num_threads - 1] - begin;
+
+			#pragma omp parallel for schedule(static)
+			for (long long int j = begin; j < end; ++j)
+				idx_out[j + j_offset] = old_idx[j];
+		}
+
+		#pragma omp parallel
+		{
+			int thread_id = omp_get_thread_num();
+			
+			#pragma omp for schedule(static)
+			for (auto i = id_begin; i < id_end; ++i) {
+				auto key = partitioner(i);
+				idx_out[--count[key*num_threads + thread_id]] = i;
+			}
+		}
 
 		#pragma omp parallel for schedule(static)
-		for (long long int j = end - 1; j >= begin; --j)
-			idx_out[j + j_offset] = old_idx[j];
-	}
+		for (int i = 1; i < n_segment; ++i)
+			offset[i] = count[i*num_threads];
+		offset[n_segment] = id_end;
+	} else {
+		std::vector<size_t> count(n_segment, 0);
 
-	#pragma omp parallel
-	{
-		int thread_id = omp_get_thread_num();
-		
-		#pragma omp for schedule(static)
 		for (auto i = id_begin; i < id_end; ++i) {
 			auto key = partitioner(i);
-			idx_out[--count[key*num_threads + thread_id]] = i;
+			++count[key];
 		}
+
+		/* add initial count to this count */
+		#pragma omp for schedule(static)
+		for (long long int i = 0; i < n_segment; ++i)
+			count[i] += offset[i + 1] - offset[i];
+		
+		__gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment, count.begin());
+
+		/* copy old indexes into the gaps */
+		#pragma omp parallel for schedule(static)
+		for (long long int i = 0; i < n_segment; ++i) {
+			long long int begin = offset[i];
+			long long int end = offset[i + 1];
+
+			long long int j_offset = count[i] - end;
+			count[i] -= end - begin;
+
+			for (long long int j = begin; j < end; ++j)
+				idx_out[j + j_offset] = old_idx[j];
+		}
+
+		for (auto i = id_begin; i < id_end; ++i) {
+			auto key = partitioner(i);
+			idx_out[--count[key]] = i;
+		}
+
+		#pragma omp parallel for schedule(static)
+		for (int i = 0; i < n_segment; ++i)
+			offset[i] = count[i];
+		offset[n_segment] = id_end;
 	}
 }
