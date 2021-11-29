@@ -99,14 +99,14 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
 	protected:
-		utils::fast_vector/*numa_vector*/<mag_t> magnitude;
-		utils::fast_vector/*numa_vector*/<char> objects;
-		utils::fast_vector/*numa_vector*/<size_t> object_begin;
-		mutable utils::fast_vector/*numa_vector*/<uint32_t> num_childs;
+		utils::fast_vector<mag_t> magnitude;
+		utils::fast_vector<char> objects;
+		utils::fast_vector<size_t> object_begin;
+		mutable utils::fast_vector<uint32_t> num_childs;
 
 		void inline resize(size_t num_object) const {
 			magnitude.resize(num_object);
-			num_childs.zero_resize(num_object + 1);
+			num_childs.resize(num_object + 1);
 			object_begin.resize(num_object + 1);
 		}
 		void inline allocate(size_t size) const {
@@ -204,23 +204,27 @@ namespace iqs {
 	protected:
 		std::vector<char*> placeholder;
 
-		utils::fast_vector/*numa_vector*/<mag_t> magnitude;
-		utils::fast_vector/*numa_vector*/<size_t> next_oid;
-		utils::fast_vector/*numa_vector*/<size_t> size;
-		utils::fast_vector/*numa_vector*/<size_t> hash;
-		utils::fast_vector/*numa_vector*/<size_t> parent_oid;
-		utils::fast_vector/*numa_vector*/<uint32_t> child_id;
-		utils::fast_vector/*numa_vector*/<double> random_selector;
-		utils::fast_vector/*numa_vector*/<size_t> bucket_begin;
+		utils::fast_vector<mag_t> magnitude;
+		utils::fast_vector<size_t> next_oid;
+		utils::fast_vector<size_t> next_oid_partitioner_buffer;
+		utils::fast_vector<size_t> size;
+		utils::fast_vector<size_t> hash;
+		utils::fast_vector<size_t> parent_oid;
+		utils::fast_vector<uint32_t> child_id;
+		utils::fast_vector<double> random_selector;
+		std::vector<utils::fast_vector<size_t>> bucket_begins;
 
 		void inline resize(size_t num_object) {
 			magnitude.resize(num_object);
-			next_oid.iota_resize(num_object);
-			size.zero_resize(num_object);
-			hash.zero_resize(num_object);
-			parent_oid.zero_resize(num_object);
-			child_id.zero_resize(num_object);
-			random_selector.zero_resize(num_object);
+			next_oid.resize(num_object);
+			next_oid_partitioner_buffer.resize(num_object);
+			size.resize(num_object);
+			hash.resize(num_object);
+			parent_oid.resize(num_object);
+			child_id.resize(num_object);
+			random_selector.resize(num_object);
+
+			utils::parallel_iota(next_oid.begin(), next_oid.begin() + num_object, 0);
 		}
 		void inline reserve(size_t max_size) {
 			int num_threads;
@@ -255,7 +259,7 @@ namespace iqs {
 	*/
 	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-		static const size_t symbolic_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+		static const size_t symbolic_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 
 		// get the free memory and the total amount of memory...
 		size_t free_mem;
@@ -431,48 +435,48 @@ namespace iqs {
 		#pragma omp single
 		num_threads = omp_get_num_threads();
 
-		const int num_bucket = utils::nearest_power_of_two(std::max(num_object / load_factor, (float)1));
-		bucket_begin.zero_resize(num_bucket + 1);
+		bucket_begins.resize(num_threads);
+		std::vector<size_t> partition_begin(num_threads + 1, 0);
+		const int bit_offset = utils::log_2_upper_bound(num_threads);
 
-		const auto compute_interferences = [&](size_t const oid_end, bool first_) {
-			std::vector<size_t> load_balancing_begin(num_threads + 1, 0);
-			
+		const auto compute_interferences = [&](size_t const oid_end) {
 			/* partition to limit collisions */
-			const size_t bitmask = num_bucket - 1;
-			if (first_) {
-				utils::generalized_partition(oid_end, next_oid.begin(), bucket_begin.begin(), num_bucket,
-					[&](size_t const oid) {
-						return hash[oid] & bitmask;
-					});
-			} else
-				utils::complete_generalized_partition(oid_end, next_oid.begin(), bucket_begin.begin(), num_bucket,
-					[&](size_t const oid) {
-						return hash[oid] & bitmask;
-					});
-			
-			/* compute load balancing */
-			utils::load_balancing_from_prefix_sum(bucket_begin.begin(), bucket_begin.begin() + num_bucket + 1,
-				load_balancing_begin.begin(), load_balancing_begin.begin() + num_threads + 1);
+			utils::complete_generalized_partition(next_oid.begin(), next_oid.begin() + oid_end, next_oid_partitioner_buffer.begin(), partition_begin.begin(), num_threads,
+				[&](size_t const oid) {
+					return hash[oid] % num_threads;
+				});
 
 			size_t total_number_inserted = 0;
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
-				size_t number_inserted = 0;
+				auto &bucket_begin = bucket_begins[thread_id];
+				long long int begin = partition_begin[thread_id];
+				long long int end = partition_begin[thread_id + 1];
 
-				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
-					long long int begin = bucket_begin[partition];
-					long long int end = bucket_begin[partition + 1];
+				const int num_bucket = utils::nearest_power_of_two(std::max((end - begin) / load_factor, (float)1));
+				bucket_begin.resize(num_bucket + 1);
 
-					number_inserted += end - begin;
+				/* finalize partition */
+				const size_t bitmask = num_bucket - 1;
+				utils::single_threaded_generalized_partition(next_oid_partitioner_buffer.begin() + begin, next_oid_partitioner_buffer.begin() + end, next_oid.begin() + begin, bucket_begin.begin(), num_bucket,
+					[&](size_t const oid) {
+						return (hash[oid] >> bit_offset) & bitmask;
+					});
 
-					for (long long int i = begin; i < end - 1; ++i) {
+				size_t number_inserted = end - begin;
+				for (long long int bucket = 0; bucket < num_bucket; ++bucket) {
+					long long int this_begin = bucket_begin[bucket] + begin;
+					long long int this_end = bucket_begin[bucket + 1] + begin;
+
+					for (long long int i = this_begin; i < this_end - 1; ++i) {
 						size_t oid_i = next_oid[i];
+						size_t hash_i = hash[oid_i];
 
-						for (long long int j = i + 1; j < end; ++j) {
+						for (long long int j = i + 1; j < this_end; ++j) {
 							size_t oid_j = next_oid[j];
 
-							if (hash[oid_i] == hash[oid_j]) {
+							if (hash_i == hash[oid_j]) {
 								magnitude[oid_j] += magnitude[oid_i];
 								magnitude[oid_i] = 0;
 
@@ -509,15 +513,16 @@ namespace iqs {
 		/* get all unique graphs with a non zero probability */
 		size_t *partitioned_it;
 		if (!skip_test) {
-			size_t number_inserted = compute_interferences(test_size, true);
+			size_t number_inserted = compute_interferences(test_size);
 			fast = test_size - number_inserted < test_size*collision_tolerance;
 		}
 		if (fast) {
 			auto test_partitioned_it = partition(test_size);
 			partitioned_it = std::rotate(test_partitioned_it, next_oid.begin() + test_size, next_oid.begin() + num_object);
 		} else {
-			compute_interferences(num_object, skip_test);
+			compute_interferences(num_object);
 			partitioned_it = partition(num_object);
+
 		}
 			
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);

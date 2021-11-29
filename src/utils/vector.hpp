@@ -30,7 +30,7 @@ private:
     mutable size_t size_ = 0;
  
 public:
-    explicit fast_vector/*numa_vector*/(size_t n = 0) {
+    explicit fast_vector(size_t n = 0) {
     	resize(n);
 	}
  
@@ -80,93 +80,6 @@ public:
     		size_ = n*upsize_policy;
     		ptr = (value_type*)realloc(ptr, size_*sizeof(value_type));
     	}
-
-    	/*if (ptr == NULL) { // just alloc if the vector is empty
-    		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
-    		ptr = (value_type *)malloc(size_*sizeof(value_type));
-
-    		#pragma omp parallel for schedule(static)
-    		for (size_t i = 0; i < size_; ++i)
-    			ptr[i] = 0; // touch memory
-
-    		return;
-    	}
-
-    	if (size_ < n || // resize if we absolutely have to because the state won't fit
-    		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
-
-    		size_t old_size = size_;
-    		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
-
-	    	value_type *new_ptr = (value_type *)malloc(size_*sizeof(value_type));
-	    	#pragma omp parallel for schedule(static)
-	    	for (size_t i = 0; i < size_; ++i)
-	    		if (i < old_size) {
-	    			new_ptr[i] = ptr[i];
-	    		} else
-	    			new_ptr[i] = 0; // touch memory
-
-	    	// free old buffer and swap them
-	    	free(ptr);
-	    	ptr = new_ptr;
-	    }*/
-    }
-
-    void iota_resize(size_t n) {
-    	resize(n);
-
-    	#pragma omp parallel for schedule(static)
-		for (size_t i = 0; i < size_; ++i)
-			ptr[i] = i;
-
-    	/*
-    	n = std::max(min_vector_size, n); // never resize under min_vector_size
-
-		if (size_ < n || // resize if we absolutely have to because the state won't fit
-    		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
-
-    		if (ptr != NULL)
-				free(ptr);
-
-    		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
-
-    		ptr = (value_type *)malloc(size_*sizeof(value_type));
-
-			#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < size_; ++i)
-				ptr[i] = i;
-    	} else
-    		// iota anyway
-    		#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < size_; ++i)
-				ptr[i] = i;*/
-    }
-
-    void zero_resize(size_t n) {
-    	resize(n);
-    	
-    	/*static value_type zero;
-
-    	n = std::max(min_vector_size, n); // never resize under min_vector_size
-
-    	if (size_ < n || // resize if we absolutely have to because the state won't fit
-    		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
-
-    		if (ptr != NULL)
-				free(ptr);
-
-    		size_ = n*upsize_policy; // resize with a margin so we don't resize too often
-
-    		ptr = (value_type *)malloc(size_*sizeof(value_type));
-
-			#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < size_; ++i)
-				ptr[i] = 0;
-    	} else
-    		// iota anyway
-    		#pragma omp parallel for schedule(static)
-			for (size_t i = 0; i < size_; ++i)
-				ptr[i] = 0;*/
     }
  
     // Begin iterator
