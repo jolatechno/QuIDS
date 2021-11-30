@@ -321,10 +321,7 @@ namespace iqs::mpi {
 		#pragma omp single
 		num_threads = omp_get_num_threads();
 
-
-		const int num_bucket = num_threads > 1 ? iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
-		const int global_num_bucket = num_bucket*size;
-		elimination_maps.resize(num_bucket);
+		elimination_maps.resize(num_threads);
 
 		/*
 		function to add a key
@@ -361,54 +358,58 @@ namespace iqs::mpi {
 			}
 		};
 
-		const auto compute_interferences = [&](size_t *end_iterator) {
+		std::vector<int> local_disp(size*num_threads + 1, 0);
+		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
 			/* prepare buffers */
-			std::vector<int> global_bucket_count(num_bucket, 0);
-			std::vector<int> global_bucket_disp(num_bucket + 1, 0);
-			std::vector<int> local_disp(global_num_bucket + 1, 0);
-			std::vector<int> local_count(global_num_bucket, 0);
-			std::vector<int> global_disp(global_num_bucket + 1, 0);
-			std::vector<int> global_count(global_num_bucket, 0);
+			std::vector<int> global_bucket_count(size*num_threads, 0);
+			std::vector<int> global_bucket_disp(size*num_threads + 1, 0);
+			
+			std::vector<int> local_count(size*num_threads, 0);
+			std::vector<int> global_disp(size*num_threads + 1, 0);
+			std::vector<int> global_count(size*num_threads, 0);
 			std::vector<int> send_disp(size + 1, 0);
 			std::vector<int> send_count(size, 0);
 			std::vector<int> receive_disp(size + 1, 0);
 			std::vector<int> receive_count(size, 0);
-			std::vector<int> load_balancing_begin(num_threads + 1, 0);
 
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
 			mpi_resize(oid_end);
 
 			/* partition nodes */
-			iqs::utils::complete_stable_generalized_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
-				local_disp.begin(), local_disp.begin() + global_num_bucket + 1,
-				[&](size_t const oid) {
-					return hash[oid] % global_num_bucket;
-				});
-			__gnu_parallel::adjacent_difference(local_disp.begin() + 1, local_disp.begin() + global_num_bucket + 1, local_count.begin(), std::minus<int>());
+			const size_t n_segment = num_threads*size;
+			const auto partioner = [&](size_t const oid) {
+				return hash[oid] % n_segment;
+			};
+			if (first) {
+				iqs::utils::stable_generalized_partition_from_iota(next_oid.begin(), end_iterator, 0,
+					local_disp.begin(), local_disp.begin() + n_segment + 1,
+					partioner);
+			} else
+				iqs::utils::complete_stable_generalized_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
+					local_disp.begin(), local_disp.begin() + n_segment + 1,
+					partioner);
+			
+			__gnu_parallel::adjacent_difference(local_disp.begin() + 1, local_disp.begin() + n_segment + 1, local_count.begin(), std::minus<int>());
 
 			/* get global count and disp */
-			MPI_Alltoall(&local_count[0], num_bucket, MPI_INT, &global_count[0], num_bucket, MPI_INT, communicator);
-			__gnu_parallel::partial_sum(global_count.begin(), global_count.begin() + global_num_bucket, global_disp.begin() + 1);
+			MPI_Alltoall(&local_count[0], num_threads, MPI_INT, &global_count[0], num_threads, MPI_INT, communicator);
+			__gnu_parallel::partial_sum(global_count.begin(), global_count.begin() + n_segment, global_disp.begin() + 1);
 
 			/* rework counts */
 			for (int i = 0; i < size; ++i) {
 				/* send disp and count */
-				send_disp[i + 1] = local_disp[(i + 1)*num_bucket];
+				send_disp[i + 1] = local_disp[(i + 1)*num_threads];
 				send_count[i] = send_disp[i + 1] - send_disp[i];
 
 				/* receive disp and count */
-				receive_disp[i + 1] = global_disp[(i + 1)*num_bucket];
+				receive_disp[i + 1] = global_disp[(i + 1)*num_threads];
 				receive_count[i] = receive_disp[i + 1] - receive_disp[i];
 
 				/* count per bucket */
-				for (int j = 0; j < num_bucket; ++j)
-					global_bucket_count[j] += global_disp[i*num_bucket + j + 1] - global_disp[i*num_bucket + j];
+				for (int j = 0; j < num_threads; ++j)
+					global_bucket_count[j] += global_disp[i*num_threads + j + 1] - global_disp[i*num_threads + j];
 			}
-			__gnu_parallel::partial_sum(global_bucket_count.begin(), global_bucket_count.begin() + num_bucket, global_bucket_disp.begin() + 1);
-
-			/* compute load balancing */
-			iqs::utils::load_balancing_from_prefix_sum(global_bucket_disp.begin(), global_bucket_disp.begin() + num_bucket + 1,
-				load_balancing_begin.begin(), load_balancing_begin.begin() + num_threads + 1);
+			__gnu_parallel::partial_sum(global_bucket_count.begin(), global_bucket_count.begin() + num_threads, global_bucket_disp.begin() + 1);
 
 			/* resize and prepare node_id buffer */
 			size_t global_num_object = receive_disp[size];
@@ -437,28 +438,28 @@ namespace iqs::mpi {
 			{
 				std::vector<int> global_num_object_after_interferences(size, 0);
 				int thread_id = omp_get_thread_num();
-				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
-					size_t total_size = 0;
-					for (int i = 0; i < size; ++i) {
-						size_t begin = global_disp[i*num_bucket + partition];
-						size_t end = global_disp[i*num_bucket + partition + 1];
 
-						total_size += end - begin;
-					}
+				auto &elimination_map = elimination_maps[thread_id];
 
-					auto &elimination_map = elimination_maps[partition];
-					elimination_map.reserve(total_size);
+				size_t total_size = 0;
+				for (int i = 0; i < size; ++i) {
+					size_t begin = global_disp[i*num_threads + thread_id];
+					size_t end = global_disp[i*num_threads + thread_id + 1];
 
-					for (int i = 0; i < size; ++i) {
-						size_t begin = global_disp[i*num_bucket + partition];
-						size_t end = global_disp[i*num_bucket + partition + 1];
-
-						for (size_t oid = begin; oid < end; ++oid)
-							insert_key(oid, elimination_map, global_num_object_after_interferences);
-					}
-
-					elimination_map.clear();
+					total_size += end - begin;
 				}
+
+				elimination_map.reserve(total_size);
+
+				for (int i = 0; i < size; ++i) {
+					size_t begin = global_disp[i*num_threads + thread_id];
+					size_t end = global_disp[i*num_threads + thread_id + 1];
+
+					for (size_t oid = begin; oid < end; ++oid)
+						insert_key(oid, elimination_map, global_num_object_after_interferences);
+				}
+
+				elimination_map.clear();
 			}
 
 			/* share is_unique and magnitude */
@@ -471,10 +472,15 @@ namespace iqs::mpi {
 				magnitude[next_oid[id]] = partitioned_mag[id];
 
 			/* keep only unique objects */
-			return __gnu_parallel::partition(next_oid.begin(), next_oid.begin() + oid_end,
-				[&](size_t const &oid) {
+			const auto final_partioner = [&](size_t const &oid) {
 					return std::norm(magnitude[oid]) > tolerance;
-				});
+				};
+			if (first) {
+				return iqs::utils::partition_conserve_stable_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
+					local_disp.begin(), local_disp.begin() + n_segment + 1,
+					final_partioner, partioner);
+			} else
+				return __gnu_parallel::partition(next_oid.begin(), end_iterator, final_partioner);
 		};
 
 		/* !!!!!!!!!!!!!!!!
@@ -491,17 +497,16 @@ namespace iqs::mpi {
 			size_t total_test_size;
 			MPI_Allreduce(&test_size, &total_test_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
 
-			auto test_partitioned_it = compute_interferences(partitioned_it);
+			auto test_partitioned_it = compute_interferences(partitioned_it, true);
 
 			size_t number_of_collision = std::distance(test_partitioned_it, partitioned_it);
 			MPI_Allreduce(MPI_IN_PLACE, &number_of_collision, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
-			fast = number_of_collision < test_size*collision_tolerance;
+			fast = number_of_collision < total_test_size*collision_tolerance;
 
 			partitioned_it = std::rotate(test_partitioned_it, partitioned_it, next_oid.begin() + num_object);
 		}
-		if (!fast) {
-			partitioned_it = compute_interferences(partitioned_it);
-		}
+		if (!fast)
+			partitioned_it = compute_interferences(partitioned_it, skip_test);
 			
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 	}

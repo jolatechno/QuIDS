@@ -435,8 +435,7 @@ namespace iqs {
 		#pragma omp single
 		num_threads = omp_get_num_threads();
 		
-		const int num_bucket = num_threads > 1 ? utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads) : 1;
-		elimination_maps.resize(num_bucket);
+		elimination_maps.resize(num_threads);
 
 		const auto insert_key = [&](size_t const oid, robin_hood::unordered_map<size_t, size_t> &elimination_map) {
 			is_unique[oid] = true;
@@ -453,45 +452,52 @@ namespace iqs {
 			}
 		};
 
-		std::vector<int> modulo_offset(num_bucket + 1, 0);
-		const auto compute_interferences = [&](size_t *end_iterator) {
-			std::vector<int> load_balancing_begin(num_threads + 1, 0);
+		std::vector<int> modulo_offset(num_threads + 1, 0);
+		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
 			
 			/* partition to limit collisions */
-			const size_t bitmask = num_bucket - 1;
-			utils::stable_generalized_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
-				modulo_offset.begin(), modulo_offset.begin() + num_bucket + 1,
-				[&](size_t const oid) {
-					return hash[oid] & bitmask;
-				});
-			utils::load_balancing_from_prefix_sum(modulo_offset.begin(), modulo_offset.begin() + num_bucket + 1,
-				load_balancing_begin.begin(), load_balancing_begin.begin() + num_threads + 1);
+			const auto partioner = [&](size_t const oid) {
+				return hash[oid] % num_threads;
+			};
+			if (first) {
+				utils::stable_generalized_partition_from_iota(next_oid.begin(), end_iterator, 0,
+					modulo_offset.begin(), modulo_offset.begin() + num_threads + 1,
+					partioner);
+			} else
+				utils::complete_stable_generalized_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
+					modulo_offset.begin(), modulo_offset.begin() + num_threads + 1,
+					partioner);
+			
 
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
-				for (int partition = load_balancing_begin[thread_id]; partition < load_balancing_begin[thread_id + 1]; ++partition) {
-					size_t begin = modulo_offset[partition];
-					size_t end = modulo_offset[partition + 1];
 
-					auto &elimination_map = elimination_maps[partition];
-					elimination_map.reserve(end - begin);
+				size_t begin = modulo_offset[thread_id];
+				size_t end = modulo_offset[thread_id + 1];
 
-					for (size_t i = begin; i < end; ++i)
-						insert_key(next_oid[i], elimination_map);
+				auto &elimination_map = elimination_maps[thread_id];
+				elimination_map.reserve(end - begin);
 
-					elimination_map.clear();
-				}
+				for (size_t i = begin; i < end; ++i)
+					insert_key(next_oid[i], elimination_map);
+
+				elimination_map.clear();
 			}
 
 			/* check for zero probability */
-			return __gnu_parallel::partition(next_oid.begin(), end_iterator,
-				[&](size_t const &oid) {
-					if (!is_unique[oid])
-						return false;
-					
+			const auto final_partioner = [&](size_t const &oid) {
+				if (!is_unique[oid])
+					return false;
+
 					return std::norm(magnitude[oid]) > tolerance;
-				});
+				};
+			if (first) {
+				return utils::partition_conserve_stable_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
+					modulo_offset.begin(), modulo_offset.begin() + num_threads + 1,
+					final_partioner, partioner);
+			} else
+				return __gnu_parallel::partition(next_oid.begin(), end_iterator, final_partioner);
 		};
 
 		/* !!!!!!!!!!!!!!!!
@@ -505,7 +511,7 @@ namespace iqs {
 
 		/* get all unique graphs with a non zero probability */
 		if (!skip_test) {
-			auto test_partitioned_it = compute_interferences(partitioned_it);
+			auto test_partitioned_it = compute_interferences(partitioned_it, true);
 
 			size_t number_of_collision = std::distance(test_partitioned_it, partitioned_it);
 			fast = number_of_collision < test_size*collision_tolerance;
@@ -513,7 +519,7 @@ namespace iqs {
 			partitioned_it = std::rotate(test_partitioned_it, partitioned_it, next_oid.begin() + num_object);
 		}
 		if (!fast) {
-			partitioned_it = compute_interferences(partitioned_it);
+			partitioned_it = compute_interferences(partitioned_it, skip_test);
 		}
 			
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);

@@ -50,6 +50,11 @@ void stable_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_e
 
 	if (n_segment == 1)
 		return;
+	if (id_end == 0) {
+		std::fill(offset, offset_end, 0);
+		return;
+	}
+
 
 	/* number of threads */
 	int num_threads;
@@ -120,6 +125,8 @@ void complete_stable_generalized_partition(idIteratorType idx_in, idIteratorType
 	/* get copy of the first indexes */
 	auto id_begin = offset[n_segment];
 
+	if (id_end == id_begin)
+		return;
 	if (id_begin == 0)
 		return stable_generalized_partition(idx_in, idx_in_end, idx_buffer, offset, offset_end, partitioner);
 
@@ -193,6 +200,10 @@ void stable_generalized_partition_from_iota(idIteratorType idx_in, idIteratorTyp
 		parallel_iota(idx_in, idx_in_end, 0);
 		return;
 	}
+	if (id_end == 0) {
+		std::fill(offset, offset_end, 0);
+		return;
+	}
 
 	/* number of threads */
 	int num_threads;
@@ -229,4 +240,37 @@ void stable_generalized_partition_from_iota(idIteratorType idx_in, idIteratorTyp
 	#pragma omp parallel for schedule(static)
 	for (int i = 1; i < n_segment; ++i)
 		offset[i] = count[i*num_threads];
+}
+
+/*
+function to partition according to one partioner while presaving another partitioner
+*/
+template <class idIteratorType, class countIteratorType, class functionType, class functionType2>
+idIteratorType partition_conserve_stable_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
+	countIteratorType offset, countIteratorType offset_end,
+	functionType const partitioner, functionType2 const old_partitioner) {
+
+	idIteratorType partitioned_it = std::stable_partition(idx_in, idx_in_end, partitioner);
+
+	size_t first_segment = std::distance(idx_in, partitioned_it);
+	size_t second_segment = std::distance(partitioned_it, idx_in_end);
+
+	if (first_segment > second_segment) {
+		const int n_segment = std::distance(offset, offset_end) - 1;
+
+		std::vector<size_t> partial_offset(n_segment + 1, 0);
+		stable_generalized_partition(partitioned_it, idx_in_end, idx_buffer,
+			partial_offset.begin(), partial_offset.begin() + n_segment + 1,
+			old_partitioner);
+
+		#pragma omp parallel for schedule(static)
+		for (int i = 1; i <= n_segment; ++i)
+			offset[i] -= partial_offset[i];
+	} else {
+		stable_generalized_partition(idx_in, partitioned_it, idx_buffer,
+			offset, offset_end,
+			old_partitioner);
+	}
+
+	return partitioned_it;
 }
