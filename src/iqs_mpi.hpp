@@ -168,9 +168,6 @@ namespace iqs::mpi {
 			mag_buffer.resize(size);
 			hash_buffer.resize(size);
 			node_id_buffer.resize(size);
-
-			if (next_oid_partitioner_buffer.size() < size)
-				next_oid_partitioner_buffer.resize(size);
 		}
 
 	public:
@@ -196,7 +193,7 @@ namespace iqs::mpi {
 	*/
 	size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm localComm) {
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-		static const size_t symbolic_iteration_memory_size = (2 + 4)*sizeof(PROBA_TYPE) + (6 + 3)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
+		static const size_t symbolic_iteration_memory_size = (2 + 4)*sizeof(PROBA_TYPE) + (5 + 3)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
 		// get the free memory and the total amount of memory...
 		size_t free_mem;
@@ -322,11 +319,9 @@ namespace iqs::mpi {
 		num_threads = omp_get_num_threads();
 		
 		std::vector<int> send_disp(size + 1, 0);
-		const int global_bit_offset = iqs::utils::log_2_upper_bound(size);
+		const int bit_offset = iqs::utils::log_2_upper_bound(size);
 
-		bucket_begins.resize(num_threads);
 		std::vector<size_t> partition_begin(num_threads + 1, 0);
-		const int local_bit_offset = global_bit_offset + iqs::utils::log_2_upper_bound(num_threads);
 
 		const auto compute_interferences = [&](size_t const oid_end) {
 			/* prepare buffers */
@@ -337,11 +332,11 @@ namespace iqs::mpi {
 			mpi_resize(oid_end);
 
 			/* partition nodes */
-			iqs::utils::complete_generalized_partition(next_oid.begin(), next_oid.begin() + oid_end, next_oid_partitioner_buffer.begin(), send_disp.begin(), size,
+			iqs::utils::complete_stable_generalized_partition(next_oid.begin(), next_oid.begin() + oid_end, next_oid_partitioner_buffer.begin(),
+				send_disp.begin(), send_disp.begin() + size + 1,
 				[&](size_t const oid) {
 					return hash[oid] % size;
 				});
-			std::copy(next_oid_partitioner_buffer.begin(), next_oid_partitioner_buffer.begin() + oid_end, next_oid.begin());
 			__gnu_parallel::adjacent_difference(send_disp.begin() + 1, send_disp.begin() + size + 1, send_count.begin(), std::minus<int>());
 
 			/* get global count and disp */
@@ -372,79 +367,61 @@ namespace iqs::mpi {
 				mag_buffer.begin(), &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
 
 			/* partition localy */
-			iqs::utils::generalized_partition_from_iota(global_num_object, next_oid_partitioner_buffer.begin(), partition_begin.begin(), num_threads,
+			iqs::utils::stable_generalized_partition_from_iota(next_oid_buffer.begin(), next_oid_buffer.begin() + global_num_object,
+				partition_begin.begin(), partition_begin.begin() + num_threads + 1,
 				[&](size_t const oid) {
-					return (hash_buffer[oid] >> global_bit_offset) % num_threads;
+					return (hash_buffer[oid] >> bit_offset) % num_threads;
 				});
 
 			size_t total_number_inserted = 0;
 			#pragma omp parallel
 			{
-				std::vector<int> global_num_object_after_interferences(size, 0);
-
 				int thread_id = omp_get_thread_num();
-				auto &bucket_begin = bucket_begins[thread_id];
+
 				long long int begin = partition_begin[thread_id];
 				long long int end = partition_begin[thread_id + 1];
 
-				const int num_bucket = iqs::utils::nearest_power_of_two(std::max((end - begin) / load_factor, (float)1));
-				bucket_begin.resize(num_bucket + 1);
+				if (end > begin) {
+					std::vector<int> global_num_object_after_interferences(size, 0);
 
-				/* finalize partition */
-				const size_t bitmask = num_bucket - 1;
-				iqs::utils::single_threaded_generalized_partition(next_oid_partitioner_buffer.begin() + begin, next_oid_partitioner_buffer.begin() + end, next_oid_buffer.begin() + begin, bucket_begin.begin(), num_bucket,
-					[&](size_t const oid) {
-						return (hash_buffer[oid] >> local_bit_offset) & bitmask;
-					});
+					std::stable_sort(next_oid_buffer.begin() + begin, next_oid_buffer.begin() + end, 
+						[&](size_t const oid1, size_t const oid2) {
+							return hash_buffer[oid1] < hash_buffer[oid2];
+						});
 
-				for (long long int bucket = 0; bucket < num_bucket; ++bucket) {
-					long long int this_begin = bucket_begin[bucket] + begin;
-					long long int this_end = bucket_begin[bucket + 1] + begin;
+					size_t write_oid = next_oid_buffer[begin];
+					size_t current_hash = hash_buffer[write_oid];
+					int write_node_id = node_id_buffer[write_oid];
+					for (long long int idx = begin + 1; idx < end; ++idx) {
+						size_t this_oid = next_oid_buffer[idx];
+						size_t this_hash = hash_buffer[this_oid];
+						int this_node_id = node_id_buffer[this_oid];
 
-					if (this_end > this_begin)
-						 ++global_num_object_after_interferences[node_id_buffer[node_id_buffer[this_end - 1]]];
+						if (this_hash != current_hash) {
+							++global_num_object_after_interferences[write_node_id];
 
-					for (long long int i = this_begin; i < this_end - 1; ++i) {
-						size_t oid_i = next_oid_buffer[i];
+							write_oid = this_oid;
+							current_hash = this_hash;
+							write_node_id = this_node_id;
+						} else {
+							bool is_greater = global_num_object_after_interferences[this_node_id] >= global_num_object_after_interferences[write_node_id];
 
-						if (std::norm(mag_buffer[oid_i]) > tolerance) {
-							size_t hash_i = hash_buffer[oid_i];
-							int node_id_i = node_id_buffer[oid_i];
-
-							int global_num_object_after_interferences_i = ++global_num_object_after_interferences[node_id_i];
-
-							for (long long int j = i + 1; j < this_end; ++j) {
-								size_t oid_j = next_oid_buffer[j];
-								int node_id_j = node_id_buffer[oid_j];
-
-								if (hash_i == hash_buffer[oid_j]) {
-									bool is_greater = global_num_object_after_interferences_i >= global_num_object_after_interferences[node_id_j];
-
-									if (is_greater) {
-										mag_buffer[oid_j] += mag_buffer[oid_i];
-										mag_buffer[oid_i] = 0;
-
-										--global_num_object_after_interferences[node_id_i];
-										break;
-									} else {
-										mag_buffer[oid_i] += mag_buffer[oid_j];
-										mag_buffer[oid_j] = 0;
-									}
-								}
+							if (is_greater) {
+								std::swap(write_oid, this_oid);
+								write_node_id = this_node_id;
 							}
+
+							mag_buffer[write_oid] += mag_buffer[this_oid];
+							mag_buffer[this_oid] = 0;
 						}
 					}
 
-					if (this_end > this_begin) {
-						auto end_node_id = node_id_buffer[this_end - 1];
-						if (std::norm(mag_buffer[end_node_id]) < tolerance)
-							--global_num_object_after_interferences[node_id_buffer[end_node_id]];
-					}
-				}
+					++global_num_object_after_interferences[write_node_id];
 
-				int number_inserted = std::accumulate(global_num_object_after_interferences.begin(), global_num_object_after_interferences.begin() + size, 0);
-				#pragma omp atomic
-				total_number_inserted += number_inserted;
+					int number_inserted = std::accumulate(global_num_object_after_interferences.begin(), global_num_object_after_interferences.begin() + size, 0);
+					#pragma omp atomic
+					total_number_inserted += number_inserted;
+				}
 			}
 
 			/* share is_unique and magnitude */

@@ -212,7 +212,6 @@ namespace iqs {
 		utils::fast_vector<size_t> parent_oid;
 		utils::fast_vector<uint32_t> child_id;
 		utils::fast_vector<double> random_selector;
-		std::vector<utils::fast_vector<size_t>> bucket_begins;
 
 		void inline resize(size_t num_object) {
 			magnitude.resize(num_object);
@@ -259,7 +258,7 @@ namespace iqs {
 	*/
 	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-		static const size_t symbolic_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+		static const size_t symbolic_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 
 		// get the free memory and the total amount of memory...
 		size_t free_mem;
@@ -435,13 +434,12 @@ namespace iqs {
 		#pragma omp single
 		num_threads = omp_get_num_threads();
 
-		bucket_begins.resize(num_threads);
 		std::vector<size_t> partition_begin(num_threads + 1, 0);
-		const int bit_offset = utils::log_2_upper_bound(num_threads);
 
 		const auto compute_interferences = [&](size_t const oid_end) {
 			/* partition to limit collisions */
-			utils::complete_generalized_partition(next_oid.begin(), next_oid.begin() + oid_end, next_oid_partitioner_buffer.begin(), partition_begin.begin(), num_threads,
+			utils::complete_stable_generalized_partition(next_oid.begin(), next_oid.begin() + oid_end, next_oid_partitioner_buffer.begin(),
+				partition_begin.begin(), partition_begin.begin() + num_threads + 1,
 				[&](size_t const oid) {
 					return hash[oid] % num_threads;
 				});
@@ -450,45 +448,39 @@ namespace iqs {
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
-				auto &bucket_begin = bucket_begins[thread_id];
+
 				long long int begin = partition_begin[thread_id];
 				long long int end = partition_begin[thread_id + 1];
 
-				const int num_bucket = utils::nearest_power_of_two(std::max((end - begin) / load_factor, (float)1));
-				bucket_begin.resize(num_bucket + 1);
+				if (end > begin) {
+					std::stable_sort(next_oid.begin() + begin, next_oid.begin() + end, 
+						[&](size_t const oid1, size_t const oid2) {
+							return hash[oid1] < hash[oid2];
+						});
 
-				/* finalize partition */
-				const size_t bitmask = num_bucket - 1;
-				utils::single_threaded_generalized_partition(next_oid_partitioner_buffer.begin() + begin, next_oid_partitioner_buffer.begin() + end, next_oid.begin() + begin, bucket_begin.begin(), num_bucket,
-					[&](size_t const oid) {
-						return (hash[oid] >> bit_offset) & bitmask;
-					});
+					size_t number_inserted = end - begin;
 
-				size_t number_inserted = end - begin;
-				for (long long int bucket = 0; bucket < num_bucket; ++bucket) {
-					long long int this_begin = bucket_begin[bucket] + begin;
-					long long int this_end = bucket_begin[bucket + 1] + begin;
+					size_t last_oid = next_oid[begin];
+					size_t current_hash = hash[last_oid];
+					for (long long int idx = begin + 1; idx < end; ++idx) {
+						size_t this_oid = next_oid[idx];
+						size_t this_hash = hash[this_oid];
 
-					for (long long int i = this_begin; i < this_end - 1; ++i) {
-						size_t oid_i = next_oid[i];
-						size_t hash_i = hash[oid_i];
+						if (this_hash != current_hash) {
+							current_hash = this_hash;
+						} else {
+							magnitude[this_oid] += magnitude[last_oid];
+							magnitude[last_oid] = 0;
 
-						for (long long int j = i + 1; j < this_end; ++j) {
-							size_t oid_j = next_oid[j];
-
-							if (hash_i == hash[oid_j]) {
-								magnitude[oid_j] += magnitude[oid_i];
-								magnitude[oid_i] = 0;
-
-								--number_inserted;
-								break;
-							}
+							--number_inserted;
 						}
-					}
-				}
 
-				#pragma omp atomic
-				total_number_inserted += number_inserted;
+						last_oid = this_oid;
+					}
+
+					#pragma omp atomic
+					total_number_inserted += number_inserted;
+				}
 			}
 
 			return total_number_inserted;
