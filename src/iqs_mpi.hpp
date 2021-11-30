@@ -168,6 +168,9 @@ namespace iqs::mpi {
 			mag_buffer.resize(size);
 			hash_buffer.resize(size);
 			node_id_buffer.resize(size);
+
+			if (size > next_oid_partitioner_buffer.size())
+				next_oid_partitioner_buffer.resize(size);
 		}
 
 	public:
@@ -384,10 +387,8 @@ namespace iqs::mpi {
 				if (end > begin) {
 					std::vector<int> global_num_object_after_interferences(size, 0);
 
-					std::stable_sort(next_oid_buffer.begin() + begin, next_oid_buffer.begin() + end, 
-						[&](size_t const oid1, size_t const oid2) {
-							return hash_buffer[oid1] < hash_buffer[oid2];
-						});
+					iqs::utils::singlethreaded_indexed_radix_sort(next_oid_buffer.begin() + begin, next_oid_buffer.begin() + end, next_oid_partitioner_buffer.begin() + begin,
+						hash_buffer.begin(), bit_offset - 1);
 
 					size_t write_oid = next_oid_buffer[begin];
 					size_t current_hash = hash_buffer[write_oid];

@@ -230,3 +230,78 @@ void stable_generalized_partition_from_iota(idIteratorType idx_in, idIteratorTyp
 	for (int i = 1; i < n_segment; ++i)
 		offset[i] = count[i*num_threads];
 }
+
+/*
+function to partition into n section
+*/
+template <class idIteratorType, class countIteratorType, class functionType>
+void singlethreaded_stable_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_out,
+	countIteratorType offset, countIteratorType offset_end,
+	functionType const partitioner) {
+	
+	int const n_segment = std::distance(offset, offset_end) - 1;
+	long long int const id_end = std::distance(idx_in, idx_in_end);
+
+	std::fill(offset, offset_end, 0);
+
+	/* limit values */
+	offset[n_segment] = id_end;
+
+	if (n_segment == 1)
+		return;
+
+	for (long long int i = id_end - 1; i >= 0; --i) {
+		auto key = partitioner(idx_in[i]);
+		++offset[key];
+	}
+	
+	std::partial_sum(offset, offset + n_segment, offset);
+
+	for (long long int i = id_end - 1; i >= 0; --i) {
+		auto idx = idx_in[i];
+		auto key = partitioner(idx);
+		idx_out[--offset[key]] = idx;
+	}
+}
+
+/*
+function to radix sort
+*/
+template <class idIteratorType, class valueIteratorType>
+void singlethreaded_indexed_radix_sort(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer, valueIteratorType hash, int const computed_offset=0, int const bit_size=64) {
+	size_t id_end = std::distance(idx_in, idx_in_end);
+
+	int n_iter = 1;
+	while ((bit_size - computed_offset) / n_iter > 8) ++n_iter;
+
+	int n_bit = (bit_size - computed_offset) / n_iter;
+	int n_segment = 1 << n_bit;
+
+	int last_n_bit = (bit_size - computed_offset) - n_bit*(n_iter - 1);
+	int last_n_segment = 1 << n_bit;
+
+	std::vector<int> count(std::max(last_n_segment, n_segment), 0);
+
+	int total_offset = computed_offset;
+	for (int iter = 0; iter < n_iter; ++iter) {
+		int this_n_segment = iter == n_iter - 1 ? last_n_segment : n_segment;
+
+		const size_t bitmask = this_n_segment - 1;
+		auto const partitioner = [&](const size_t idx) {
+			return (hash[idx] >> total_offset) & bitmask;
+		};
+		if (iter & 1) {
+			singlethreaded_stable_generalized_partition(idx_buffer, idx_buffer + id_end, idx_in,
+				count.begin(), count.begin() + this_n_segment + 1,
+				partitioner);
+		} else
+			singlethreaded_stable_generalized_partition(idx_in, idx_in_end, idx_buffer,
+				count.begin(), count.begin() + this_n_segment + 1,
+				partitioner);
+		
+		total_offset += n_bit;
+	} 
+
+	if (n_iter & 1)
+		std::copy(idx_buffer, idx_buffer + id_end, idx_in);
+}

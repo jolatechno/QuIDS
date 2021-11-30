@@ -435,6 +435,7 @@ namespace iqs {
 		num_threads = omp_get_num_threads();
 
 		std::vector<size_t> partition_begin(num_threads + 1, 0);
+		int const bit_offset = utils::log_2_upper_bound(num_threads);
 
 		const auto compute_interferences = [&](size_t const oid_end) {
 			/* partition to limit collisions */
@@ -453,10 +454,8 @@ namespace iqs {
 				long long int end = partition_begin[thread_id + 1];
 
 				if (end > begin) {
-					std::stable_sort(next_oid.begin() + begin, next_oid.begin() + end, 
-						[&](size_t const oid1, size_t const oid2) {
-							return hash[oid1] < hash[oid2];
-						});
+					utils::singlethreaded_indexed_radix_sort(next_oid.begin() + begin, next_oid.begin() + end, next_oid_partitioner_buffer.begin() + begin,
+						hash.begin(), bit_offset - 1);
 
 					size_t number_inserted = end - begin;
 
