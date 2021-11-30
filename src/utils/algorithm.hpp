@@ -37,7 +37,79 @@ void parallel_iota(iteratorType begin, iteratorType end, const valueType value_b
 function to partition into n section
 */
 template <class idIteratorType, class countIteratorType, class functionType>
-void stable_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
+void generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
+	countIteratorType offset, countIteratorType offset_end,
+	functionType const partitioner) {
+	
+	int const n_segment = std::distance(offset, offset_end) - 1;
+	long long int const id_end = std::distance(idx_in, idx_in_end);
+
+	/* limit values */
+	std::fill(offset, offset_end - 1, 0);
+	offset[n_segment] = id_end;
+
+	if (n_segment == 1)
+		return;
+	if (id_end == 0)
+		return;
+
+	for (long long int i = id_end - 1; i >= 0; --i) {
+		auto key = partitioner(idx_in[i]);
+		++offset[key];
+	}
+	
+	std::partial_sum(offset, offset + n_segment, offset);
+
+	for (long long int i = id_end - 1; i >= 0; --i) {
+		auto idx = idx_in[i];
+		auto key = partitioner(idx);
+		idx_buffer[--offset[key]] = idx;
+	}
+
+	std::copy(idx_buffer, idx_buffer + id_end, idx_in);
+}
+
+/*
+function to partition into n section
+*/
+template <class idIteratorType, class idType, class countIteratorType, class functionType>
+void generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset,
+	countIteratorType offset, countIteratorType offset_end,
+	functionType const partitioner) {
+
+	long long int iota_offset = iotaOffset;
+	int const n_segment = std::distance(offset, offset_end) - 1;
+	long long int const id_end = std::distance(idx_in, idx_in_end);
+
+	/* limit values */
+	std::fill(offset, offset_end - 1, 0);
+	offset[n_segment] = id_end;
+
+	if (n_segment == 1) {
+		parallel_iota(idx_in, idx_in_end, iota_offset);
+		return;
+	}
+	if (id_end == 0)
+		return;
+
+	for (long long int i = id_end + iota_offset - 1; i >= iota_offset; --i) {
+		auto key = partitioner(i);
+		++offset[key];
+	}	
+	
+	std::partial_sum(offset, offset + n_segment, offset);
+
+	for (long long int i = id_end + iota_offset - 1; i >= iota_offset; --i) {
+		auto key = partitioner(i);
+		idx_in[--offset[key]] = i;
+	}
+}
+
+/*
+function to partition into n section
+*/
+template <class idIteratorType, class countIteratorType, class functionType>
+void parallel_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
 	countIteratorType offset, countIteratorType offset_end,
 	functionType const partitioner) {
 	
@@ -54,7 +126,6 @@ void stable_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_e
 		std::fill(offset, offset_end, 0);
 		return;
 	}
-
 
 	/* number of threads */
 	int num_threads;
@@ -100,7 +171,7 @@ void stable_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_e
 function to complete an aldready partial partition into n section
 */
 template <class idIteratorType, class countIteratorType, class functionType>
-void complete_stable_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
+void parallel_complete_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
 	countIteratorType offset, countIteratorType offset_end,
 	functionType const partitioner) {
 
@@ -128,7 +199,7 @@ void complete_stable_generalized_partition(idIteratorType idx_in, idIteratorType
 	if (id_end == id_begin)
 		return;
 	if (id_begin == 0)
-		return stable_generalized_partition(idx_in, idx_in_end, idx_buffer, offset, offset_end, partitioner);
+		return parallel_generalized_partition(idx_in, idx_in_end, idx_buffer, offset, offset_end, partitioner);
 
 	std::vector<size_t> count(n_segment*num_threads, 0);
 
@@ -185,7 +256,7 @@ void complete_stable_generalized_partition(idIteratorType idx_in, idIteratorType
 function to partition into n section
 */
 template <class idIteratorType, class idType, class countIteratorType, class functionType>
-void stable_generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const offset_iota,
+void parallel_generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const offset_iota,
 	countIteratorType offset, countIteratorType offset_end,
 	functionType const partitioner) {
 	
@@ -246,7 +317,7 @@ void stable_generalized_partition_from_iota(idIteratorType idx_in, idIteratorTyp
 function to partition according to one partioner while presaving another partitioner
 */
 template <class idIteratorType, class countIteratorType, class functionType, class functionType2>
-idIteratorType partition_conserve_stable_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
+idIteratorType partition_conserve_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
 	countIteratorType offset, countIteratorType offset_end,
 	functionType const partitioner, functionType2 const old_partitioner) {
 
@@ -259,7 +330,7 @@ idIteratorType partition_conserve_stable_partition(idIteratorType idx_in, idIter
 		const int n_segment = std::distance(offset, offset_end) - 1;
 
 		std::vector<size_t> partial_offset(n_segment + 1, 0);
-		stable_generalized_partition(partitioned_it, idx_in_end, idx_buffer,
+		parallel_generalized_partition(partitioned_it, idx_in_end, idx_buffer,
 			partial_offset.begin(), partial_offset.begin() + n_segment + 1,
 			old_partitioner);
 
@@ -267,7 +338,7 @@ idIteratorType partition_conserve_stable_partition(idIteratorType idx_in, idIter
 		for (int i = 1; i <= n_segment; ++i)
 			offset[i] -= partial_offset[i];
 	} else {
-		stable_generalized_partition(idx_in, partitioned_it, idx_buffer,
+		parallel_generalized_partition(idx_in, partitioned_it, idx_buffer,
 			offset, offset_end,
 			old_partitioner);
 	}

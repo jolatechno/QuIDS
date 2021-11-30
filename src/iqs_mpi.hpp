@@ -358,15 +358,9 @@ namespace iqs::mpi {
 			}
 		};
 
-		std::vector<int> local_disp(size*num_threads + 1, 0);
+		std::vector<int> send_disp(size + 1, 0);
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
 			/* prepare buffers */
-			std::vector<int> global_bucket_count(size*num_threads, 0);
-			std::vector<int> global_bucket_disp(size*num_threads + 1, 0);
-			
-			std::vector<int> local_count(size*num_threads, 0);
-			std::vector<int> global_disp(size*num_threads + 1, 0);
-			std::vector<int> global_count(size*num_threads, 0);
 			std::vector<int> send_disp(size + 1, 0);
 			std::vector<int> send_count(size, 0);
 			std::vector<int> receive_disp(size + 1, 0);
@@ -376,40 +370,24 @@ namespace iqs::mpi {
 			mpi_resize(oid_end);
 
 			/* partition nodes */
-			const size_t n_segment = num_threads*size;
 			const auto partioner = [&](size_t const oid) {
-				return hash[oid] % n_segment;
+				return hash[oid] % size;
 			};
 			if (first) {
-				iqs::utils::stable_generalized_partition_from_iota(next_oid.begin(), end_iterator, 0,
-					local_disp.begin(), local_disp.begin() + n_segment + 1,
+				iqs::utils::parallel_generalized_partition_from_iota(next_oid.begin(), end_iterator, 0,
+					send_disp.begin(), send_disp.begin() + size + 1,
 					partioner);
 			} else
-				iqs::utils::complete_stable_generalized_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
-					local_disp.begin(), local_disp.begin() + n_segment + 1,
+				//iqs::utils::parallel_complete_generalized_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
+				iqs::utils::parallel_generalized_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
+					send_disp.begin(), send_disp.begin() + size + 1,
 					partioner);
 			
-			__gnu_parallel::adjacent_difference(local_disp.begin() + 1, local_disp.begin() + n_segment + 1, local_count.begin(), std::minus<int>());
+			__gnu_parallel::adjacent_difference(send_disp.begin() + 1, send_disp.begin() + size + 1, send_count.begin(), std::minus<int>());
 
 			/* get global count and disp */
-			MPI_Alltoall(&local_count[0], num_threads, MPI_INT, &global_count[0], num_threads, MPI_INT, communicator);
-			__gnu_parallel::partial_sum(global_count.begin(), global_count.begin() + n_segment, global_disp.begin() + 1);
-
-			/* rework counts */
-			for (int i = 0; i < size; ++i) {
-				/* send disp and count */
-				send_disp[i + 1] = local_disp[(i + 1)*num_threads];
-				send_count[i] = send_disp[i + 1] - send_disp[i];
-
-				/* receive disp and count */
-				receive_disp[i + 1] = global_disp[(i + 1)*num_threads];
-				receive_count[i] = receive_disp[i + 1] - receive_disp[i];
-
-				/* count per bucket */
-				for (int j = 0; j < num_threads; ++j)
-					global_bucket_count[j] += global_disp[i*num_threads + j + 1] - global_disp[i*num_threads + j];
-			}
-			__gnu_parallel::partial_sum(global_bucket_count.begin(), global_bucket_count.begin() + num_threads, global_bucket_disp.begin() + 1);
+			MPI_Alltoall(&send_count[0], 1, MPI_INT, &receive_count[0], 1, MPI_INT, communicator);
+			__gnu_parallel::partial_sum(receive_count.begin(), receive_count.begin() + size, receive_disp.begin() + 1);
 
 			/* resize and prepare node_id buffer */
 			size_t global_num_object = receive_disp[size];
@@ -434,29 +412,45 @@ namespace iqs::mpi {
 			MPI_Alltoallv(partitioned_mag.begin(), &send_count[0], &send_disp[0], mag_MPI_Datatype,
 				mag_buffer.begin(), &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
 
+			std::vector<size_t> modulo_offset(num_threads*(num_threads + 1) + 1, 0);
+			const int bit_offset = iqs::utils::log_2_upper_bound(size);
+			
+			/* partition to limit collisions */
 			#pragma omp parallel
 			{
 				std::vector<int> global_num_object_after_interferences(size, 0);
 				int thread_id = omp_get_thread_num();
 
+				size_t this_oid_begin = thread_id * global_num_object / num_threads;
+				size_t this_oid_end = (thread_id + 1) * global_num_object / num_threads;
+
+				iqs::utils::generalized_partition_from_iota(next_oid_buffer.begin() + this_oid_begin, next_oid_buffer.begin() + this_oid_end, this_oid_begin,
+					modulo_offset.begin() + (num_threads + 1)*thread_id, modulo_offset.begin() + (num_threads + 1)*(thread_id + 1),
+					[&](size_t const oid) {
+						return (hash_buffer[oid] >> bit_offset) % num_threads;
+					});
+
+				#pragma omp barrier
+
 				auto &elimination_map = elimination_maps[thread_id];
 
 				size_t total_size = 0;
-				for (int i = 0; i < size; ++i) {
-					size_t begin = global_disp[i*num_threads + thread_id];
-					size_t end = global_disp[i*num_threads + thread_id + 1];
-
+				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
+					size_t begin = modulo_offset[(num_threads + 1)*other_thread_id + thread_id];
+					size_t end = modulo_offset[(num_threads + 1)*other_thread_id + thread_id + 1];
 					total_size += end - begin;
 				}
 
 				elimination_map.reserve(total_size);
 
-				for (int i = 0; i < size; ++i) {
-					size_t begin = global_disp[i*num_threads + thread_id];
-					size_t end = global_disp[i*num_threads + thread_id + 1];
+				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
+					size_t other_oid_begin = other_thread_id * global_num_object / num_threads;
 
-					for (size_t oid = begin; oid < end; ++oid)
-						insert_key(oid, elimination_map, global_num_object_after_interferences);
+					size_t begin = modulo_offset[(num_threads + 1)*other_thread_id + thread_id] + other_oid_begin;
+					size_t end = modulo_offset[(num_threads + 1)*other_thread_id + thread_id + 1] + other_oid_begin;
+
+					for (size_t i = begin; i < end; ++i)
+						insert_key(next_oid_buffer[i], elimination_map, global_num_object_after_interferences);
 				}
 
 				elimination_map.clear();
@@ -475,11 +469,11 @@ namespace iqs::mpi {
 			const auto final_partioner = [&](size_t const &oid) {
 					return std::norm(magnitude[oid]) > tolerance;
 				};
-			if (first) {
-				return iqs::utils::partition_conserve_stable_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
-					local_disp.begin(), local_disp.begin() + n_segment + 1,
+			/*if (first) {
+				return iqs::utils::partition_conserve_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
+					send_disp.begin(), send_disp.begin() + size + 1,
 					final_partioner, partioner);
-			} else
+			} else*/
 				return __gnu_parallel::partition(next_oid.begin(), end_iterator, final_partioner);
 		};
 

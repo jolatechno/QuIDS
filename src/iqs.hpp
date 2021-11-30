@@ -452,52 +452,65 @@ namespace iqs {
 			}
 		};
 
-		std::vector<int> modulo_offset(num_threads + 1, 0);
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
+			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
+			std::vector<size_t> modulo_offset(num_threads*(num_threads + 1) + 1, 0);
 			
 			/* partition to limit collisions */
-			const auto partioner = [&](size_t const oid) {
-				return hash[oid] % num_threads;
-			};
-			if (first) {
-				utils::stable_generalized_partition_from_iota(next_oid.begin(), end_iterator, 0,
-					modulo_offset.begin(), modulo_offset.begin() + num_threads + 1,
-					partioner);
-			} else
-				utils::complete_stable_generalized_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
-					modulo_offset.begin(), modulo_offset.begin() + num_threads + 1,
-					partioner);
-			
-
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
 
-				size_t begin = modulo_offset[thread_id];
-				size_t end = modulo_offset[thread_id + 1];
+				size_t this_oid_begin = thread_id * oid_end / num_threads;
+				size_t this_oid_end = (thread_id + 1) * oid_end / num_threads;
+
+				if (first) {
+					utils::generalized_partition_from_iota(next_oid.begin() + this_oid_begin, next_oid.begin() + this_oid_end, this_oid_begin,
+						modulo_offset.begin() + (num_threads + 1)*thread_id, modulo_offset.begin() + (num_threads + 1)*(thread_id + 1),
+						[&](size_t const oid) {
+							return hash[oid] % num_threads;
+						});
+				} else
+					utils::generalized_partition(next_oid.begin() + this_oid_begin, next_oid.begin() + this_oid_end, next_oid_partitioner_buffer.begin() + this_oid_begin,
+						modulo_offset.begin() + (num_threads + 1)*thread_id, modulo_offset.begin() + (num_threads + 1)*(thread_id + 1),
+						[&](size_t const oid) {
+							return hash[oid] % num_threads;
+						});
+
+				#pragma omp barrier
 
 				auto &elimination_map = elimination_maps[thread_id];
-				elimination_map.reserve(end - begin);
 
-				for (size_t i = begin; i < end; ++i)
-					insert_key(next_oid[i], elimination_map);
+				size_t total_size = 0;
+				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
+					size_t begin = modulo_offset[(num_threads + 1)*other_thread_id + thread_id];
+					size_t end = modulo_offset[(num_threads + 1)*other_thread_id + thread_id + 1];
+					total_size += end - begin;
+				}
+
+				elimination_map.reserve(total_size);
+
+				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
+					size_t other_oid_begin = other_thread_id * oid_end / num_threads;
+
+					size_t begin = modulo_offset[(num_threads + 1)*other_thread_id + thread_id] + other_oid_begin;
+					size_t end = modulo_offset[(num_threads + 1)*other_thread_id + thread_id + 1] + other_oid_begin;
+
+					for (size_t i = begin; i < end; ++i)	
+						insert_key(next_oid[i], elimination_map);
+				}
 
 				elimination_map.clear();
 			}
 
 			/* check for zero probability */
-			const auto final_partioner = [&](size_t const &oid) {
-				if (!is_unique[oid])
-					return false;
+			return __gnu_parallel::partition(next_oid.begin(), end_iterator,
+				[&](size_t const &oid) {
+					if (!is_unique[oid])
+						return false;
 
 					return std::norm(magnitude[oid]) > tolerance;
-				};
-			if (first) {
-				return utils::partition_conserve_stable_partition(next_oid.begin(), end_iterator, next_oid_partitioner_buffer.begin(),
-					modulo_offset.begin(), modulo_offset.begin() + num_threads + 1,
-					final_partioner, partioner);
-			} else
-				return __gnu_parallel::partition(next_oid.begin(), end_iterator, final_partioner);
+				});
 		};
 
 		/* !!!!!!!!!!!!!!!!
@@ -518,9 +531,8 @@ namespace iqs {
 
 			partitioned_it = std::rotate(test_partitioned_it, partitioned_it, next_oid.begin() + num_object);
 		}
-		if (!fast) {
+		if (!fast)
 			partitioned_it = compute_interferences(partitioned_it, skip_test);
-		}
 			
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
 	}
