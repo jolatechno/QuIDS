@@ -1,7 +1,5 @@
 #include <mpi.h>
 
-MPI_Status global_status;
-
 /*
 function to partition into pair of almost equal sum
 */

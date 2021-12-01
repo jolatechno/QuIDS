@@ -455,14 +455,21 @@ namespace iqs {
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
 			std::vector<size_t> modulo_offset(num_threads*(num_threads + 1) + 1, 0);
+
+			std::vector<size_t> load_begin(num_threads + 1, 0);
+			load_begin[0] = 0;
 			
 			/* partition to limit collisions */
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
 
-				size_t this_oid_begin = thread_id * oid_end / num_threads;
-				size_t this_oid_end = (thread_id + 1) * oid_end / num_threads;
+				load_begin[thread_id + 1] = (thread_id + 1) * oid_end / num_threads;
+
+				#pragma omp barrier
+
+				size_t this_oid_begin = load_begin[thread_id];
+				size_t this_oid_end = load_begin[thread_id + 1];
 
 				if (first) {
 					utils::generalized_partition_from_iota(next_oid.begin() + this_oid_begin, next_oid.begin() + this_oid_end, this_oid_begin,
@@ -491,7 +498,7 @@ namespace iqs {
 				elimination_map.reserve(total_size);
 
 				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
-					size_t other_oid_begin = other_thread_id * oid_end / num_threads;
+					size_t other_oid_begin = load_begin[other_thread_id];
 
 					size_t begin = modulo_offset[(num_threads + 1)*other_thread_id + thread_id] + other_oid_begin;
 					size_t end = modulo_offset[(num_threads + 1)*other_thread_id + thread_id + 1] + other_oid_begin;
