@@ -507,6 +507,9 @@ namespace iqs::mpi {
 
 				elimination_map.reserve(total_size);
 
+				#pragma omp critical
+				std::cout << total_size << ", " << rank << "[" << thread_id << "] d!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"; 
+
 				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
 					size_t other_oid_begin = global_load_begin[other_thread_id];
 
