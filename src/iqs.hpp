@@ -258,6 +258,9 @@ namespace iqs {
 	for memory managment
 	*/
 	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
+		if (symbolic_iteration.num_object_after_interferences == 0)
+			return -1;
+		
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
 		static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 

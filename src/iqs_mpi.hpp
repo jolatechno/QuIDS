@@ -300,7 +300,7 @@ namespace iqs::mpi {
 		mid_step_function(8);
 
 		/* finish by normalizing */
-		//iteration.normalize(communicator);
+		iteration.normalize(communicator);
 
 		mid_step_function(9);
 
@@ -368,7 +368,7 @@ namespace iqs::mpi {
 			error when freeing this vector
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 			int n_segment = size*num_threads;
-			std::vector<int> global_disp(num_threads*(n_segment + 1) + 20, 0);
+			std::vector<int> global_disp(num_threads*(n_segment + 1), 0);
 
 			std::vector<int> local_disp(num_threads*(n_segment + 1), 0);
 			std::vector<int> local_count(num_threads*n_segment, 0);
@@ -428,19 +428,11 @@ namespace iqs::mpi {
 					partitioned_hash[id] = hash[oid];
 				}
 
+				#pragma omp barrier
+
 				/* send partition size */
 				MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, per_thread_comm[thread_id]);
-				std::partial_sum(global_count.begin() + count_offset_begin, global_count.begin() + count_offset_begin + n_segment + 1, global_disp.begin() + disp_offset_begin + 1);
-				
-				#pragma omp critical
-				{
-					for (int j = 0; j < n_segment; ++j)
-						std::cout << "(" << local_count[count_offset_begin + j] << "," << local_disp[disp_offset_begin + j] << "), ";
-					std::cout << "/" << num_object << ", " << rank << "[" << thread_id << "] local b\n"; 
-					for (int j = 0; j < n_segment; ++j)
-						std::cout << "(" << global_count[count_offset_begin + j] << "," << global_disp[disp_offset_begin + j] << "), ";
-					std::cout << rank << "[" << thread_id << "] global b\n"; 
-				}
+				std::partial_sum(global_count.begin() + count_offset_begin, global_count.begin() + count_offset_begin + n_segment, global_disp.begin() + disp_offset_begin + 1);
 
 				#pragma omp barrier
 
@@ -458,9 +450,6 @@ namespace iqs::mpi {
 
 				global_load_begin[thread_id + 1] = receive_disp[size];
 
-				#pragma omp critical
-				std::cout << disp_offset_begin << "," << count_offset_begin << ", " << num_object << ", " << rank << "[" << thread_id << "] b\n";
-
 				#pragma omp barrier
 				#pragma omp single
 				{
@@ -473,22 +462,10 @@ namespace iqs::mpi {
 				size_t this_oid_buffer_begin = global_load_begin[thread_id];
 				size_t this_oid_buffer_end = global_load_begin[thread_id + 1];
 
-				#pragma omp critical
-				{
-					for (int j = 0; j < size; ++j)
-						std::cout << "(" << send_count[j] << "," << send_disp[j] + this_oid_begin << "), ";
-					std::cout << "/" << num_object << "," << global_load_begin[num_threads] << ", " << rank << "[" << thread_id << "] send c\n"; 
-					for (int j = 0; j < size; ++j)
-						std::cout << "(" << receive_count[j] << "," << receive_disp[j] + this_oid_buffer_begin << "), ";
-					std::cout << "/" << num_object << "," << global_load_begin[num_threads] << ", " << rank << "[" << thread_id << "] receive c\n\n"; 
-				}
-
 				/* prepare node_id buffer */
 				for (int node = 0; node < size; ++node)
 					for (size_t i = receive_disp[node] + this_oid_buffer_begin; i < receive_disp[node + 1] + this_oid_buffer_begin; ++i)
 						node_id_buffer[i] = node;
-
-				#pragma omp barrier
 
 				/* share actual partition */
 				MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG,
@@ -498,6 +475,8 @@ namespace iqs::mpi {
 
 				auto &elimination_map = elimination_maps[thread_id];
 
+				#pragma omp barrier
+
 				size_t total_size = 0;
 				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id)
 					for (int node_id = 0; node_id < size; ++node_id)
@@ -505,21 +484,12 @@ namespace iqs::mpi {
 
 				elimination_map.reserve(total_size);
 
-				#pragma omp critical
-				std::cout << total_size << ", " << rank << "[" << thread_id << "] d!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"; 
-
-				#pragma omp barrier
-
 				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
 					size_t other_oid_begin = global_load_begin[other_thread_id];
 
 					for (int node_id = 0; node_id < size; ++node_id) {
 						size_t begin = global_disp[other_thread_id*(n_segment + 1) + node_id*num_threads + thread_id] + other_oid_begin;
 						size_t end = global_disp[other_thread_id*(n_segment + 1) + node_id*num_threads + thread_id + 1] + other_oid_begin;
-
-						#pragma omp critical
-						if (end > begin)
-							std::cout << other_oid_begin << " " << begin << "->" << end << ", " << rank << "[" << thread_id << "] d\n"; 
 
 						for (size_t i = begin; i < end; ++i)
 							insert_key(i, elimination_map, global_num_object_after_interferences);
@@ -533,6 +503,8 @@ namespace iqs::mpi {
 				/* share back partition */
 				MPI_Alltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
 					partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, per_thread_comm[thread_id]);
+
+				#pragma omp barrier
 
 				/* un-partition magnitude */
 				for (size_t id = this_oid_begin; id < this_oid_end; ++id)
@@ -562,11 +534,7 @@ namespace iqs::mpi {
 			size_t total_test_size;
 			MPI_Allreduce(&test_size, &total_test_size, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
 
-			std::cout << rank << " test\n";
-
 			auto test_partitioned_it = compute_interferences(partitioned_it, true);
-
-			std::cout << rank << " tested\n";
 
 			size_t number_of_collision = std::distance(test_partitioned_it, partitioned_it);
 			MPI_Allreduce(MPI_IN_PLACE, &number_of_collision, 1, MPI_UNSIGNED_LONG, MPI_SUM, communicator);
@@ -574,18 +542,10 @@ namespace iqs::mpi {
 
 			partitioned_it = std::rotate(test_partitioned_it, partitioned_it, next_oid.begin() + num_object);
 		}
-		if (!fast) {
-			std::cout << rank << " finish\n";
-
+		if (!fast)
 			partitioned_it = compute_interferences(partitioned_it, skip_test);
-
-			std::cout << rank << " finished\n";
-		} else 
-			std::cout << rank << " fast!!!!!\n";
 			
 		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
-
-		std::cout << rank << ", " << num_object_after_interferences << " g\n";
 	}
 
 	/*
