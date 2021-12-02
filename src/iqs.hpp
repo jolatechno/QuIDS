@@ -459,9 +459,9 @@ namespace iqs {
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
 
 			std::vector<size_t> modulo_offset(num_threads*(num_threads + 1) + 1, 0);
-			std::vector<size_t> load_balancing_begin(num_threads + 1, 0);
 
 			int const num_bucket = utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads);
+			std::vector<int> load_balancing_begin(num_threads + 1, 0);
 			std::vector<size_t> partition_begin(num_threads*(num_bucket + 1), 0);
 			std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
 

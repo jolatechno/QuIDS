@@ -373,10 +373,19 @@ namespace iqs::mpi {
 			std::vector<int> local_count(num_threads*n_segment, 0);
 			std::vector<int> global_disp(num_threads*(n_segment + 1), 0);
 			std::vector<int> global_count(num_threads*n_segment, 0);
-			
+
+			int const num_bucket = iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*n_segment);
+			std::vector<int> load_balancing_begin(n_segment + 1, 0);
+			std::vector<int> partition_begin(num_threads*(num_bucket + 1), 0);
+			std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
 
 			std::vector<size_t> local_load_begin(num_threads + 1, 0);
 			std::vector<size_t> global_load_begin(num_threads + 1, 0);
+
+			size_t const bitmask = num_bucket - 1;
+			const auto partitioner = [&](size_t const oid) {
+				return hash[oid] & bitmask;
+			};
 			
 			local_load_begin[0] = 0; global_load_begin[0] = 0;
 
@@ -408,16 +417,37 @@ namespace iqs::mpi {
 				/* partition nodes */
 				if (first) {
 					iqs::utils::generalized_partition_from_iota(next_oid.begin() + this_oid_begin, next_oid.begin() + this_oid_end, this_oid_begin,
-						local_disp.begin() + disp_offset_begin, local_disp.begin() + disp_offset_end,
-						[&](size_t const oid) {
-							return hash[oid] % n_segment;
-						});
+						partition_begin.begin() + thread_id*(num_bucket + 1), partition_begin.begin() + (thread_id + 1)*(num_bucket + 1),
+						partitioner);
 				} else
 					iqs::utils::/*complete_*/generalized_partition(next_oid.begin() + this_oid_begin, next_oid.begin() + this_oid_end, next_oid_partitioner_buffer.begin() + this_oid_begin,
-						local_disp.begin() + disp_offset_begin, local_disp.begin() + (thread_id + 1)*(n_segment + 1),
-						[&](size_t const oid) {
-							return hash[oid] % n_segment;
-						});
+						partition_begin.begin() + thread_id*(num_bucket + 1), partition_begin.begin() + (thread_id + 1)*(num_bucket + 1),
+						partitioner);
+
+				/* compute total partition for load balancing */
+				for (int i = 1; i <= num_bucket; ++i)
+					#pragma omp atomic
+					total_partition_begin[i] += partition_begin[(num_bucket + 1)*thread_id + i];
+
+				/* compute load balancing */
+				#pragma omp barrier
+				#pragma omp single
+				{
+					MPI_Reduce(rank == 0 ? MPI_IN_PLACE : &total_partition_begin[1], &total_partition_begin[1],
+						num_bucket, MPI_LONG_LONG_INT, MPI_SUM, 0, communicator);
+
+					if (rank == 0)
+						iqs::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
+							load_balancing_begin.begin(), load_balancing_begin.end());
+
+					MPI_Bcast(&load_balancing_begin[1], n_segment, MPI_INT, 0, communicator);
+				}
+
+				/* rework indexes */
+				for (int i = 1; i <= n_segment; ++i)
+					local_disp[(n_segment + 1)*thread_id + i] = partition_begin[(num_bucket + 1)*thread_id + load_balancing_begin[i]];
+
+				/* compute count */
 				std::adjacent_difference(local_disp.begin() + disp_offset_begin + 1, local_disp.begin() + disp_offset_end, local_count.begin() + count_offset_begin);
 
 				/* generate partitioned hash */
