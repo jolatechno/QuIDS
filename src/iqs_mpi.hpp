@@ -238,10 +238,13 @@ namespace iqs::mpi {
 		size_t iteration_size_per_object = 0;
 
 		// compute the average size of an object for the next iteration:
-		size_t test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.num_object_after_interferences));
-		#pragma omp parallel for reduction(+:iteration_size_per_object)
-		for (size_t oid = 0; oid < test_size; ++oid)
-			iteration_size_per_object += symbolic_iteration.size[oid];
+		size_t test_size = 0;
+		if (symbolic_iteration.num_object_after_interferences > 0) {
+			test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.num_object_after_interferences));
+			#pragma omp parallel for reduction(+:iteration_size_per_object)
+			for (size_t oid = 0; oid < test_size; ++oid)
+				iteration_size_per_object += symbolic_iteration.size[oid];
+		}
 
 		// get total average
 		size_t total_test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.get_total_num_object_after_interferences(localComm)));
@@ -258,6 +261,15 @@ namespace iqs::mpi {
 		iteration_size_per_object *= iqs::utils::upsize_policy;
 
 		return total_useable_memory / iteration_size_per_object * (1 - safety_margin);
+	}
+
+	/*
+	function to compute the maximum per node size imbablance
+	*/
+	size_t get_max_num_object_per_task(mpi_it_t const &iteration, MPI_Comm communicator) {
+		size_t max_num_object_per_node;
+		MPI_Allreduce(&iteration.num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG, MPI_MAX, communicator);
+		return max_num_object_per_node;
 	}
 
 	/*
@@ -295,14 +307,9 @@ namespace iqs::mpi {
 
 		/* equalize and/or normalize */
 		size_t average_num_object = iteration.get_total_num_object(communicator)/size;
-		size_t max_num_object_per_node;
-		MPI_Allreduce(&iteration.num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG, MPI_MAX, communicator);
-		if (max_num_object_per_node > min_equalize_size) {
-
-			/* if both condition are met equalize */
-			while(get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance)
+		while(get_max_num_object_per_task(iteration, communicator) > min_equalize_size &&
+			get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance)
 				iteration.equalize(communicator); 
-		}
 			
 		mid_step_function(8);
 
