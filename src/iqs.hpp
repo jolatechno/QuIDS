@@ -262,7 +262,7 @@ namespace iqs {
 			return -1;
 		
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-		static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 6*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+		static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 7*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 
 		// get the free memory and the total amount of memory...
 		size_t free_mem;

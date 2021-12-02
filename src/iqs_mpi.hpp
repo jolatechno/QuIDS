@@ -152,22 +152,24 @@ namespace iqs::mpi {
 	protected:
 		iqs::utils::fast_vector<mag_t> partitioned_mag;
 		iqs::utils::fast_vector<size_t> partitioned_hash;
+		iqs::utils::fast_vector<bool> partitioned_is_unique;
 
 		iqs::utils::fast_vector<mag_t> mag_buffer;
 		iqs::utils::fast_vector<size_t> hash_buffer;
 		iqs::utils::fast_vector<int> node_id_buffer;
-		iqs::utils::fast_vector<size_t> next_oid_buffer;
+		iqs::utils::fast_vector<bool> is_unique_buffer;
 
 		void compute_collisions(MPI_Comm communicator);
 		void mpi_resize(size_t size) {
 			partitioned_mag.resize(size);
 			partitioned_hash.resize(size);
+			partitioned_is_unique.resize(size);
 		}
 		void buffer_resize(size_t size) {
-			next_oid_buffer.resize(size);
 			mag_buffer.resize(size);
 			hash_buffer.resize(size);
 			node_id_buffer.resize(size);
+			is_unique_buffer.resize(size);
 
 			if (size > next_oid_partitioner_buffer.size())
 				next_oid_partitioner_buffer.resize(size);
@@ -196,7 +198,7 @@ namespace iqs::mpi {
 	*/
 	size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm localComm) {
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
-		static const size_t symbolic_iteration_memory_size = (2 + 4)*sizeof(PROBA_TYPE) + (6 + 4)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
+		static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 4)*sizeof(PROBA_TYPE) + (7 + 2)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
 		// get the free memory and the total amount of memory...
 		size_t free_mem;
@@ -336,6 +338,7 @@ namespace iqs::mpi {
 			if (unique) {
 				/* increment values */
 				++global_num_object_after_interferences[node_id];
+				is_unique_buffer[oid] = true;
 			} else {
 				auto other_oid = it->second;
 				auto other_node_id = node_id_buffer[other_oid];
@@ -344,14 +347,15 @@ namespace iqs::mpi {
 				if (is_greater) {
 					/* if it exist add the probabilities */
 					mag_buffer[other_oid] += mag_buffer[oid];
-					mag_buffer[oid] = 0;
+					is_unique_buffer[oid] = false;
 				} else {
 					/* keep this graph */
 					it->second = oid;
 
 					/* if the size aren't balanced, add the probabilities */
 					mag_buffer[oid] += mag_buffer[other_oid];
-					mag_buffer[other_oid] = 0;
+					is_unique_buffer[oid] = true;
+					is_unique_buffer[other_oid] = false;
 
 					/* increment values */
 					++global_num_object_after_interferences[node_id];
@@ -364,14 +368,10 @@ namespace iqs::mpi {
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
 			mpi_resize(oid_end);
 
-			/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			error when freeing this vector
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 			int n_segment = size*num_threads;
-			std::vector<int> global_disp(num_threads*(n_segment + 1), 0);
-
 			std::vector<int> local_disp(num_threads*(n_segment + 1), 0);
 			std::vector<int> local_count(num_threads*n_segment, 0);
+			std::vector<int> global_disp(num_threads*(n_segment + 1), 0);
 			std::vector<int> global_count(num_threads*n_segment, 0);
 			
 
@@ -503,12 +503,18 @@ namespace iqs::mpi {
 				/* share back partition */
 				MPI_Alltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
 					partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, per_thread_comm[thread_id]);
+				MPI_Alltoallv(is_unique_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_CHAR,
+					partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, per_thread_comm[thread_id]);
 
 				#pragma omp barrier
 
 				/* un-partition magnitude */
-				for (size_t id = this_oid_begin; id < this_oid_end; ++id)
-					magnitude[next_oid[id]] = partitioned_mag[id];
+				for (size_t id = this_oid_begin; id < this_oid_end; ++id) {
+					size_t oid = next_oid[id];
+
+					is_unique[oid] = partitioned_is_unique[id];
+					magnitude[oid] = partitioned_mag[id];
+				}
 
 				MPI_Comm_free(&per_thread_comm[thread_id]);
 			}
@@ -516,6 +522,9 @@ namespace iqs::mpi {
 			/* keep only unique objects */
 			return __gnu_parallel::partition(next_oid.begin(), end_iterator,
 				[&](size_t const &oid) {
+					if (!is_unique[oid])
+						return false;
+
 					return std::norm(magnitude[oid]) > tolerance;
 				});
 		};
