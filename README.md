@@ -48,8 +48,12 @@ Simulations can also be done across nodes. For that, you'll need to replace `iqs
 
 int main(int argc, char* argv[]) {
 	/* MPI initialization */
-	int size, rank;
-	MPI_Init(&argc, &argv);
+	int size, rank, provided;
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+    if(provided < MPI_THREAD_MULTIPLE) {
+        printf("The threading support level is lesser than that demanded.\n");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
 
 	/* variables*/
 	iqs::mpi::mpi_it_t buffer, state;

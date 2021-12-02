@@ -223,6 +223,11 @@ namespace iqs::mpi {
 		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_num_object, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
 		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_num_object, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
 
+		size_t num_object_after_interferences = symbolic_iteration.num_object_after_interferences;
+		MPI_Allreduce(MPI_IN_PLACE, &num_object_after_interferences, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
+		if (num_object_after_interferences == 0)
+			return -1;
+
 		// get the total memory
 		size_t total_useable_memory = next_iteration_object_size + last_iteration_object_size + // size of objects
 			(last_iteration_property_size + next_iteration_property_size)*iteration_memory_size + // size of properties

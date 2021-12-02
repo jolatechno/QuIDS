@@ -1,4 +1,4 @@
-U_CFLAGS=$(CFLAGS) -O3 -fopenmp --std=c++2a
+U_CFLAGS=$(CFLAGS) --std=c++2a -O3 -fopenmp
 
 targets=$(basename $(wildcard **.cpp))
 
@@ -8,4 +8,4 @@ clean:
 	rm *.out
 
 $(targets):
-	$(CXX) $@.cpp -o$@.out $(U_CFLAGS)
+	$(CXX) $@.cpp -o$@.out $(U_CFLAGS) 
