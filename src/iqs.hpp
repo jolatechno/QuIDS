@@ -457,10 +457,21 @@ namespace iqs {
 
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
+
 			std::vector<size_t> modulo_offset(num_threads*(num_threads + 1) + 1, 0);
+			std::vector<size_t> load_balancing_begin(num_threads + 1, 0);
+
+			int const num_bucket = utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads);
+			std::vector<size_t> partition_begin(num_threads*(num_bucket + 1), 0);
+			std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
 
 			std::vector<size_t> load_begin(num_threads + 1, 0);
 			load_begin[0] = 0;
+
+			size_t const bitmask = num_bucket - 1;
+			const auto partitioner = [&](size_t const oid) {
+				return hash[oid] & bitmask;
+			};
 			
 			/* partition to limit collisions */
 			#pragma omp parallel
@@ -476,16 +487,27 @@ namespace iqs {
 
 				if (first) {
 					utils::generalized_partition_from_iota(next_oid.begin() + this_oid_begin, next_oid.begin() + this_oid_end, this_oid_begin,
-						modulo_offset.begin() + (num_threads + 1)*thread_id, modulo_offset.begin() + (num_threads + 1)*(thread_id + 1),
-						[&](size_t const oid) {
-							return hash[oid] % num_threads;
-						});
+						partition_begin.begin() + (num_bucket + 1)*thread_id, partition_begin.begin() + (num_bucket + 1)*(thread_id + 1),
+						partitioner);
 				} else
 					utils::generalized_partition(next_oid.begin() + this_oid_begin, next_oid.begin() + this_oid_end, next_oid_partitioner_buffer.begin() + this_oid_begin,
-						modulo_offset.begin() + (num_threads + 1)*thread_id, modulo_offset.begin() + (num_threads + 1)*(thread_id + 1),
-						[&](size_t const oid) {
-							return hash[oid] % num_threads;
-						});
+						partition_begin.begin() + (num_bucket + 1)*thread_id, partition_begin.begin() + (num_bucket + 1)*(thread_id + 1),
+						partitioner);
+
+				/* compute total partition for load balancing */
+				for (int i = 1; i <= num_bucket; ++i)
+					#pragma omp atomic
+					total_partition_begin[i] += partition_begin[(num_bucket + 1)*thread_id + i];
+
+				/* compute load balancing */
+				#pragma omp barrier
+				#pragma omp single 
+					utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
+						load_balancing_begin.begin(), load_balancing_begin.end());
+
+				/* rework indexes */
+				for (int i = 1; i <= num_threads; ++i)
+					modulo_offset[(num_threads + 1)*thread_id + i] = partition_begin[(num_bucket + 1)*thread_id + load_balancing_begin[i]];
 
 				#pragma omp barrier
 
