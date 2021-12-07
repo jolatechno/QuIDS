@@ -200,10 +200,6 @@ namespace iqs::mpi {
 		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
 		static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 4)*sizeof(PROBA_TYPE) + (7 + 2)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
-		// get the free memory and the total amount of memory...
-		size_t free_mem;
-		iqs::utils::get_free_mem(free_mem);
-
 		// get each size
 		size_t next_iteration_object_size = next_iteration.objects.size();
 		size_t last_iteration_object_size = last_iteration.objects.size();
@@ -227,6 +223,10 @@ namespace iqs::mpi {
 		MPI_Allreduce(MPI_IN_PLACE, &num_object_after_interferences, 1, MPI_UNSIGNED_LONG, MPI_SUM, localComm);
 		if (num_object_after_interferences == 0)
 			return -1;
+
+		// get the free memory and the total amount of memory...
+		size_t free_mem;
+		iqs::utils::get_free_mem(free_mem);
 
 		// get the total memory
 		size_t total_useable_memory = next_iteration_object_size + last_iteration_object_size + // size of objects
@@ -285,9 +285,6 @@ namespace iqs::mpi {
 	simulation function
 	*/
 	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](int){}) {
-		int size;
-		MPI_Comm_size(communicator, &size);
-
 		/* get local size */
 		MPI_Comm localComm;
 		int rank, local_size;

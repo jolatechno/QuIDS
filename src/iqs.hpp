@@ -334,11 +334,17 @@ namespace iqs {
 	*/
 	void iteration::apply_modifier(modifier_t const rule) {
 		#pragma omp parallel for schedule(static)
-		for (size_t oid = 0; oid < num_object; ++oid)
+		for (size_t oid = 0; oid < num_object; ++oid) {
+			/* get graphs */
+			char *object;
+			mag_t *magnitude;
+			size_t size;
+			get_object(oid, object, size, magnitude);
+
 			/* generate graph */
-			rule(objects.begin() + object_begin[oid],
-				objects.begin() + object_begin[oid + 1],
-				magnitude[oid]);
+			rule(object, object + size, *magnitude);
+		}
+			
 	}
 
 	/*
