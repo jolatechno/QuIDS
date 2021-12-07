@@ -287,7 +287,8 @@ namespace iqs::mpi {
 	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](int){}) {
 		/* get local size */
 		MPI_Comm localComm;
-		int rank, local_size;
+		int rank, size, local_size;
+		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
 		MPI_Comm_size(localComm, &local_size);
@@ -303,7 +304,7 @@ namespace iqs::mpi {
 		std::swap(iteration_buffer, iteration);
 
 		/* equalize and/or normalize */
-		size_t average_num_object = iteration.get_total_num_object(communicator)/size;
+		size_t average_num_object = iteration.get_total_num_object(communicator) / size;
 		while(get_max_num_object_per_task(iteration, communicator) > min_equalize_size &&
 			get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance)
 				iteration.equalize(communicator); 
