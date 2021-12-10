@@ -82,6 +82,12 @@ namespace iqs {
 		rule() {};
 		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const = 0;
 		virtual inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id, size_t &size, mag_t &mag) const = 0;
+		virtual inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id) const {
+			size_t size_placeholder;
+			mag_t mag_placeholder;
+			populate_child(parent_begin, parent_end, child_begin, child_id,
+				size_placeholder, mag_placeholder);
+		}
 		virtual inline size_t hasher(char const *parent_begin, char const *parent_end) const { //can be overwritten
 			return std::hash<std::string_view>()(std::string_view(parent_begin, std::distance(parent_begin, parent_end)));
 		}
@@ -327,24 +333,6 @@ namespace iqs {
 	}
 	void inline simulate(it_t &iteration, modifier_t const rule) {
 		iteration.apply_modifier(rule);
-	}
-
-	/*
-	apply modifier
-	*/
-	void iteration::apply_modifier(modifier_t const rule) {
-		#pragma omp parallel for schedule(static)
-		for (size_t oid = 0; oid < num_object; ++oid) {
-			/* get graphs */
-			char *object;
-			mag_t *magnitude;
-			size_t size;
-			get_object(oid, object, size, magnitude);
-
-			/* generate graph */
-			rule(object, object + size, *magnitude);
-		}
-			
 	}
 
 	/*
@@ -647,26 +635,30 @@ namespace iqs {
 		step (7)
 		 !!!!!!!!!!!!!!!! */
 
-		#pragma omp parallel
-		{
-			auto thread_id = omp_get_thread_num();
-			mag_t mag_;
-			size_t size_;
-
-			#pragma omp for schedule(static)
-			for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
-				auto id = next_oid[oid];
-				auto this_parent_oid = parent_oid[id];
+		#pragma omp parallel for schedule(static)
+		for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
+			auto id = next_oid[oid];
+			auto this_parent_oid = parent_oid[id];
 				
-				rule->populate_child(last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid],
-					last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid + 1],
-					next_iteration.objects.begin() + next_iteration.object_begin[oid],
-					child_id[id],
-					size_, mag_);
-			}
+			rule->populate_child_simple(last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid],
+				last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid + 1],
+				next_iteration.objects.begin() + next_iteration.object_begin[oid],
+				child_id[id]);
 		}
 		
 		mid_step_function(7);
+	}
+
+	/*
+	apply modifier
+	*/
+	void iteration::apply_modifier(modifier_t const rule) {
+		#pragma omp parallel for schedule(static)
+		for (size_t oid = 0; oid < num_object; ++oid)
+			/* generate graph */
+			rule(objects.begin() + object_begin[oid],
+				objects.begin() + object_begin[oid + 1],
+				magnitude[oid]);
 	}
 
 	/*
