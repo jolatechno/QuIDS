@@ -50,7 +50,7 @@ namespace iqs::mpi {
 		size_t get_total_num_object(MPI_Comm communicator) const {
 			/* accumulate number of node */
 			size_t total_num_object;
-			MPI_Allreduce(&num_object, &total_num_object, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, communicator);
+			MPI_Allreduce(&num_object, &total_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 
 			return total_num_object;
 		}
@@ -76,7 +76,7 @@ namespace iqs::mpi {
 		}
 		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator) {
 			/* send size */
-			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG_LONG, node, 0 /* tag */, communicator);
+			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 
 			if (num_object_sent != 0) {
 				size_t begin = num_object - num_object_sent;
@@ -89,7 +89,7 @@ namespace iqs::mpi {
 
 				/* send properties */
 				MPI_Send(magnitude.begin() + begin, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator);
-				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG_LONG, node, 0 /* tag */, communicator);
+				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 
 				/* send objects */
 				const size_t max_int = 0x7FFFFFFF;
@@ -108,7 +108,7 @@ namespace iqs::mpi {
 		void receive_objects(int node, MPI_Comm communicator) {
 			/* receive size */
 			size_t num_object_sent;
-			MPI_Recv(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+			MPI_Recv(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 			if (num_object_sent != 0) {
 				/* prepare state */
@@ -116,7 +116,7 @@ namespace iqs::mpi {
 
 				/* receive properties */
 				MPI_Recv(magnitude.begin() + num_object, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 				/* prepare receive objects */
 				size_t send_object_begin = object_begin[num_object];
@@ -179,14 +179,14 @@ namespace iqs::mpi {
 		size_t get_total_num_object(MPI_Comm communicator) const {
 			/* accumulate number of node */
 			size_t total_num_object;
-			MPI_Allreduce(&num_object, &total_num_object, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, communicator);
+			MPI_Allreduce(&num_object, &total_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 
 			return total_num_object;
 		}
 		size_t get_total_num_object_after_interferences(MPI_Comm communicator) const {
 			/* accumulate number of node */
 			size_t total_num_object_after_interference;
-			MPI_Allreduce(&num_object_after_interferences, &total_num_object_after_interference, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, communicator);
+			MPI_Allreduce(&num_object_after_interferences, &total_num_object_after_interference, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 
 			return total_num_object_after_interference;
 		}
@@ -203,24 +203,24 @@ namespace iqs::mpi {
 		// get each size
 		size_t next_iteration_object_size = next_iteration.objects.size();
 		size_t last_iteration_object_size = last_iteration.objects.size();
-		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, localComm);
-		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
 		size_t next_iteration_property_size = next_iteration.magnitude.size();
 		size_t last_iteration_property_size = last_iteration.magnitude.size();
-		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, localComm);
-		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
 		size_t symbolic_iteration_size = symbolic_iteration.magnitude.size();
-		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_size, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
 		size_t last_iteration_num_object = last_iteration.num_object;
 		size_t symbolic_iteration_num_object = symbolic_iteration.num_object;
-		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_num_object, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, localComm);
-		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_num_object, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
 		size_t num_object_after_interferences = symbolic_iteration.num_object_after_interferences;
-		MPI_Allreduce(MPI_IN_PLACE, &num_object_after_interferences, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &num_object_after_interferences, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 		if (num_object_after_interferences == 0)
 			return -1;
 
@@ -248,7 +248,7 @@ namespace iqs::mpi {
 
 		// get total average
 		size_t total_test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.get_total_num_object_after_interferences(localComm)));
-		MPI_Allreduce(MPI_IN_PLACE, &iteration_size_per_object, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_SUM, localComm);
+		MPI_Allreduce(MPI_IN_PLACE, &iteration_size_per_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 		iteration_size_per_object /= total_test_size;
 
 		// add the cost of the symbolic iteration in itself
@@ -268,7 +268,7 @@ namespace iqs::mpi {
 	*/
 	size_t get_max_num_object_per_task(mpi_it_t const &iteration, MPI_Comm communicator) {
 		size_t max_num_object_per_node;
-		MPI_Allreduce(&iteration.num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_MAX, communicator);
+		MPI_Allreduce(&iteration.num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
 		return max_num_object_per_node;
 	}
 
@@ -277,7 +277,7 @@ namespace iqs::mpi {
 	*/
 	float get_max_num_object_imbalance(mpi_it_t const &iteration, size_t const size_comp, MPI_Comm communicator) {
 		size_t total_imbalance, local_imbalance = (size_t)std::abs((long long int)iteration.num_object - (long long int)size_comp);
-		MPI_Allreduce(&local_imbalance, &total_imbalance, 1, MPI_UNSIGNED_LONG_LONG_LONG, MPI_MAX, communicator);
+		MPI_Allreduce(&local_imbalance, &total_imbalance, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
 		return ((float) total_imbalance) / ((float) size_comp);
 	}
 
@@ -508,7 +508,7 @@ namespace iqs::mpi {
 						node_id_buffer[i] = node;
 
 				/* share actual partition */
-				MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG_LONG,
+				MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
 					hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, per_thread_comm[thread_id]);
 				MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
 					mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, per_thread_comm[thread_id]);
