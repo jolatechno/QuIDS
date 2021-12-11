@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdexcept>
 #include <iterator>     // std::iterator, std::input_iterator_tag
 #include <algorithm>
 
@@ -79,6 +80,9 @@ public:
     		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
     		size_ = n*upsize_policy;
     		ptr = (value_type*)realloc(ptr, size_*sizeof(value_type));
+
+    		if (ptr == NULL)
+    			throw std::runtime_error("bad allocation in fast_vector !!");
     	}
     }
  
