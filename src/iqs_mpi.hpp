@@ -75,86 +75,75 @@ namespace iqs::mpi {
 			return avg;
 		}
 		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator) {
-			const static size_t max_int = 0x7FFFFFFF;
+			const static size_t max_int = 1 << 31 - 1;
 
-			if (num_object_sent > max_int) {
-				send_objects(max_int, node, communicator);
-				send_objects(num_object_sent - max_int, node, communicator);
-			} else {
-				/* send size */
-				MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+			/* send size */
+			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 
-				if (num_object_sent != 0) {
-					size_t begin = num_object - num_object_sent;
+			if (num_object_sent != 0) {
+				size_t begin = num_object - num_object_sent;
 
-					/* prepare send */
-					size_t send_object_begin = object_begin[begin];
-					#pragma omp parallel for schedule(static)
-					for (size_t i = begin + 1; i <= num_object; ++i)
-						object_begin[i] -= send_object_begin;
+				/* prepare send */
+				size_t send_object_begin = object_begin[begin];
+				#pragma omp parallel for schedule(static)
+				for (size_t i = begin + 1; i <= num_object; ++i)
+					object_begin[i] -= send_object_begin;
 
-					/* send properties */
-					MPI_Send(magnitude.begin() + begin, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator);
-					MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+				/* send properties */
+				MPI_Send(magnitude.begin() + begin, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator);
+				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 
-					/* send objects */
-					size_t send_object_size = object_begin[num_object];
-					MPI_Send(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator);
+				/* send objects */
+				size_t send_object_size = object_begin[num_object];
+				while (send_object_size > max_int) {
+					MPI_Send(objects.begin() + send_object_begin, max_int, MPI_CHAR, node, 0 /* tag */, communicator);
 
-					while (send_object_size > max_int) {
-						MPI_Send(objects.begin() + send_object_begin, max_int, MPI_CHAR, node, 0 /* tag */, communicator);
+					send_object_size -= max_int;
+					send_object_begin += max_int;
+				}
 
-						send_object_size -= max_int;
-						send_object_begin += max_int;
-					}
+				MPI_Send(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator);
 
-					MPI_Send(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator);
-
-					/* pop */
-					pop(num_object_sent, false);
-				}				
+				/* pop */
+				pop(num_object_sent, false);
 			}
 		}
 		void receive_objects(int node, MPI_Comm communicator) {
-			const static size_t max_int = 0x7FFFFFFF;
+			const static size_t max_int = 1 << 31 - 1;
 
-			size_t num_object_sent = max_int;
-			while (num_object_sent == max_int) {
-				/* receive size */
-				MPI_Recv(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+			/* receive size */
+			size_t num_object_sent;
+			MPI_Recv(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
-				if (num_object_sent != 0) {
-					/* prepare state */
-					resize(num_object + num_object_sent);
+			if (num_object_sent != 0) {
+				/* prepare state */
+				resize(num_object + num_object_sent);
 
-					/* receive properties */
-					MPI_Recv(magnitude.begin() + num_object, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-					MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+				/* receive properties */
+				MPI_Recv(magnitude.begin() + num_object, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
-					/* prepare receive objects */
-					size_t send_object_begin = object_begin[num_object];
-					size_t send_object_size = object_begin[num_object + num_object_sent];
-					allocate(send_object_begin + send_object_size);
+				/* prepare receive objects */
+				size_t send_object_begin = object_begin[num_object];
+				size_t object_offset = send_object_begin;
+				size_t send_object_size = object_begin[num_object + num_object_sent];
+				allocate(send_object_begin + send_object_size);
 
-					/* receive objects */
-					MPI_Recv(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+				/* receive objects */
+				while (send_object_size > max_int) {
+					MPI_Recv(objects.begin() + send_object_begin, max_int, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
-					while (send_object_size > max_int) {
-						MPI_Recv(objects.begin() + send_object_begin, max_int, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-
-						send_object_size -= max_int;
-						send_object_begin += max_int;
-					}
-					
-					MPI_Recv(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-
-					/* correct values */
-					send_object_begin = object_begin[num_object];
-					#pragma omp parallel for schedule(static)
-					for (size_t i = num_object + 1; i <= num_object + num_object_sent; ++i)
-						object_begin[i] += send_object_begin;
-					num_object += num_object_sent;
+					send_object_size -= max_int;
+					send_object_begin += max_int;
 				}
+				
+				MPI_Recv(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+
+				/* correct values */
+				#pragma omp parallel for schedule(static)
+				for (size_t i = num_object + 1; i <= num_object + num_object_sent; ++i)
+					object_begin[i] += object_offset;
+				num_object += num_object_sent;
 			}
 		}
 		void equalize(MPI_Comm communicator);
