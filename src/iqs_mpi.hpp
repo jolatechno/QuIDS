@@ -450,6 +450,13 @@ namespace iqs::mpi {
 				#pragma omp barrier
 				#pragma omp single
 				{
+
+					/* !!!!!!!!!!!!!!!!!
+					debugging
+					!!!!!!!!!!!!!!!!!! */
+					if (rank == 0)
+                        std::cerr << "step 3.1\n";
+
 					MPI_Reduce(rank == 0 ? MPI_IN_PLACE : &total_partition_begin[1], &total_partition_begin[1],
 						num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
 
@@ -458,6 +465,12 @@ namespace iqs::mpi {
 							load_balancing_begin.begin(), load_balancing_begin.end());
 
 					MPI_Bcast(&load_balancing_begin[1], n_segment, MPI_INT, 0, communicator);
+
+					/* !!!!!!!!!!!!!!!!!
+					debugging
+					!!!!!!!!!!!!!!!!!! */
+					if (rank == 0)
+                        std::cerr << "step 3.1.1\n";
 				}
 
 				/* rework indexes */
@@ -477,11 +490,31 @@ namespace iqs::mpi {
 
 				#pragma omp barrier
 
+				/* !!!!!!!!!!!!!!!!!
+				debugging
+				!!!!!!!!!!!!!!!!!! */
+				#pragma omp single
+				{
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.1.2\n";
+				}
+
 				/* send partition size */
 				MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, per_thread_comm[thread_id]);
 				std::partial_sum(global_count.begin() + count_offset_begin, global_count.begin() + count_offset_begin + n_segment, global_disp.begin() + disp_offset_begin + 1);
 
 				#pragma omp barrier
+
+				/* !!!!!!!!!!!!!!!!!
+				debugging
+				!!!!!!!!!!!!!!!!!! */
+				#pragma omp single
+				{
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.1.3\n";
+				}
 
 				/* rework counts */
 				send_disp[0] = 0; receive_disp[0] = 0;
@@ -500,6 +533,14 @@ namespace iqs::mpi {
 				#pragma omp barrier
 				#pragma omp single
 				{
+
+					/* !!!!!!!!!!!!!!!!!
+					debugging
+					!!!!!!!!!!!!!!!!!! */
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.1.4\n";
+				
 					__gnu_parallel::partial_sum(global_load_begin.begin() + 1, global_load_begin.begin() + num_threads + 1, global_load_begin.begin() + 1);
 
 					/* resize */
@@ -514,11 +555,33 @@ namespace iqs::mpi {
 					for (size_t i = receive_disp[node] + this_oid_buffer_begin; i < receive_disp[node + 1] + this_oid_buffer_begin; ++i)
 						node_id_buffer[i] = node;
 
+				/* !!!!!!!!!!!!!!!!!
+				debugging
+				!!!!!!!!!!!!!!!!!! */
+				#pragma omp barrier
+				#pragma omp single
+				{
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.1.5\n";
+				}
+
 				/* share actual partition */
 				MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
 					hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, per_thread_comm[thread_id]);
 				MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
 					mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, per_thread_comm[thread_id]);
+
+				/* !!!!!!!!!!!!!!!!!
+				debugging
+				!!!!!!!!!!!!!!!!!! */
+				#pragma omp barrier
+				#pragma omp single
+				{
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.2\n";
+				}
 
 				auto &elimination_map = elimination_maps[thread_id];
 
@@ -543,6 +606,17 @@ namespace iqs::mpi {
 					}
 				}
 
+				/* !!!!!!!!!!!!!!!!!
+				debugging
+				!!!!!!!!!!!!!!!!!! */
+				#pragma omp barrier
+				#pragma omp single
+				{
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.2.1\n";
+				}
+
 				elimination_map.clear();
 
 				#pragma omp barrier
@@ -555,12 +629,33 @@ namespace iqs::mpi {
 
 				#pragma omp barrier
 
+				/* !!!!!!!!!!!!!!!!!
+				debugging
+				!!!!!!!!!!!!!!!!!! */
+				#pragma omp single
+				{
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.3\n";
+				}
+
 				/* un-partition magnitude */
 				for (size_t id = this_oid_begin; id < this_oid_end; ++id) {
 					size_t oid = next_oid[id];
 
 					is_unique[oid] = partitioned_is_unique[id];
 					magnitude[oid] = partitioned_mag[id];
+				}
+
+				/* !!!!!!!!!!!!!!!!!
+				debugging
+				!!!!!!!!!!!!!!!!!! */
+				#pragma omp barrier
+				#pragma omp single
+				{
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.3.1\n";
 				}
 
 				MPI_Comm_free(&per_thread_comm[thread_id]);
