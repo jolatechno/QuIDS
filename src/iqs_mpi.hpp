@@ -495,7 +495,7 @@ namespace iqs::mpi {
 				!!!!!!!!!!!!!!!!!! */
 				#pragma omp single
 				{
-					MPI_Barrier(communicator);
+					//MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.1.2\n";
 				}
@@ -511,7 +511,7 @@ namespace iqs::mpi {
 				!!!!!!!!!!!!!!!!!! */
 				#pragma omp single
 				{
-					MPI_Barrier(communicator);
+					//MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.1.3\n";
 				}
@@ -537,7 +537,7 @@ namespace iqs::mpi {
 					/* !!!!!!!!!!!!!!!!!
 					debugging
 					!!!!!!!!!!!!!!!!!! */
-					MPI_Barrier(communicator);
+					//MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.1.4\n";
 				
@@ -561,7 +561,7 @@ namespace iqs::mpi {
 				#pragma omp barrier
 				#pragma omp single
 				{
-					MPI_Barrier(communicator);
+					//MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.1.5\n";
 				}
@@ -578,7 +578,7 @@ namespace iqs::mpi {
 				#pragma omp barrier
 				#pragma omp single
 				{
-					MPI_Barrier(communicator);
+					//MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.2\n";
 				}
@@ -612,7 +612,7 @@ namespace iqs::mpi {
 				#pragma omp barrier
 				#pragma omp single
 				{
-					MPI_Barrier(communicator);
+					//MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.2.1\n";
 				}
@@ -634,7 +634,7 @@ namespace iqs::mpi {
 				!!!!!!!!!!!!!!!!!! */
 				#pragma omp single
 				{
-					MPI_Barrier(communicator);
+					//MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.3\n";
 				}
@@ -653,7 +653,7 @@ namespace iqs::mpi {
 				#pragma omp barrier
 				#pragma omp single
 				{
-					MPI_Barrier(communicator);
+					//MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.3.1\n";
 				}
