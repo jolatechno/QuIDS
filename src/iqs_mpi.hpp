@@ -550,6 +550,35 @@ namespace iqs::mpi {
 				size_t this_oid_buffer_begin = global_load_begin[thread_id];
 				size_t this_oid_buffer_end = global_load_begin[thread_id + 1];
 
+				/* !!!!!!!!!!!!!!!!!
+				debugging
+				!!!!!!!!!!!!!!!!!! */
+				#pragma omp critical
+				{
+					for (int i = 0; i < size; ++i)
+                    	if (send_disp[i + 1] < send_disp[i])
+                    		std::cerr << "send disp not in order at rank " << rank << "\n";
+                    for (int i = 0; i <= size; ++i)
+                    	if (send_disp[i] < 0)
+                    		std::cerr << "send disp smaller than 0 at rank " << rank << "\n";
+                    for (int i = 0; i <= size; ++i)
+                    	if (send_disp[i] > (this_oid_end - this_oid_begin))
+                    		std::cerr << "send disp bigger than size at rank " << rank << "\n";
+
+                    for (int i = 0; i < size; ++i)
+                    	if (receive_disp[i + 1] < receive_disp[i])
+                    		std::cerr << "receive disp not in order at rank " << rank << "\n";
+                    for (int i = 0; i <= size; ++i)
+                    	if (receive_disp[i] < 0)
+                    		std::cerr << "receive disp smaller than 0 at rank " << rank << "\n";
+                    for (int i = 0; i <= size; ++i)
+                    	if (receive_disp[i] > (this_oid_buffer_end - this_oid_buffer_begin))
+                    		std::cerr << "receive disp bigger than size at rank " << rank << "\n";
+
+                   	if (this_oid_end > num_object)
+                    	std::cerr << "partition out of bound at rank " << rank << "\n";
+				}
+
 				/* prepare node_id buffer */
 				for (int node = 0; node < size; ++node)
 					for (size_t i = receive_disp[node] + this_oid_buffer_begin; i < receive_disp[node + 1] + this_oid_buffer_begin; ++i)
