@@ -408,14 +408,6 @@ namespace iqs::mpi {
 
 			#pragma omp parallel
 			{
-				MPI_Comm per_thread_comm;
-
-				/* duplicate communicator */
-				#pragma omp for ordered
-				for (int thread = 0; thread < num_threads; ++thread)
-					#pragma omp ordered
-					MPI_Comm_dup(communicator, &per_thread_comm);
-
 				std::vector<int> send_disp(size + 1, 0);
 				std::vector<int> send_count(size, 0);
 				std::vector<int> receive_disp(size + 1, 0);
@@ -483,11 +475,10 @@ namespace iqs::mpi {
 				#pragma omp barrier
 
 				/* send partition size */
-				/* !!! unclear why omp ordered is necessary !!! */
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
-					MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, per_thread_comm);
+					MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, communicator);
 				std::partial_sum(global_count.begin() + count_offset_begin, global_count.begin() + count_offset_begin + n_segment, global_disp.begin() + disp_offset_begin + 1);
 
 				#pragma omp barrier
@@ -530,9 +521,9 @@ namespace iqs::mpi {
 					{
 						/* share actual partition */
 						MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
-							hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, per_thread_comm);
+							hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
 						MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
-							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, per_thread_comm);
+							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
 					}
 
 				auto &elimination_map = elimination_maps[thread_id];
@@ -559,17 +550,15 @@ namespace iqs::mpi {
 				elimination_map.clear();
 
 				#pragma omp barrier
-
-				/* !!! unclear why omp ordered is necessary !!! */
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
 					{
 						/* share back partition */
 						MPI_Alltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
-							partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, per_thread_comm);
+							partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
 						MPI_Alltoallv(is_unique_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_CHAR,
-							partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, per_thread_comm);
+							partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, communicator);
 					}
 
 				/* un-partition magnitude */
@@ -579,8 +568,6 @@ namespace iqs::mpi {
 					is_unique[oid] = partitioned_is_unique[id];
 					magnitude[oid] = partitioned_mag[id];
 				}
-
-				MPI_Comm_free(&per_thread_comm);
 			}
 
 			/* keep only unique objects */
