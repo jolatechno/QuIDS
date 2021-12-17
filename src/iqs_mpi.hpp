@@ -408,6 +408,14 @@ namespace iqs::mpi {
 
 			#pragma omp parallel
 			{
+				MPI_Comm per_thread_comm;
+
+				/* duplicate communicator */
+				#pragma omp for ordered
+				for (int thread = 0; thread < num_threads; ++thread)
+					#pragma omp ordered
+					MPI_Comm_dup(communicator, &per_thread_comm);
+
 				std::vector<int> send_disp(size + 1, 0);
 				std::vector<int> send_count(size, 0);
 				std::vector<int> receive_disp(size + 1, 0);
@@ -417,13 +425,6 @@ namespace iqs::mpi {
 				int thread_id = omp_get_thread_num();
 
 				local_load_begin[thread_id + 1] = (thread_id + 1) * oid_end / num_threads;
-
-				#pragma omp barrier
-
-				/* duplicate communicator */
-				MPI_Comm per_thread_comm;
-				#pragma omp critical
-				MPI_Comm_dup(communicator, &per_thread_comm);
 
 				#pragma omp barrier
 
@@ -553,48 +554,6 @@ namespace iqs::mpi {
 				size_t this_oid_buffer_begin = global_load_begin[thread_id];
 				size_t this_oid_buffer_end = global_load_begin[thread_id + 1];
 
-				/* !!!!!!!!!!!!!!!!!
-				debugging
-				!!!!!!!!!!!!!!!!!! */
-				#pragma omp single
-				{
-					MPI_Barrier(communicator);
-					if (rank == 0)
-                   		std::cerr << "step 3.1.5, test send\n";
-				}
-				#pragma omp critical
-				{
-                    for (int i = 0; i < size; ++i) {
-                    	int begin = this_oid_begin + send_disp[i];
-                    	int end = begin + send_count[i];
-
-                    	for (int j = begin; j < end; ++j)
-                    		volatile size_t hash_ = partitioned_hash[j];
-                    }
-                }
-                #pragma omp single
-				{
-                	MPI_Barrier(communicator);
-					if (rank == 0)
-                    	std::cerr << "step 3.1.5, test receive\n";
-                }
-				#pragma omp critical
-				{
-                    for (int i = 0; i < size; ++i) {
-                    	int begin = this_oid_buffer_begin + receive_disp[i];
-                    	int end = begin + receive_count[i];
-
-                    	for (int j = begin; j < end; ++j)
-                    		volatile size_t hash_ = hash_buffer[j];
-                    }
-                }
-                #pragma omp single
-				{
-                    MPI_Barrier(communicator);
-					if (rank == 0)
-                    	std::cerr << "step 3.1.5, test done\n";
-				}
-
 				/* prepare node_id buffer */
 				for (int node = 0; node < size; ++node)
 					for (size_t i = receive_disp[node] + this_oid_buffer_begin; i < receive_disp[node + 1] + this_oid_buffer_begin; ++i)
@@ -611,23 +570,16 @@ namespace iqs::mpi {
                     	std::cerr << "step 3.1.5\n";
 				}
 
-				/* share actual partition */
-				MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
-					hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, per_thread_comm);
-
-				/* !!!!!!!!!!!!!!!!!
-				debugging
-				!!!!!!!!!!!!!!!!!! */
-				#pragma omp barrier
-				#pragma omp single
-				{
-					MPI_Barrier(communicator);
-					if (rank == 0)
-                    	std::cerr << "step 3.1.6\n";
-				}
-
-				MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
-					mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, per_thread_comm);
+				#pragma omp for ordered
+				for (int thread = 0; thread < num_threads; ++thread)
+					#pragma omp ordered
+					{
+						/* share actual partition */
+						MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
+							hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, per_thread_comm);
+						MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
+							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, per_thread_comm);
+					}
 
 				/* !!!!!!!!!!!!!!!!!
 				debugging
