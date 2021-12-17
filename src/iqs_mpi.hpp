@@ -406,10 +406,6 @@ namespace iqs::mpi {
 			
 			local_load_begin[0] = 0; global_load_begin[0] = 0;
 
-			std::vector<MPI_Comm> per_thread_comm(num_threads);
-			for (int i = 0; i < num_threads; ++i)
-				MPI_Comm_dup(communicator, &per_thread_comm[i]);
-
 			#pragma omp parallel
 			{
 				std::vector<int> send_disp(size + 1, 0);
@@ -421,6 +417,13 @@ namespace iqs::mpi {
 				int thread_id = omp_get_thread_num();
 
 				local_load_begin[thread_id + 1] = (thread_id + 1) * oid_end / num_threads;
+
+				#pragma omp barrier
+
+				/* duplicate communicator */
+				MPI_Comm per_thread_comm;
+				#pragma omp critical
+				MPI_Comm_dup(communicator, &per_thread_comm);
 
 				#pragma omp barrier
 
@@ -501,7 +504,7 @@ namespace iqs::mpi {
 				}
 
 				/* send partition size */
-				MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, per_thread_comm[thread_id]);
+				MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, per_thread_comm);
 				std::partial_sum(global_count.begin() + count_offset_begin, global_count.begin() + count_offset_begin + n_segment, global_disp.begin() + disp_offset_begin + 1);
 
 				#pragma omp barrier
@@ -601,7 +604,7 @@ namespace iqs::mpi {
 
 				/* share actual partition */
 				MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
-					hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, per_thread_comm[thread_id]);
+					hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, per_thread_comm);
 
 				/* !!!!!!!!!!!!!!!!!
 				debugging
@@ -615,7 +618,7 @@ namespace iqs::mpi {
 				}
 
 				MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
-					mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, per_thread_comm[thread_id]);
+					mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, per_thread_comm);
 
 				/* !!!!!!!!!!!!!!!!!
 				debugging
@@ -668,9 +671,9 @@ namespace iqs::mpi {
 
 				/* share back partition */
 				MPI_Alltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
-					partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, per_thread_comm[thread_id]);
+					partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, per_thread_comm);
 				MPI_Alltoallv(is_unique_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_CHAR,
-					partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, per_thread_comm[thread_id]);
+					partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, per_thread_comm);
 
 				#pragma omp barrier
 
@@ -702,8 +705,8 @@ namespace iqs::mpi {
 					if (rank == 0)
                     	std::cerr << "step 3.3.1\n";
 				}
-
-				MPI_Comm_free(&per_thread_comm[thread_id]);
+				
+				MPI_Comm_free(&per_thread_comm);
 			}
 
 			/* keep only unique objects */
