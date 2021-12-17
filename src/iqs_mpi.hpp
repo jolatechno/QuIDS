@@ -556,34 +556,43 @@ namespace iqs::mpi {
 				/* !!!!!!!!!!!!!!!!!
 				debugging
 				!!!!!!!!!!!!!!!!!! */
+				#pragma omp single
+				{
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                   		std::cerr << "step 3.1.5, test send\n";
+				}
 				#pragma omp critical
 				{
-					if (thread_id == 0)
-						if ((size_t)(partitioned_mag.begin()) % sizeof(std::complex<PROBA_TYPE>) != 0)
-							std::cerr << "magnitude not alligned at rank " << rank << "\n";
+                    for (int i = 0; i < size; ++i) {
+                    	int begin = this_oid_begin + send_disp[i];
+                    	int end = begin + send_count[i];
 
-					for (int i = 0; i < size; ++i)
-                    	if (send_disp[i + 1] < send_disp[i])
-                    		std::cerr << "send disp not in order at rank " << rank << "\n";
-                    for (int i = 0; i <= size; ++i)
-                    	if (send_disp[i] < 0)
-                    		std::cerr << "send disp smaller than 0 at rank " << rank << "\n";
-                    for (int i = 0; i <= size; ++i)
-                    	if (send_disp[i] > (this_oid_end - this_oid_begin))
-                    		std::cerr << "send disp bigger than size at rank " << rank << "\n";
+                    	for (int j = begin; j < end; ++j)
+                    		volatile size_t hash_ = partitioned_hash[j];
+                    }
+                }
+                #pragma omp single
+				{
+                	MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.1.5, test receive\n";
+                }
+				#pragma omp critical
+				{
+                    for (int i = 0; i < size; ++i) {
+                    	int begin = this_oid_buffer_begin + receive_disp[i];
+                    	int end = begin + receive_count[i];
 
-                    for (int i = 0; i < size; ++i)
-                    	if (receive_disp[i + 1] < receive_disp[i])
-                    		std::cerr << "receive disp not in order at rank " << rank << "\n";
-                    for (int i = 0; i <= size; ++i)
-                    	if (receive_disp[i] < 0)
-                    		std::cerr << "receive disp smaller than 0 at rank " << rank << "\n";
-                    for (int i = 0; i <= size; ++i)
-                    	if (receive_disp[i] > (this_oid_buffer_end - this_oid_buffer_begin))
-                    		std::cerr << "receive disp bigger than size at rank " << rank << "\n";
-
-                   	if (this_oid_end > num_object)
-                    	std::cerr << "partition out of bound at rank " << rank << "\n";
+                    	for (int j = begin; j < end; ++j)
+                    		volatile size_t hash_ = hash_buffer[j];
+                    }
+                }
+                #pragma omp single
+				{
+                    MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.1.5, test done\n";
 				}
 
 				/* prepare node_id buffer */
@@ -705,7 +714,7 @@ namespace iqs::mpi {
 					if (rank == 0)
                     	std::cerr << "step 3.3.1\n";
 				}
-				
+
 				MPI_Comm_free(&per_thread_comm);
 			}
 
