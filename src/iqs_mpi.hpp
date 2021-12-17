@@ -537,7 +537,7 @@ namespace iqs::mpi {
 					/* !!!!!!!!!!!!!!!!!
 					debugging
 					!!!!!!!!!!!!!!!!!! */
-					//MPI_Barrier(communicator);
+					MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.1.4\n";
 				
@@ -555,6 +555,10 @@ namespace iqs::mpi {
 				!!!!!!!!!!!!!!!!!! */
 				#pragma omp critical
 				{
+					if (thread_id == 0)
+						if ((size_t)(partitioned_mag.begin()) % sizeof(std::complex<PROBA_TYPE>) != 0)
+							std::cerr << "magnitude not alligned at rank " << rank << "\n";
+
 					for (int i = 0; i < size; ++i)
                     	if (send_disp[i + 1] < send_disp[i])
                     		std::cerr << "send disp not in order at rank " << rank << "\n";
@@ -590,7 +594,7 @@ namespace iqs::mpi {
 				#pragma omp barrier
 				#pragma omp single
 				{
-					//MPI_Barrier(communicator);
+					MPI_Barrier(communicator);
 					if (rank == 0)
                     	std::cerr << "step 3.1.5\n";
 				}
@@ -598,6 +602,18 @@ namespace iqs::mpi {
 				/* share actual partition */
 				MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
 					hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, per_thread_comm[thread_id]);
+
+				/* !!!!!!!!!!!!!!!!!
+				debugging
+				!!!!!!!!!!!!!!!!!! */
+				#pragma omp barrier
+				#pragma omp single
+				{
+					MPI_Barrier(communicator);
+					if (rank == 0)
+                    	std::cerr << "step 3.1.6\n";
+				}
+
 				MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
 					mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, per_thread_comm[thread_id]);
 
