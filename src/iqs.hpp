@@ -1,8 +1,8 @@
 #pragma once
 
-#include <iostream>
 #include <parallel/algorithm>
 #include <parallel/numeric>
+#include <limits>
 
 #include <complex>
 #include <cstddef>
@@ -14,7 +14,7 @@
 	#define PROBA_TYPE double
 #endif
 #ifndef TOLERANCE
-	#define TOLERANCE 1e-18
+	#define TOLERANCE 1e-30;
 #endif
 #ifndef SAFETY_MARGIN
 	#define SAFETY_MARGIN 0.2

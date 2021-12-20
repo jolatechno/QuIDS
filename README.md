@@ -277,7 +277,7 @@ namespace iqs {
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
 	float collision_test_proportion = COLLISION_TEST_PROPORTION;
-	float collision_tolerance = default is COLLISION_TOLERANCE;
+	float collision_tolerance = COLLISION_TOLERANCE;
 
 	namespace mpi {
 		size_t min_equalize_size = MIN_EQUALIZE_SIZE;
@@ -302,7 +302,7 @@ The default value of any of those variable can be altered at compilation, by pas
 
 #### tolerance
 
-`tolerance` represents the minimum probability considered non-zero (default is `1e-18`, to compensate for numerical errors).
+`tolerance` represents the minimum probability considered non-zero (default is `1e-30`, to compensate for numerical errors).
 
 #### safety margin
 
