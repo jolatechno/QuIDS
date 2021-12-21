@@ -103,6 +103,8 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
 	protected:
+		mutable size_t max_symbolic_object_size;
+
 		utils::fast_vector<mag_t> magnitude;
 		utils::fast_vector<char> objects;
 		utils::fast_vector<size_t> object_begin;
@@ -117,6 +119,7 @@ namespace iqs {
 			objects.resize(size);
 		}
 
+		void compute_num_child(rule_t const *rule) const;
 		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) const;
 		void apply_modifier(modifier_t const rule);
 		void normalize();
@@ -318,6 +321,9 @@ namespace iqs {
 	simulation function
 	*/
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](int){}) {
+		mid_step_function(0);
+
+		iteration.compute_num_child(rule);
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions();
 
@@ -336,31 +342,37 @@ namespace iqs {
 	}
 
 	/*
-	generate symbolic iteration
+	compute num child
 	*/
-	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const {
-		if (num_object == 0) {
-			symbolic_iteration.num_object = 0;
-			for (int i = 0; i <= 3; ++i)
-				mid_step_function(i);
+	void iteration::compute_num_child(rule_t const *rule) const {
+		if (num_object == 0)
 			return;
-		}
-
-		size_t max_size;
-
-		mid_step_function(0);
 
 		/* !!!!!!!!!!!!!!!!
 		step (1)
 		 !!!!!!!!!!!!!!!! */
 
-		#pragma omp parallel for schedule(static) reduction(max:max_size)
+		max_symbolic_object_size = 0;
+
+		#pragma omp parallel for schedule(static) reduction(max:max_symbolic_object_size)
 		for (size_t oid = 0; oid < num_object; ++oid) {
 			size_t size;
 			rule->get_num_child(objects.begin() + object_begin[oid],
 				objects.begin() + object_begin[oid + 1],
 				num_childs[oid + 1], size);
-			max_size = std::max(max_size, size);
+			max_symbolic_object_size = std::max(max_symbolic_object_size, size);
+		}
+	}
+
+	/*
+	generate symbolic iteration
+	*/
+	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const {
+		if (num_object == 0) {
+			symbolic_iteration.num_object = 0;
+			for (int i = 1; i <= 3; ++i)
+				mid_step_function(i);
+			return;
 		}
 
 		mid_step_function(1);
@@ -374,7 +386,7 @@ namespace iqs {
 
 		/* resize symbolic iteration */
 		symbolic_iteration.resize(symbolic_iteration.num_object);
-		symbolic_iteration.reserve(max_size);
+		symbolic_iteration.reserve(max_symbolic_object_size);
 		
 		#pragma omp parallel
 		{

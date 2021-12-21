@@ -300,7 +300,10 @@ namespace iqs::mpi {
 		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
 		MPI_Comm_size(localComm, &local_size);
 
+		mid_step_function(0);
+
 		/* actual simulation */
+		iteration.compute_num_child(rule);
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(communicator);
 
