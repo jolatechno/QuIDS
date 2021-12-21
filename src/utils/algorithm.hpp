@@ -12,7 +12,7 @@ int nearest_power_of_two(int n) {
 int log_2_upper_bound(int n) {
 	for (int i = 1;; ++i)
 		if (n >> i == 0)
-			return i;
+			return i - 1;
 }
 
 /* 

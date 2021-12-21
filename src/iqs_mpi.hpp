@@ -5,10 +5,10 @@
 #include <mpi.h>
 
 #ifndef MIN_EQUALIZE_SIZE
-	#define MIN_EQUALIZE_SIZE 1000
+	#define MIN_EQUALIZE_SIZE 100
 #endif
 #ifndef EQUALIZE_IMBALANCE
-	#define EQUALIZE_IMBALANCE 0.2
+	#define EQUALIZE_IMBALANCE 0.01
 #endif
 
 namespace iqs::mpi {
@@ -311,9 +311,11 @@ namespace iqs::mpi {
 		std::swap(iteration_buffer, iteration);
 
 		/* equalize and/or normalize */
+		int max_equalize = iqs::utils::log_2_upper_bound(size);
 		size_t average_num_object = iteration.get_total_num_object(communicator) / size;
 		while(get_max_num_object_per_task(iteration, communicator) > min_equalize_size &&
-			get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance)
+			get_max_num_object_imbalance(iteration, average_num_object, communicator) > equalize_imablance &&
+			--max_equalize >= 0)
 				iteration.equalize(communicator); 
 			
 		mid_step_function(8);
