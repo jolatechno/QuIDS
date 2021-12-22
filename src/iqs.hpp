@@ -80,7 +80,7 @@ namespace iqs {
 	class rule {
 	public:
 		rule() {};
-		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const = 0;
+		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const = 0;
 		virtual inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id, size_t &size, mag_t &mag) const = 0;
 		virtual inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id) const {
 			size_t size_placeholder;
@@ -103,12 +103,12 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
 	protected:
-		mutable size_t max_symbolic_object_size;
+		mutable size_t max_symbolic_object_size = 0;
 
 		utils::fast_vector<mag_t> magnitude;
 		utils::fast_vector<char> objects;
 		utils::fast_vector<size_t> object_begin;
-		mutable utils::fast_vector<uint32_t> num_childs;
+		mutable utils::fast_vector<size_t> num_childs;
 
 		void inline resize(size_t num_object) const {
 			magnitude.resize(num_object);
@@ -136,6 +136,9 @@ namespace iqs {
 		}
 		iteration(char* object_begin_, char* object_end_) : iteration() {
 			append(object_begin_, object_end_);
+		}
+		size_t get_num_symbolic_object() const {
+			return num_childs[num_object];
 		}
 		void append(char const *object_begin_, char const *object_end_, mag_t const mag=1) {
 			size_t offset = object_begin[num_object];
@@ -270,7 +273,7 @@ namespace iqs {
 		if (symbolic_iteration.num_object_after_interferences == 0)
 			return -1;
 		
-		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(uint32_t);
+		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 2*sizeof(size_t);
 		static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 7*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 
 		// get the free memory and the total amount of memory...
@@ -362,6 +365,8 @@ namespace iqs {
 				num_childs[oid + 1], size);
 			max_symbolic_object_size = std::max(max_symbolic_object_size, size);
 		}
+
+		__gnu_parallel::partial_sum(num_childs.begin() + 1, num_childs.begin() + num_object + 1, num_childs.begin() + 1);
 	}
 
 	/*
@@ -381,8 +386,7 @@ namespace iqs {
 		step (2)
 		 !!!!!!!!!!!!!!!! */
 
-		__gnu_parallel::partial_sum(num_childs.begin() + 1, num_childs.begin() + num_object + 1, num_childs.begin() + 1);
-		symbolic_iteration.num_object = num_childs[num_object];
+		symbolic_iteration.num_object = get_num_symbolic_object();
 
 		/* resize symbolic iteration */
 		symbolic_iteration.resize(symbolic_iteration.num_object);

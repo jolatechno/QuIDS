@@ -393,7 +393,7 @@ namespace iqs::rules::qcgd {
 		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
 		}
-		inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const override {
 			max_child_size = std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -447,7 +447,7 @@ namespace iqs::rules::qcgd {
 		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
 		}
-		inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const override {
 			max_child_size = std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -500,7 +500,7 @@ namespace iqs::rules::qcgd {
 		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
 		}
-		inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const override {
 			max_child_size = 4*std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);

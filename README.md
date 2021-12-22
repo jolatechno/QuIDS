@@ -95,7 +95,7 @@ class my_rule : public iqs::rule_t {
 public:
 	my_rule() {};
 	inline void get_num_child(char const *parent_begin, char const *parent_end, 
-		uint32_t &num_child, size_t &max_child_size) const override;
+		size_t &num_child, size_t &max_child_size) const override;
 
 	inline void populate_child(char const *parent_begin, char const *parent_end,
 		char* const child_begin, uint32_t const child_id,
@@ -109,7 +109,7 @@ The first function, `get_num_child(...)`, finds the number of objects created th
 
 ```cpp
 inline void my_rule::get_num_child(char const *parent_begin, char const *parent_end,
-	uint32_t &num_child, size_t &max_child_size) const override
+	size_t &num_child, size_t &max_child_size) const override
 {
 	// do stuff...
 	num_child = actual_num_child;

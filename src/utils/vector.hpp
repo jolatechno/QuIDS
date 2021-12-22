@@ -16,7 +16,7 @@
 	#define DOWNSIZE_POLICY 0.85
 #endif
 #ifndef MIN_VECTOR_SIZE
-	#define MIN_VECTOR_SIZE 100000
+	#define MIN_VECTOR_SIZE 1000
 #endif
 
 // global variable definition
