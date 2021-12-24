@@ -278,6 +278,8 @@ namespace iqs {
 	float safety_margin = SAFETY_MARGIN;
 	float collision_test_proportion = COLLISION_TEST_PROPORTION;
 	float collision_tolerance = COLLISION_TOLERANCE;
+	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
+	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
 
 	namespace mpi {
 		size_t min_equalize_size = MIN_EQUALIZE_SIZE;
@@ -319,6 +321,12 @@ The default value of any of those variable can be altered at compilation, by pas
 `load_balancing_bucket_per_thread` represent the number of partition par thread (or MPI node), which allows load balancing by then having a variable number of partition per thread according to each partition's size.
 
 `load_balancing_bucket_per_thread` has a default of `8`.
+
+#### size average proportion
+
+`size_average_proportion` represents the proportion of object used to compute the average size of an object to then compute the number of object that can fit in memory.
+
+`size_average_proportion` has a default of `0.1`.
 
 #### minimum equalize size and equalize imbalance.
 
