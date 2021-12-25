@@ -24,11 +24,11 @@ void parallel_iota(iteratorType begin, iteratorType end, const valueType value_b
 	size_t distance = std::distance(begin, end);
 
 	if (value_begin == 0) {
-		#pragma omp parallel for schedule(static)
+		#pragma omp parallel for 
 		for (size_t i = 0; i < distance; ++i)
 			begin[i] = i;
 	} else
-		#pragma omp parallel for schedule(static)
+		#pragma omp parallel for 
 		for (size_t i = 0; i < distance; ++i)
 			begin[i] = value_begin + i;
 }
@@ -139,7 +139,7 @@ void parallel_generalized_partition(idIteratorType idx_in, idIteratorType idx_in
 	{
 		int thread_id = omp_get_thread_num();
 
-		#pragma omp for schedule(static)
+		#pragma omp for 
 		for (long long int i = id_end - 1; i >= 0; --i) {
 			auto key = partitioner(idx_in[i]);
 			++count[key*num_threads + thread_id];
@@ -152,7 +152,7 @@ void parallel_generalized_partition(idIteratorType idx_in, idIteratorType idx_in
 	{
 		int thread_id = omp_get_thread_num();
 		
-		#pragma omp for schedule(static)
+		#pragma omp for 
 		for (long long int i = id_end - 1; i >= 0; --i) {
 			auto idx = idx_in[i];
 			auto key = partitioner(idx);
@@ -160,7 +160,7 @@ void parallel_generalized_partition(idIteratorType idx_in, idIteratorType idx_in
 		}
 	}
 
-	#pragma omp parallel for schedule(static)
+	#pragma omp parallel for 
 	for (int i = 1; i < n_segment; ++i)
 		offset[i] = count[i*num_threads];
 
@@ -207,14 +207,14 @@ void parallel_complete_generalized_partition(idIteratorType idx_in, idIteratorTy
 	{
 		int thread_id = omp_get_thread_num();
 
-		#pragma omp for schedule(static)
+		#pragma omp for 
 		for (long long int i = id_end - 1; i >= id_begin; --i) {
 			auto key = partitioner(idx_in[i]);
 			++count[key*num_threads + thread_id];
 		}
 
 		/* add initial count to this count */
-		#pragma omp for schedule(static)
+		#pragma omp for 
 		for (int i = 0; i < n_segment; ++i)
 			count[(i + 1)*num_threads] += offset[i + 1] - offset[i];
 	}
@@ -227,7 +227,7 @@ void parallel_complete_generalized_partition(idIteratorType idx_in, idIteratorTy
 		long long int end = offset[i + 1];
 		long long int j_offset = count[i*num_threads + num_threads - 1] - begin;
 		
-		#pragma omp parallel for schedule(static)
+		#pragma omp parallel for 
 		for (long long int j = begin; j < end; ++j)
 			idx_buffer[j + j_offset] = idx_in[j];
 	}
@@ -236,7 +236,7 @@ void parallel_complete_generalized_partition(idIteratorType idx_in, idIteratorTy
 	{
 		int thread_id = omp_get_thread_num();
 		
-		#pragma omp for schedule(static)
+		#pragma omp for 
 		for (long long int i = id_end - 1; i >= id_begin; --i) {
 			auto idx = idx_in[i];
 			auto key = partitioner(idx);
@@ -244,7 +244,7 @@ void parallel_complete_generalized_partition(idIteratorType idx_in, idIteratorTy
 		}
 	}
 
-	#pragma omp parallel for schedule(static)
+	#pragma omp parallel for 
 	for (int i = 1; i < n_segment; ++i)
 		offset[i] = count[i*num_threads];
 	offset[n_segment] = id_end;
@@ -288,7 +288,7 @@ void parallel_generalized_partition_from_iota(idIteratorType idx_in, idIteratorT
 	{
 		int thread_id = omp_get_thread_num();
 
-		#pragma omp for schedule(static)
+		#pragma omp for 
 		for (long long int i = id_end + offset_iota - 1; i >= offset_iota; --i) {
 			auto key = partitioner(i);
 			++count[key*num_threads + thread_id];
@@ -301,14 +301,14 @@ void parallel_generalized_partition_from_iota(idIteratorType idx_in, idIteratorT
 	{
 		int thread_id = omp_get_thread_num();
 		
-		#pragma omp for schedule(static)
+		#pragma omp for 
 		for (long long int i = id_end + offset_iota - 1; i >= offset_iota; --i) {
 			auto key = partitioner(i);
 			idx_in[--count[key*num_threads + thread_id]] = i;
 		}
 	}
 
-	#pragma omp parallel for schedule(static)
+	#pragma omp parallel for 
 	for (int i = 1; i < n_segment; ++i)
 		offset[i] = count[i*num_threads];
 }
@@ -334,7 +334,7 @@ idIteratorType partition_conserve_partition(idIteratorType idx_in, idIteratorTyp
 			partial_offset.begin(), partial_offset.begin() + n_segment + 1,
 			old_partitioner);
 
-		#pragma omp parallel for schedule(static)
+		#pragma omp parallel for 
 		for (int i = 1; i <= n_segment; ++i)
 			offset[i] -= partial_offset[i];
 	} else {

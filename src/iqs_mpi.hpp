@@ -40,7 +40,7 @@ namespace iqs::mpi {
 
 	protected:
 		void equalize_symbolic(MPI_Comm communicator);
-		void normalize(MPI_Comm communicator);
+		void normalize(MPI_Comm communicator, std::function<void()> mid_step_function=[](){});
 
 	public:
 		PROBA_TYPE node_total_proba = 0;
@@ -86,7 +86,7 @@ namespace iqs::mpi {
 
 				/* prepare send */
 				size_t send_object_begin = object_begin[begin];
-				#pragma omp parallel for schedule(static)
+				#pragma omp parallel for 
 				for (size_t i = begin + 1; i <= num_object; ++i)
 					object_begin[i] -= send_object_begin;
 
@@ -108,7 +108,7 @@ namespace iqs::mpi {
 				if (send_num_child) {
 					/* prepare send */
 					size_t child_begin = num_childs[begin];
-					#pragma omp parallel for schedule(static)
+					#pragma omp parallel for 
 					for (size_t i = begin + 1; i <= num_object; ++i)
 						num_childs[i] -= child_begin;
 
@@ -152,7 +152,7 @@ namespace iqs::mpi {
 				MPI_Recv(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 				/* correct values */
-				#pragma omp parallel for schedule(static)
+				#pragma omp parallel for 
 				for (size_t i = num_object + 1; i <= num_object + num_object_sent; ++i)
 					object_begin[i] += object_offset;
 
@@ -162,7 +162,7 @@ namespace iqs::mpi {
 
 					/* correct num child */
 					size_t child_begin = num_childs[num_object];
-					#pragma omp parallel for schedule(static)
+					#pragma omp parallel for 
 					for (size_t i = num_object + 1; i <= num_object + num_object_sent; ++i)
 						num_childs[i] += child_begin;
 				}
@@ -190,7 +190,7 @@ namespace iqs::mpi {
 		iqs::utils::fast_vector<int> node_id_buffer;
 		iqs::utils::fast_vector<bool> is_unique_buffer;
 
-		void compute_collisions(MPI_Comm communicator);
+		void compute_collisions(MPI_Comm communicator, std::function<void()> mid_step_function=[](){});
 		void mpi_resize(size_t size) {
 			partitioned_mag.resize(size);
 			partitioned_hash.resize(size);
@@ -332,10 +332,12 @@ namespace iqs::mpi {
 		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
 		MPI_Comm_size(localComm, &local_size);
 
-		mid_step_function(0);
+		int n = 0;
+		auto actual_mid_step_function = [&]() { mid_step_function(n++); };
 
 		/* start actual simulation */
-		iteration.compute_num_child(rule);
+		iteration.compute_num_child(rule, actual_mid_step_function);
+		actual_mid_step_function();
 
 		/* equalize symbolic objects */
 		size_t max_n_object;
@@ -346,14 +348,15 @@ namespace iqs::mpi {
 				iteration.equalize_symbolic(communicator);
 
 		/* rest of the simulation */
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
-		symbolic_iteration.compute_collisions(communicator);
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, actual_mid_step_function);
+		symbolic_iteration.compute_collisions(communicator, actual_mid_step_function);
 
 		if (max_num_object == 0)
 			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration, localComm)/2;
 
 		/* finalize simulation */
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object / local_size, mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object / local_size, actual_mid_step_function);
+		actual_mid_step_function();
 		std::swap(iteration_buffer, iteration);
 
 		/* equalize and/or normalize */
@@ -362,13 +365,9 @@ namespace iqs::mpi {
 			((float)(max_n_object - get_min_num_object_per_task(iteration, communicator)))/((float)max_n_object)/max_n_object > equalize_imablance &&
 			--max_equalize >= 0)
 				iteration.equalize(communicator); 
-			
-		mid_step_function(8);
 
 		/* finish by normalizing */
-		iteration.normalize(communicator);
-
-		mid_step_function(9);
+		iteration.normalize(communicator, actual_mid_step_function);
 
 		MPI_Comm_free(&localComm);
 	}
@@ -376,7 +375,7 @@ namespace iqs::mpi {
 	/*
 	distributed interference function
 	*/
-	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator) {
+	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator, std::function<void()> mid_step_function) {
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
@@ -627,6 +626,8 @@ namespace iqs::mpi {
 				});
 		};
 
+		mid_step_function();
+
 		/* !!!!!!!!!!!!!!!!
 		step (4)
 		 !!!!!!!!!!!!!!!! */
@@ -658,7 +659,9 @@ namespace iqs::mpi {
 	/*
 	distributed normalization function
 	*/
-	void mpi_iteration::normalize(MPI_Comm communicator) {
+	void mpi_iteration::normalize(MPI_Comm communicator, std::function<void()> mid_step_function) {
+		mid_step_function();
+
 		/* !!!!!!!!!!!!!!!!
 		step (8)
 		 !!!!!!!!!!!!!!!! */
@@ -675,11 +678,13 @@ namespace iqs::mpi {
 		PROBA_TYPE normalization_factor = std::sqrt(total_proba);
 
 		if (normalization_factor != 1)
-			#pragma omp parallel for schedule(static)
+			#pragma omp parallel for 
 			for (size_t oid = 0; oid < num_object; ++oid)
 				magnitude[oid] /= normalization_factor;
 
 		node_total_proba /= total_proba;
+
+		mid_step_function();
 	}
 
 	/*

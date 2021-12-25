@@ -119,10 +119,10 @@ namespace iqs {
 			objects.resize(size);
 		}
 
-		void compute_num_child(rule_t const *rule) const;
-		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](int){}) const;
+		void compute_num_child(rule_t const *rule, std::function<void()> mid_step_function=[](){}) const;
+		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, std::function<void()> mid_step_function=[](){}) const;
 		void apply_modifier(modifier_t const rule);
-		void normalize();
+		void normalize(std::function<void()> mid_step_function=[](){});
 
 	public:
 		size_t num_object = 0;
@@ -171,7 +171,7 @@ namespace iqs {
 			{	
 				/* compute average per thread */
 				T local_avg = 0;
-				#pragma omp for schedule(static)
+				#pragma omp for 
 				for (size_t oid = 0; oid < num_object; ++oid) {
 					size_t size;
 					std::complex<PROBA_TYPE> mag;
@@ -256,8 +256,8 @@ namespace iqs {
 			}
 		}
 
-		void compute_collisions();
-		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object=0xffffffff, debug_t mid_step_function=[](int){});
+		void compute_collisions(std::function<void()> mid_step_function=[](){});
+		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object=0xffffffff, std::function<void()> mid_step_function=[](){});
 
 	public:
 		size_t num_object = 0;
@@ -324,20 +324,19 @@ namespace iqs {
 	simulation function
 	*/
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](int){}) {
-		mid_step_function(0);
+		int n = 0;
+		auto actual_mid_step_function = [&]() { mid_step_function(n++); };
 
-		iteration.compute_num_child(rule);
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
-		symbolic_iteration.compute_collisions();
+		iteration.compute_num_child(rule, actual_mid_step_function);
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, actual_mid_step_function);
+		symbolic_iteration.compute_collisions(actual_mid_step_function);
 
 		if (max_num_object == 0)
 			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration)/2;
 
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object, mid_step_function);
-		iteration_buffer.normalize();
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object, actual_mid_step_function);
+		iteration_buffer.normalize(actual_mid_step_function);
 
-		mid_step_function(8);
-		
 		std::swap(iteration_buffer, iteration);
 	}
 	void inline simulate(it_t &iteration, modifier_t const rule) {
@@ -347,7 +346,9 @@ namespace iqs {
 	/*
 	compute num child
 	*/
-	void iteration::compute_num_child(rule_t const *rule) const {
+	void iteration::compute_num_child(rule_t const *rule, std::function<void()> mid_step_function) const {
+		mid_step_function();
+
 		if (num_object == 0)
 			return;
 
@@ -357,7 +358,7 @@ namespace iqs {
 
 		max_symbolic_object_size = 0;
 
-		#pragma omp parallel for schedule(static) reduction(max:max_symbolic_object_size)
+		#pragma omp parallel for  reduction(max:max_symbolic_object_size)
 		for (size_t oid = 0; oid < num_object; ++oid) {
 			size_t size;
 			rule->get_num_child(objects.begin() + object_begin[oid],
@@ -372,15 +373,15 @@ namespace iqs {
 	/*
 	generate symbolic iteration
 	*/
-	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const {
+	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, std::function<void()> mid_step_function) const {
 		if (num_object == 0) {
 			symbolic_iteration.num_object = 0;
-			for (int i = 1; i <= 3; ++i)
-				mid_step_function(i);
+			mid_step_function();
+			mid_step_function();
 			return;
 		}
 
-		mid_step_function(1);
+		mid_step_function();
 
 		/* !!!!!!!!!!!!!!!!
 		step (2)
@@ -396,7 +397,7 @@ namespace iqs {
 		{
 			auto thread_id = omp_get_thread_num();
 
-			#pragma omp for schedule(static)
+			#pragma omp for 
 			for (size_t oid = 0; oid < num_object; ++oid) {
 				/* assign parent ids and child ids for each child */
 				std::fill(symbolic_iteration.parent_oid.begin() + num_childs[oid],
@@ -408,13 +409,13 @@ namespace iqs {
 			}
 
 			#pragma omp single
-			mid_step_function(2);
+			mid_step_function();
 
 			/* !!!!!!!!!!!!!!!!
 			step (3)
 			 !!!!!!!!!!!!!!!! */
 
-			#pragma omp for schedule(static)
+			#pragma omp for 
 			for (size_t oid = 0; oid < symbolic_iteration.num_object; ++oid) {
 				auto id = symbolic_iteration.parent_oid[oid];
 
@@ -430,16 +431,15 @@ namespace iqs {
 					symbolic_iteration.placeholder[thread_id] + symbolic_iteration.size[oid]);
 			}
 		}
-
-		mid_step_function(3);
 	}
 
 	/*
 	compute interferences
 	*/
-	void symbolic_iteration::compute_collisions() {
+	void symbolic_iteration::compute_collisions(std::function<void()> mid_step_function) {
 		if (num_object == 0) {
 			num_object_after_interferences = 0;
+			mid_step_function();
 			return;
 		}
 
@@ -555,6 +555,8 @@ namespace iqs {
 				});
 		};
 
+		mid_step_function();
+
 		/* !!!!!!!!!!!!!!!!
 		step (4)
 		 !!!!!!!!!!!!!!!! */
@@ -582,15 +584,16 @@ namespace iqs {
 	/*
 	finalize iteration
 	*/
-	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object, debug_t mid_step_function) {
+	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object, std::function<void()> mid_step_function) {
 		if (num_object_after_interferences == 0) {
 			next_iteration.num_object = 0;
-			for (int i = 4; i <= 7; ++i)
-				mid_step_function(i);
+			mid_step_function();
+			mid_step_function();
+			mid_step_function();
 			return;
 		}
 		
-		mid_step_function(4);
+		mid_step_function();
 
 		/* !!!!!!!!!!!!!!!!
 		step (5)
@@ -599,7 +602,7 @@ namespace iqs {
 		if (max_num_object > utils::min_vector_size && num_object_after_interferences > max_num_object) {
 
 			/* generate random selectors */
-			#pragma omp parallel for schedule(static)
+			#pragma omp parallel for 
 			for (size_t i = 0; i < num_object_after_interferences; ++i)  {
 				size_t oid = next_oid[i];
 
@@ -617,7 +620,7 @@ namespace iqs {
 		} else
 			next_iteration.num_object = num_object_after_interferences;
 
-		mid_step_function(5);
+		mid_step_function();
 
 		/* !!!!!!!!!!!!!!!!
 		step (6)
@@ -630,7 +633,7 @@ namespace iqs {
 		next_iteration.resize(next_iteration.num_object);
 				
 		/* prepare for partial sum */
-		#pragma omp parallel for schedule(static)
+		#pragma omp parallel for 
 		for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
 			auto id = next_oid[oid];
 
@@ -645,13 +648,13 @@ namespace iqs {
 
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
-		mid_step_function(6);
+		mid_step_function();
 
 		/* !!!!!!!!!!!!!!!!
 		step (7)
 		 !!!!!!!!!!!!!!!! */
 
-		#pragma omp parallel for schedule(static)
+		#pragma omp parallel for 
 		for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
 			auto id = next_oid[oid];
 			auto this_parent_oid = parent_oid[id];
@@ -661,15 +664,13 @@ namespace iqs {
 				next_iteration.objects.begin() + next_iteration.object_begin[oid],
 				child_id[id]);
 		}
-		
-		mid_step_function(7);
 	}
 
 	/*
 	apply modifier
 	*/
 	void iteration::apply_modifier(modifier_t const rule) {
-		#pragma omp parallel for schedule(static)
+		#pragma omp parallel for 
 		for (size_t oid = 0; oid < num_object; ++oid)
 			/* generate graph */
 			rule(objects.begin() + object_begin[oid],
@@ -680,15 +681,20 @@ namespace iqs {
 	/*
 	normalize
 	*/
-	void iteration::normalize() {
+	void iteration::normalize(std::function<void()> mid_step_function) {
+		total_proba = 0;
+
+		if (num_object == 0) {
+			mid_step_function();
+			mid_step_function();
+			return;
+		}
+
+		mid_step_function();
+
 		/* !!!!!!!!!!!!!!!!
 		step (8)
 		 !!!!!!!!!!!!!!!! */
-
-		total_proba = 0;
-
-		if (num_object == 0)
-			return;
 
 		#pragma omp parallel
 		{
@@ -704,5 +710,6 @@ namespace iqs {
 					magnitude[oid] /= normalization_factor;
 		}
 		
+		mid_step_function();
 	}
 }
