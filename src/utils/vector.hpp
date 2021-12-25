@@ -34,6 +34,11 @@ public:
     explicit fast_vector(size_t n = 0) {
     	resize(n);
 	}
+
+	explicit fast_vector(size_t n, value_type v) {
+    	resize(n);
+    	std::fill(begin(), begin() + n, v);
+	}
  
     // NOT SUPPORTED !!!
     size_t push_back(value_type) {

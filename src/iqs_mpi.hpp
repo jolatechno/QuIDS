@@ -493,7 +493,6 @@ namespace iqs::mpi {
 				#pragma omp barrier
 				#pragma omp single
 				{
-
 					MPI_Reduce(rank == 0 ? MPI_IN_PLACE : &total_partition_begin[1], &total_partition_begin[1],
 						num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
 
@@ -525,8 +524,6 @@ namespace iqs::mpi {
 					#pragma omp ordered
 					MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, communicator);
 				std::partial_sum(global_count.begin() + count_offset_begin, global_count.begin() + count_offset_begin + n_segment, global_disp.begin() + disp_offset_begin + 1);
-
-				#pragma omp barrier
 
 				/* rework counts */
 				send_disp[0] = 0; receive_disp[0] = 0;

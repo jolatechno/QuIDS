@@ -487,6 +487,7 @@ namespace iqs {
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
+				auto &elimination_map = elimination_maps[thread_id];
 
 				load_begin[thread_id + 1] = (thread_id + 1) * oid_end / num_threads;
 
@@ -520,8 +521,6 @@ namespace iqs {
 					modulo_offset[(num_threads + 1)*thread_id + i] = partition_begin[(num_bucket + 1)*thread_id + load_balancing_begin[i]];
 
 				#pragma omp barrier
-
-				auto &elimination_map = elimination_maps[thread_id];
 
 				size_t total_size = 0;
 				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
