@@ -454,6 +454,8 @@ namespace iqs::mpi {
 
 			#pragma omp parallel
 			{
+				MPI_Request request1, request2, request3, request4;
+
 				std::vector<int> send_disp(size + 1, 0);
 				std::vector<int> send_count(size, 0);
 				std::vector<int> receive_disp(size + 1, 0);
@@ -560,17 +562,19 @@ namespace iqs::mpi {
 					for (size_t i = receive_disp[node] + this_oid_buffer_begin; i < receive_disp[node + 1] + this_oid_buffer_begin; ++i)
 						node_id_buffer[i] = node;
 
-				/* !!! unclear why omp ordered is necessary !!! */
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
 					{
 						/* share actual partition */
-						MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
-							hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
-						MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
-							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
+						MPI_Ialltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
+							hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator, &request1);
+						MPI_Ialltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
+							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator, &request2);
 					}
+				MPI_Wait(&request1, MPI_STATUS_IGNORE);
+				MPI_Wait(&request2, MPI_STATUS_IGNORE);
+				#pragma omp barrier
 
 				auto &elimination_map = elimination_maps[thread_id];
 
@@ -601,11 +605,14 @@ namespace iqs::mpi {
 					#pragma omp ordered
 					{
 						/* share back partition */
-						MPI_Alltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
-							partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
-						MPI_Alltoallv(is_unique_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_CHAR,
-							partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, communicator);
+						MPI_Ialltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
+							partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator, &request3);
+						MPI_Ialltoallv(is_unique_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_CHAR,
+							partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, communicator, &request4);
 					}
+				MPI_Wait(&request3, MPI_STATUS_IGNORE);
+				MPI_Wait(&request4, MPI_STATUS_IGNORE);
+				#pragma omp barrier
 
 				/* un-partition magnitude */
 				for (size_t id = this_oid_begin; id < this_oid_end; ++id) {
@@ -691,6 +698,8 @@ namespace iqs::mpi {
 	equalize symbolic object across nodes
 	*/
 	void mpi_iteration::equalize_symbolic(MPI_Comm communicator) {
+		MPI_Request request = MPI_REQUEST_NULL;
+
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
@@ -721,23 +730,14 @@ namespace iqs::mpi {
 		/* get the number of objects of the respective pairs */
 		size_t other_num_object;
 		size_t other_max_symbolic_object_size;
-		if (rank < this_pair_id) {
-			MPI_Send(&num_symbolic_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator);
-			MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+		
+		MPI_Isend(&num_symbolic_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
+		MPI_Isend(&max_symbolic_object_size, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
 
-			MPI_Send(&max_symbolic_object_size, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator);
-			MPI_Recv(&other_max_symbolic_object_size, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+		MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+		MPI_Recv(&other_max_symbolic_object_size, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
-			max_symbolic_object_size = std::max(max_symbolic_object_size, other_max_symbolic_object_size);
-		} else {
-			MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-			MPI_Send(&num_symbolic_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator);
-
-			MPI_Recv(&other_max_symbolic_object_size, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-			MPI_Send(&max_symbolic_object_size, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator);
-
-			max_symbolic_object_size = std::max(max_symbolic_object_size, other_max_symbolic_object_size);
-		}
+		max_symbolic_object_size = std::max(max_symbolic_object_size, other_max_symbolic_object_size);
 
 		/* equalize amoung pairs */
 		if (num_symbolic_object > other_num_object) {
@@ -759,6 +759,8 @@ namespace iqs::mpi {
 	equalize the number of objects across nodes
 	*/
 	void mpi_iteration::equalize(MPI_Comm communicator) {
+		MPI_Request request = MPI_REQUEST_NULL;
+
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
@@ -786,13 +788,11 @@ namespace iqs::mpi {
 
 		/* get the number of objects of the respective pairs */
 		size_t other_num_object;
-		if (rank < this_pair_id) {
-			MPI_Send(&num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator);
-			MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-		} else {
-			MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-			MPI_Send(&num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator);
-		}
+		MPI_Isend(&num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
+		MPI_Isend(&num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
+		
+		MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+		MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 		/* equalize amoung pairs */
 		if (num_object > other_num_object) {
