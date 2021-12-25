@@ -454,8 +454,6 @@ namespace iqs::mpi {
 
 			#pragma omp parallel
 			{
-				MPI_Request request1, request2, request3, request4;
-
 				std::vector<int> send_disp(size + 1, 0);
 				std::vector<int> send_count(size, 0);
 				std::vector<int> receive_disp(size + 1, 0);
@@ -560,15 +558,12 @@ namespace iqs::mpi {
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
-					MPI_Ialltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
-						hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator, &request1);
-				MPI_Wait(&request1, MPI_STATUS_IGNORE);
-				#pragma omp for ordered
-				for (int thread = 0; thread < num_threads; ++thread)
-					#pragma omp ordered
-					MPI_Ialltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
-						mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator, &request2);
-				MPI_Wait(&request2, MPI_STATUS_IGNORE);
+					{
+						MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
+							hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
+						MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
+							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
+					}
 
 				/* prepare node_id buffer */
 				for (int node = 0; node < size; ++node)
@@ -603,15 +598,12 @@ namespace iqs::mpi {
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
-					MPI_Ialltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
-						partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator, &request3);
-				MPI_Wait(&request3, MPI_STATUS_IGNORE);
-				#pragma omp for ordered
-				for (int thread = 0; thread < num_threads; ++thread)
-					#pragma omp ordered
-					MPI_Ialltoallv(is_unique_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_CHAR,
-						partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, communicator, &request4);
-				MPI_Wait(&request4, MPI_STATUS_IGNORE);
+					{
+						MPI_Alltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
+							partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
+						MPI_Alltoallv(is_unique_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_CHAR,
+							partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, communicator);
+					}
 				#pragma omp barrier
 
 				/* un-partition magnitude */
