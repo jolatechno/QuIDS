@@ -65,6 +65,11 @@ namespace iqs {
 	float collision_tolerance = COLLISION_TOLERANCE;
 	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
+	#ifdef SIMPLE_TRUNCATION
+		bool simple_truncation = true;
+	#else
+		bool simple_truncation = false;
+	#endif
 
 	/* forward typedef */
 	typedef std::complex<PROBA_TYPE> mag_t;
@@ -82,7 +87,7 @@ namespace iqs {
 		rule() {};
 		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const = 0;
 		virtual inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id, size_t &size, mag_t &mag) const = 0;
-		virtual inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id) const {
+		virtual inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id) const { //can be overwritten
 			size_t size_placeholder;
 			mag_t mag_placeholder;
 			populate_child(parent_begin, parent_end, child_begin, child_id,
@@ -599,21 +604,29 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 
 		if (max_num_object > utils::min_vector_size && num_object_after_interferences > max_num_object) {
+			if (simple_truncation) {
+				/* select graphs according to random selectors */
+				__gnu_parallel::nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
+				[&](size_t const &oid1, size_t const &oid2) {
+					return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
+				});
 
-			/* generate random selectors */
-			#pragma omp parallel for 
-			for (size_t i = 0; i < num_object_after_interferences; ++i)  {
-				size_t oid = next_oid[i];
+			} else {
+				/* generate random selectors */
+				#pragma omp parallel for 
+				for (size_t i = 0; i < num_object_after_interferences; ++i)  {
+					size_t oid = next_oid[i];
 
-				double random_number = utils::unfiorm_from_hash(hash[oid]); //random_generator();
-				random_selector[oid] = std::log( -std::log(1 - random_number) / std::norm(magnitude[oid]));
+					double random_number = utils::unfiorm_from_hash(hash[oid]); //random_generator();
+					random_selector[oid] = std::log( -std::log(1 - random_number) / std::norm(magnitude[oid]));
+				}
+
+				/* select graphs according to random selectors */
+				__gnu_parallel::nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
+				[&](size_t const &oid1, size_t const &oid2) {
+					return random_selector[oid1] < random_selector[oid2];
+				});
 			}
-
-			/* select graphs according to random selectors */
-			__gnu_parallel::nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
-			[&](size_t const &oid1, size_t const &oid2) {
-				return random_selector[oid1] < random_selector[oid2];
-			});
 
 			next_iteration.num_object = max_num_object;
 		} else
