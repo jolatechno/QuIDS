@@ -40,7 +40,7 @@ namespace iqs::mpi {
 
 	protected:
 		void equalize_symbolic(MPI_Comm communicator);
-		void normalize(MPI_Comm communicator, std::function<void()> mid_step_function=[](){});
+		void normalize(MPI_Comm communicator, iqs::debug_t mid_step_function=[](const char*){});
 
 	public:
 		PROBA_TYPE node_total_proba = 0;
@@ -190,7 +190,7 @@ namespace iqs::mpi {
 		iqs::utils::fast_vector<int> node_id_buffer;
 		iqs::utils::fast_vector<bool> is_unique_buffer;
 
-		void compute_collisions(MPI_Comm communicator, std::function<void()> mid_step_function=[](){});
+		void compute_collisions(MPI_Comm communicator, iqs::debug_t mid_step_function=[](const char*){});
 		void mpi_resize(size_t size) {
 			partitioned_mag.resize(size);
 			partitioned_hash.resize(size);
@@ -323,7 +323,7 @@ namespace iqs::mpi {
 	/*
 	simulation function
 	*/
-	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](int){}) {
+	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](const char*){}) {
 		/* get local size */
 		MPI_Comm localComm;
 		int rank, size, local_size;
@@ -332,12 +332,12 @@ namespace iqs::mpi {
 		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
 		MPI_Comm_size(localComm, &local_size);
 
-		int n = 0;
-		auto actual_mid_step_function = [&]() { mid_step_function(n++); };
+		if (size == 1)
+			return iqs::simulate(iteration, rule, iteration_buffer, symbolic_iteration, max_num_object, mid_step_function);
 
 		/* start actual simulation */
-		iteration.compute_num_child(rule, actual_mid_step_function);
-		actual_mid_step_function();
+		iteration.compute_num_child(rule, mid_step_function);
+		mid_step_function("equalize_child");
 
 		/* equalize symbolic objects */
 		size_t max_n_object;
@@ -348,15 +348,17 @@ namespace iqs::mpi {
 				iteration.equalize_symbolic(communicator);
 
 		/* rest of the simulation */
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration, actual_mid_step_function);
-		symbolic_iteration.compute_collisions(communicator, actual_mid_step_function);
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
+		symbolic_iteration.compute_collisions(communicator, mid_step_function);
 
-		if (max_num_object == 0)
+		if (max_num_object == 0) {
+			mid_step_function("get_max_num_object");
 			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration, localComm)/2;
+		}
 
 		/* finalize simulation */
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object / local_size, actual_mid_step_function);
-		actual_mid_step_function();
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object / local_size, mid_step_function);
+		mid_step_function("equalize");
 		std::swap(iteration_buffer, iteration);
 
 		/* equalize and/or normalize */
@@ -367,7 +369,7 @@ namespace iqs::mpi {
 				iteration.equalize(communicator); 
 
 		/* finish by normalizing */
-		iteration.normalize(communicator, actual_mid_step_function);
+		iteration.normalize(communicator, mid_step_function);
 
 		MPI_Comm_free(&localComm);
 	}
@@ -375,13 +377,13 @@ namespace iqs::mpi {
 	/*
 	distributed interference function
 	*/
-	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator, std::function<void()> mid_step_function) {
+	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator, iqs::debug_t mid_step_function) {
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 
 		if (size == 1)
-			return iqs::symbolic_iteration::compute_collisions();
+			return iqs::symbolic_iteration::compute_collisions(mid_step_function);
 
 		int num_threads;
 		#pragma omp parallel
@@ -390,44 +392,9 @@ namespace iqs::mpi {
 
 		elimination_maps.resize(num_threads);
 
-		/*
-		function to add a key
-		*/
-		const auto insert_key = [&](size_t const oid, robin_hood::unordered_map<size_t, size_t> &elimination_map, std::vector<int> &global_num_object_after_interferences) {
-			int node_id = node_id_buffer[oid];
-
-			/* accessing key */
-			auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
-			if (unique) {
-				/* increment values */
-				++global_num_object_after_interferences[node_id];
-				is_unique_buffer[oid] = true;
-			} else {
-				auto other_oid = it->second;
-				auto other_node_id = node_id_buffer[other_oid];
-
-				bool is_greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
-				if (is_greater) {
-					/* if it exist add the probabilities */
-					mag_buffer[other_oid] += mag_buffer[oid];
-					is_unique_buffer[oid] = false;
-				} else {
-					/* keep this graph */
-					it->second = oid;
-
-					/* if the size aren't balanced, add the probabilities */
-					mag_buffer[oid] += mag_buffer[other_oid];
-					is_unique_buffer[oid] = true;
-					is_unique_buffer[other_oid] = false;
-
-					/* increment values */
-					++global_num_object_after_interferences[node_id];
-					--global_num_object_after_interferences[other_node_id];
-				}
-			}
-		};
-
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
+			mid_step_function(("compute_collisions - prepare " + std::to_string(!first + 1) + "th").c_str());
+
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
 			mpi_resize(oid_end);
 
@@ -518,11 +485,18 @@ namespace iqs::mpi {
 					partitioned_hash[id] = hash[oid];
 				}
 
+				#pragma omp single
+				mid_step_function(("compute_collisions - com load_balance " + std::to_string(!first + 1) + "th").c_str());
+
 				/* send partition size */
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
 					MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, communicator);
+
+				#pragma omp single
+				mid_step_function(("compute_collisions - prepare " + std::to_string(!first + 1) + "th").c_str());
+
 				std::partial_sum(global_count.begin() + count_offset_begin, global_count.begin() + count_offset_begin + n_segment, global_disp.begin() + disp_offset_begin + 1);
 
 				/* rework counts */
@@ -551,6 +525,9 @@ namespace iqs::mpi {
 				size_t this_oid_buffer_begin = global_load_begin[thread_id];
 				size_t this_oid_buffer_end = global_load_begin[thread_id + 1];
 
+				#pragma omp single
+				mid_step_function(("compute_collisions - com scatter " + std::to_string(!first + 1) + "th").c_str());
+
 				/* share actual partition */
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
@@ -561,6 +538,9 @@ namespace iqs::mpi {
 						MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
 							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
 					}
+
+				#pragma omp single
+				mid_step_function(("compute_collisions - insert " + std::to_string(!first + 1) + "th").c_str());
 
 				/* prepare node_id buffer */
 				for (int node = 0; node < size; ++node)
@@ -583,15 +563,49 @@ namespace iqs::mpi {
 						size_t begin = global_disp[other_thread_id*(n_segment + 1) + node_id*num_threads + thread_id] + other_oid_begin;
 						size_t end = global_disp[other_thread_id*(n_segment + 1) + node_id*num_threads + thread_id + 1] + other_oid_begin;
 
-						for (size_t i = begin; i < end; ++i)
-							insert_key(i, elimination_map, global_num_object_after_interferences);
+						for (size_t oid = begin; oid < end; ++oid) {
+							int node_id = node_id_buffer[oid];
+
+							/* accessing key */
+							auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
+							if (unique) {
+								/* increment values */
+								++global_num_object_after_interferences[node_id];
+								is_unique_buffer[oid] = true;
+							} else {
+								auto other_oid = it->second;
+								auto other_node_id = node_id_buffer[other_oid];
+
+								bool is_greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
+								if (is_greater) {
+									/* if it exist add the probabilities */
+									mag_buffer[other_oid] += mag_buffer[oid];
+									is_unique_buffer[oid] = false;
+								} else {
+									/* keep this graph */
+									it->second = oid;
+
+									/* if the size aren't balanced, add the probabilities */
+									mag_buffer[oid] += mag_buffer[other_oid];
+									is_unique_buffer[oid] = true;
+									is_unique_buffer[other_oid] = false;
+
+									/* increment values */
+									++global_num_object_after_interferences[node_id];
+									--global_num_object_after_interferences[other_node_id];
+								}
+							}
+						}
 					}
 				}
 
 				elimination_map.clear();
 
-				/* share back partition */
 				#pragma omp barrier
+				#pragma omp single
+				mid_step_function(("compute_collisions - com gather " + std::to_string(!first + 1) + "th").c_str());
+
+				/* share back partition */
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
@@ -602,6 +616,9 @@ namespace iqs::mpi {
 							partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, communicator);
 					}
 				#pragma omp barrier
+
+				#pragma omp barrier
+				mid_step_function(("compute_collisions - finalize " + std::to_string(!first + 1) + "th").c_str());
 
 				/* un-partition magnitude */
 				for (size_t id = this_oid_begin; id < this_oid_end; ++id) {
@@ -621,8 +638,6 @@ namespace iqs::mpi {
 					return std::norm(magnitude[oid]) > tolerance;
 				});
 		};
-
-		mid_step_function();
 
 		/* !!!!!!!!!!!!!!!!
 		step (4)
@@ -655,8 +670,8 @@ namespace iqs::mpi {
 	/*
 	distributed normalization function
 	*/
-	void mpi_iteration::normalize(MPI_Comm communicator, std::function<void()> mid_step_function) {
-		mid_step_function();
+	void mpi_iteration::normalize(MPI_Comm communicator, iqs::debug_t mid_step_function) {
+		mid_step_function("normalize");
 
 		/* !!!!!!!!!!!!!!!!
 		step (8)
@@ -680,7 +695,7 @@ namespace iqs::mpi {
 
 		node_total_proba /= total_proba;
 
-		mid_step_function();
+		mid_step_function("end");
 	}
 
 	/*

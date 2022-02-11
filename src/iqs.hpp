@@ -77,7 +77,7 @@ namespace iqs {
 	typedef class symbolic_iteration sy_it_t;
 	typedef class rule rule_t;
 	typedef std::function<void(char* parent_begin, char* parent_end, mag_t &mag)> modifier_t;
-	typedef std::function<void(int step)> debug_t;
+	typedef std::function<void(const char* step)> debug_t;
 
 	/* 
 	rule virtual class
@@ -124,10 +124,10 @@ namespace iqs {
 			objects.resize(size);
 		}
 
-		void compute_num_child(rule_t const *rule, std::function<void()> mid_step_function=[](){}) const;
-		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, std::function<void()> mid_step_function=[](){}) const;
+		void compute_num_child(rule_t const *rule, debug_t mid_step_function=[](const char*){}) const;
+		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](const char*){}) const;
 		void apply_modifier(modifier_t const rule);
-		void normalize(std::function<void()> mid_step_function=[](){});
+		void normalize(debug_t mid_step_function=[](const char*){});
 
 	public:
 		size_t num_object = 0;
@@ -261,8 +261,8 @@ namespace iqs {
 			}
 		}
 
-		void compute_collisions(std::function<void()> mid_step_function=[](){});
-		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object=0xffffffff, std::function<void()> mid_step_function=[](){});
+		void compute_collisions(debug_t mid_step_function=[](const char*){});
+		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object=0xffffffff, debug_t mid_step_function=[](const char*){});
 
 	public:
 		size_t num_object = 0;
@@ -328,19 +328,18 @@ namespace iqs {
 	/*
 	simulation function
 	*/
-	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](int){}) {
-		int n = 0;
-		auto actual_mid_step_function = [&]() { mid_step_function(n++); };
+	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
+		iteration.compute_num_child(rule, mid_step_function);
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
+		symbolic_iteration.compute_collisions(mid_step_function);
 
-		iteration.compute_num_child(rule, actual_mid_step_function);
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration, actual_mid_step_function);
-		symbolic_iteration.compute_collisions(actual_mid_step_function);
-
-		if (max_num_object == 0)
+		if (max_num_object == 0) {
+			mid_step_function("get_max_num_object");
 			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration)/2;
+		}
 
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object, actual_mid_step_function);
-		iteration_buffer.normalize(actual_mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object, mid_step_function);
+		iteration_buffer.normalize(mid_step_function);
 
 		std::swap(iteration_buffer, iteration);
 	}
@@ -351,8 +350,8 @@ namespace iqs {
 	/*
 	compute num child
 	*/
-	void iteration::compute_num_child(rule_t const *rule, std::function<void()> mid_step_function) const {
-		mid_step_function();
+	void iteration::compute_num_child(rule_t const *rule, debug_t mid_step_function) const {
+		mid_step_function("num_child");
 
 		if (num_object == 0)
 			return;
@@ -378,15 +377,15 @@ namespace iqs {
 	/*
 	generate symbolic iteration
 	*/
-	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, std::function<void()> mid_step_function) const {
+	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const {
 		if (num_object == 0) {
 			symbolic_iteration.num_object = 0;
-			mid_step_function();
-			mid_step_function();
+			mid_step_function("prepare_index");
+			mid_step_function("symbolic_iteration");
 			return;
 		}
 
-		mid_step_function();
+		mid_step_function("prepare_index");
 
 		/* !!!!!!!!!!!!!!!!
 		step (2)
@@ -414,7 +413,7 @@ namespace iqs {
 			}
 
 			#pragma omp single
-			mid_step_function();
+			mid_step_function("symbolic_iteration");
 
 			/* !!!!!!!!!!!!!!!!
 			step (3)
@@ -441,10 +440,11 @@ namespace iqs {
 	/*
 	compute interferences
 	*/
-	void symbolic_iteration::compute_collisions(std::function<void()> mid_step_function) {
+	void symbolic_iteration::compute_collisions(debug_t mid_step_function) {
 		if (num_object == 0) {
 			num_object_after_interferences = 0;
-			mid_step_function();
+			mid_step_function("compute_collisions - prepare 1th");
+			mid_step_function("compute_collisions - insert 1th");
 			return;
 		}
 
@@ -455,22 +455,9 @@ namespace iqs {
 		
 		elimination_maps.resize(num_threads);
 
-		const auto insert_key = [&](size_t const oid, robin_hood::unordered_map<size_t, size_t> &elimination_map) {
-			is_unique[oid] = true;
-
-			/* accessing key */
-			auto [it, unique] = elimination_map.insert({hash[oid], oid});
-			if (!unique) {
-				/* if it exist add the probabilities */
-				magnitude[oid] += magnitude[it->second];
-
-				/* discard other graph, to keep this graph closer */
-				is_unique[it->second] = false;
-				it->second = oid;
-			}
-		};
-
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
+			mid_step_function(("compute_collisions - prepare " + std::to_string(!first + 1) + "th").c_str());
+
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
 
 			std::vector<size_t> modulo_offset(num_threads*(num_threads + 1) + 1, 0);
@@ -534,6 +521,9 @@ namespace iqs {
 					total_size += end - begin;
 				}
 
+				if (thread_id == 0)
+					mid_step_function(("compute_collisions - insert " + std::to_string(!first + 1) + "th").c_str());
+
 				elimination_map.reserve(total_size);
 
 				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
@@ -542,8 +532,17 @@ namespace iqs {
 					size_t begin = modulo_offset[(num_threads + 1)*other_thread_id + thread_id] + other_oid_begin;
 					size_t end = modulo_offset[(num_threads + 1)*other_thread_id + thread_id + 1] + other_oid_begin;
 
-					for (size_t i = begin; i < end; ++i)	
-						insert_key(next_oid[i], elimination_map);
+					for (size_t i = begin; i < end; ++i) {
+						size_t oid = next_oid[i];
+
+						/* accessing key */
+						auto [it, unique] = elimination_map.insert({hash[oid], oid});
+						if (!unique)
+							/* if it exist add the probabilities */
+							magnitude[it->second] += magnitude[oid];
+						/* keep the object if it is unique */
+						is_unique[oid] = unique;
+					}
 				}
 
 				elimination_map.clear();
@@ -558,8 +557,6 @@ namespace iqs {
 					return std::norm(magnitude[oid]) > tolerance;
 				});
 		};
-
-		mid_step_function();
 
 		/* !!!!!!!!!!!!!!!!
 		step (4)
@@ -588,16 +585,16 @@ namespace iqs {
 	/*
 	finalize iteration
 	*/
-	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object, std::function<void()> mid_step_function) {
+	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object, debug_t mid_step_function) {
 		if (num_object_after_interferences == 0) {
 			next_iteration.num_object = 0;
-			mid_step_function();
-			mid_step_function();
-			mid_step_function();
+			mid_step_function("truncate");
+			mid_step_function("prepare_final");
+			mid_step_function("final");
 			return;
 		}
 		
-		mid_step_function();
+		mid_step_function("truncate");
 
 		/* !!!!!!!!!!!!!!!!
 		step (5)
@@ -632,7 +629,7 @@ namespace iqs {
 		} else
 			next_iteration.num_object = num_object_after_interferences;
 
-		mid_step_function();
+		mid_step_function("prepare_final");
 
 		/* !!!!!!!!!!!!!!!!
 		step (6)
@@ -660,7 +657,7 @@ namespace iqs {
 
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
-		mid_step_function();
+		mid_step_function("final");
 
 		/* !!!!!!!!!!!!!!!!
 		step (7)
@@ -693,16 +690,16 @@ namespace iqs {
 	/*
 	normalize
 	*/
-	void iteration::normalize(std::function<void()> mid_step_function) {
+	void iteration::normalize(debug_t mid_step_function) {
 		total_proba = 0;
 
 		if (num_object == 0) {
-			mid_step_function();
-			mid_step_function();
+			mid_step_function("normalize");
+			mid_step_function("end");
 			return;
 		}
 
-		mid_step_function();
+		mid_step_function("normalize");
 
 		/* !!!!!!!!!!!!!!!!
 		step (8)
@@ -722,6 +719,6 @@ namespace iqs {
 					magnitude[oid] /= normalization_factor;
 		}
 		
-		mid_step_function();
+		mid_step_function("end");
 	}
 }
