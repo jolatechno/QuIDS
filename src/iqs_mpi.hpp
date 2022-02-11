@@ -485,18 +485,19 @@ namespace iqs::mpi {
 					partitioned_hash[id] = hash[oid];
 				}
 
-				#pragma omp single
-				mid_step_function(("compute_collisions - com load_balance " + std::to_string(!first + 1) + "th").c_str());
-
 				/* send partition size */
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
-					MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, communicator);
+					{
+						if (thread == 0)
+							mid_step_function(("compute_collisions - com load_balance " + std::to_string(!first + 1) + "th").c_str());
 
-				#pragma omp single
-				mid_step_function(("compute_collisions - prepare " + std::to_string(!first + 1) + "th").c_str());
+						MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, communicator);
 
+						if (thread == num_threads - 1)
+							mid_step_function(("compute_collisions - prepare " + std::to_string(!first + 1) + "th").c_str());
+					}
 				std::partial_sum(global_count.begin() + count_offset_begin, global_count.begin() + count_offset_begin + n_segment, global_disp.begin() + disp_offset_begin + 1);
 
 				/* rework counts */
@@ -525,22 +526,22 @@ namespace iqs::mpi {
 				size_t this_oid_buffer_begin = global_load_begin[thread_id];
 				size_t this_oid_buffer_end = global_load_begin[thread_id + 1];
 
-				#pragma omp single
-				mid_step_function(("compute_collisions - com scatter " + std::to_string(!first + 1) + "th").c_str());
-
 				/* share actual partition */
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
 					{
+						if (thread == 0)
+							mid_step_function(("compute_collisions - com scatter " + std::to_string(!first + 1) + "th").c_str());
+
 						MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
 							hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
 						MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
 							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
-					}
 
-				#pragma omp single
-				mid_step_function(("compute_collisions - insert " + std::to_string(!first + 1) + "th").c_str());
+						if (thread == num_threads - 1)
+							mid_step_function(("compute_collisions - insert " + std::to_string(!first + 1) + "th").c_str());
+					}
 
 				/* prepare node_id buffer */
 				for (int node = 0; node < size; ++node)
@@ -601,24 +602,23 @@ namespace iqs::mpi {
 
 				elimination_map.clear();
 
-				#pragma omp barrier
-				#pragma omp single
-				mid_step_function(("compute_collisions - com gather " + std::to_string(!first + 1) + "th").c_str());
-
 				/* share back partition */
+				#pragma omp barrier
 				#pragma omp for ordered
 				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
 					{
+						if (thread == 0)
+							mid_step_function(("compute_collisions - com gather " + std::to_string(!first + 1) + "th").c_str());
+
 						MPI_Alltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
 							partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
 						MPI_Alltoallv(is_unique_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_CHAR,
 							partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, communicator);
-					}
-				#pragma omp barrier
 
-				#pragma omp barrier
-				mid_step_function(("compute_collisions - finalize " + std::to_string(!first + 1) + "th").c_str());
+						if (thread == num_threads - 1)
+							mid_step_function(("compute_collisions - finalize " + std::to_string(!first + 1) + "th").c_str());
+					}
 
 				/* un-partition magnitude */
 				for (size_t id = this_oid_begin; id < this_oid_end; ++id) {
