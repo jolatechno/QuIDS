@@ -545,58 +545,26 @@ namespace iqs {
 
 					elimination_map.clear();
 				}
-
-
-				/*for (int i = 1; i <= num_threads; ++i)
-					modulo_offset[(num_threads + 1)*thread_id + i] = partition_begin[(num_bucket + 1)*thread_id + load_balancing_begin[i]];
-
-				#pragma omp barrier
-
-				size_t total_size = 0;
-				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
-					size_t begin = modulo_offset[(num_threads + 1)*other_thread_id + thread_id];
-					size_t end = modulo_offset[(num_threads + 1)*other_thread_id + thread_id + 1];
-					total_size += end - begin;
-				}
-
-				if (thread_id == 0)
-					mid_step_function("compute_collisions - insert");
-
-				elimination_map.reserve(total_size);
-
-				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
-					size_t other_oid_begin = load_begin[other_thread_id];
-
-					size_t begin = modulo_offset[(num_threads + 1)*other_thread_id + thread_id] + other_oid_begin;
-					size_t end = modulo_offset[(num_threads + 1)*other_thread_id + thread_id + 1] + other_oid_begin;
-
-					for (size_t i = begin; i < end; ++i) {
-						size_t oid = next_oid[i];
-
-						/* accessing key *//*
-						auto [it, unique] = elimination_map.insert({hash[oid], oid});
-						if (!unique)
-							/* if it exist add the probabilities *//*
-							magnitude[it->second] += magnitude[oid];
-						/* keep the object if it is unique *//*
-						is_unique[oid] = unique;
-					}
-				}*/
-
-				if (thread_id == 0)
-					mid_step_function("compute_collisions - finalize");
-
-				//elimination_map.clear();
 			}
 
+			mid_step_function("compute_collisions - finalize");
+
 			/* check for zero probability */
-			return __gnu_parallel::partition(next_oid.begin(), end_iterator,
+			/*return __gnu_parallel::partition(next_oid.begin(), end_iterator,
 				[&](size_t const &oid) {
 					if (!is_unique[oid])
 						return false;
 
 					return std::norm(magnitude[oid]) > tolerance;
-				});
+				});*/
+
+			return utils::parallel_partition(next_oid.begin(), end_iterator,
+				[&](size_t const &oid) {
+					if (!is_unique[oid])
+						return false;
+
+					return std::norm(magnitude[oid]) > tolerance;
+				}, next_oid_partitioner_buffer.begin());
 		};
 
 		/* !!!!!!!!!!!!!!!!
