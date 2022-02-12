@@ -1,4 +1,6 @@
-#include <vector>
+#pragma once
+
+#include "vector.hpp"
 
 /*
 closest power of two
@@ -133,7 +135,7 @@ void parallel_generalized_partition(idIteratorType idx_in, idIteratorType idx_in
 	#pragma omp single
 	num_threads = omp_get_num_threads();
 
-	std::vector<size_t> count(n_segment*num_threads, 0);
+	fast_vector<size_t> count(n_segment*num_threads, 0);
 
 	#pragma omp parallel
 	{
@@ -165,51 +167,4 @@ void parallel_generalized_partition(idIteratorType idx_in, idIteratorType idx_in
 		offset[i] = count[i*num_threads];
 
 	std::copy(idx_buffer, idx_buffer + id_end, idx_in);
-}
-
-/*
-function to partition in parallel
-*/
-template <class BidirIt, class UnaryPredicate>
-BidirIt parallel_partition(BidirIt first, BidirIt last, UnaryPredicate partitioner, BidirIt buffer) {
-	long long int const id_end = std::distance(first, last);
-
-	/* number of threads */
-	int num_threads;
-	#pragma omp parallel
-	#pragma omp single
-	num_threads = omp_get_num_threads();
-
-	std::vector<size_t> count(2*num_threads, 0);
-
-	#pragma omp parallel
-	{
-		int thread_id = omp_get_thread_num();
-
-		#pragma omp for 
-		for (long long int i = id_end - 1; i >= 0; --i) {
-			bool key = !partitioner(first[i]);
-			++count[key*num_threads + thread_id];
-		}
-	}
-	
-	__gnu_parallel::partial_sum(count.begin(), count.begin() + 2*num_threads, count.begin());
-
-	#pragma omp parallel
-	{
-		int thread_id = omp_get_thread_num();
-		
-		#pragma omp for 
-		for (long long int i = id_end - 1; i >= 0; --i) {
-			auto value = first[i];
-			bool key = !partitioner(value);
-			buffer[--count[key*num_threads + thread_id]] = value;
-		}
-	}
-
-	long long int separator = count[num_threads];
-
-	std::copy(buffer, buffer + id_end, first);
-
-	return first + separator;
 }
