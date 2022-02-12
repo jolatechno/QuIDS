@@ -393,7 +393,7 @@ namespace iqs::mpi {
 		elimination_maps.resize(num_threads);
 
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
-			mid_step_function(("compute_collisions - prepare " + std::to_string(!first + 1) + "th").c_str());
+			mid_step_function("compute_collisions - prepare");
 
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
 			mpi_resize(oid_end);
@@ -491,12 +491,12 @@ namespace iqs::mpi {
 					#pragma omp ordered
 					{
 						if (thread == 0)
-							mid_step_function(("compute_collisions - com load_balance " + std::to_string(!first + 1) + "th").c_str());
+							mid_step_function("compute_collisions - com");
 
 						MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, communicator);
 
 						if (thread == num_threads - 1)
-							mid_step_function(("compute_collisions - prepare " + std::to_string(!first + 1) + "th").c_str());
+							mid_step_function("compute_collisions - prepare");
 					}
 				std::partial_sum(global_count.begin() + count_offset_begin, global_count.begin() + count_offset_begin + n_segment, global_disp.begin() + disp_offset_begin + 1);
 
@@ -532,7 +532,7 @@ namespace iqs::mpi {
 					#pragma omp ordered
 					{
 						if (thread == 0)
-							mid_step_function(("compute_collisions - com scatter " + std::to_string(!first + 1) + "th").c_str());
+							mid_step_function("compute_collisions - com");
 
 						MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
 							hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
@@ -540,7 +540,7 @@ namespace iqs::mpi {
 							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
 
 						if (thread == num_threads - 1)
-							mid_step_function(("compute_collisions - insert " + std::to_string(!first + 1) + "th").c_str());
+							mid_step_function("compute_collisions - insert");
 					}
 
 				/* prepare node_id buffer */
@@ -609,7 +609,7 @@ namespace iqs::mpi {
 					#pragma omp ordered
 					{
 						if (thread == 0)
-							mid_step_function(("compute_collisions - com gather " + std::to_string(!first + 1) + "th").c_str());
+							mid_step_function("compute_collisions - com");
 
 						MPI_Alltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
 							partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
@@ -617,7 +617,7 @@ namespace iqs::mpi {
 							partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, communicator);
 
 						if (thread == num_threads - 1)
-							mid_step_function(("compute_collisions - finalize " + std::to_string(!first + 1) + "th").c_str());
+							mid_step_function("compute_collisions - finalize");
 					}
 
 				/* un-partition magnitude */

@@ -443,8 +443,9 @@ namespace iqs {
 	void symbolic_iteration::compute_collisions(debug_t mid_step_function) {
 		if (num_object == 0) {
 			num_object_after_interferences = 0;
-			mid_step_function("compute_collisions - prepare 1th");
-			mid_step_function("compute_collisions - insert 1th");
+			mid_step_function("compute_collisions - prepare");
+			mid_step_function("compute_collisions - insert");
+			mid_step_function("compute_collisions - finalize");
 			return;
 		}
 
@@ -456,7 +457,7 @@ namespace iqs {
 		elimination_maps.resize(num_threads);
 
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
-			mid_step_function(("compute_collisions - prepare " + std::to_string(!first + 1) + "th").c_str());
+			mid_step_function("compute_collisions - prepare");
 
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
 
@@ -522,7 +523,7 @@ namespace iqs {
 				}
 
 				if (thread_id == 0)
-					mid_step_function(("compute_collisions - insert " + std::to_string(!first + 1) + "th").c_str());
+					mid_step_function("compute_collisions - insert");
 
 				elimination_map.reserve(total_size);
 
@@ -544,6 +545,9 @@ namespace iqs {
 						is_unique[oid] = unique;
 					}
 				}
+
+				if (thread_id == 0)
+					mid_step_function("compute_collisions - finalize");
 
 				elimination_map.clear();
 			}
