@@ -234,7 +234,7 @@ namespace iqs {
 		utils::fast_vector<size_t> parent_oid;
 		utils::fast_vector<uint32_t> child_id;
 		utils::fast_vector<double> random_selector;
-		iqs::utils::fast_vector<size_t> next_oid_partitioner_buffer;
+		utils::fast_vector<size_t> next_oid_partitioner_buffer;
 
 		void inline resize(size_t num_object) {
 			magnitude.resize(num_object);
@@ -518,64 +518,17 @@ namespace iqs {
 				if (thread_id == 0)
 					mid_step_function("compute_collisions - insert");
 
-
-
-				utils::fast_vector<size_t> bucketed_oid, bucket_begin, buffer;
-
 				/* insert into separate hashmaps */
 				for (int j = load_balancing_begin[thread_id]; j < load_balancing_begin[thread_id + 1]; ++j) {
 					size_t total_size = 0;
 					for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
-						size_t other_oid_begin = load_begin[other_thread_id];
+						size_t begin = partition_begin[(num_bucket + 1)*other_thread_id + j];
+						size_t end = partition_begin[(num_bucket + 1)*other_thread_id + j + 1];
 
-						size_t begin = partition_begin[(num_bucket + 1)*other_thread_id + j] + other_oid_begin;
-						size_t end = partition_begin[(num_bucket + 1)*other_thread_id + j + 1] + other_oid_begin;
-
-						size_t old_total_size = total_size;
 						total_size += end - begin;
-
-						bucketed_oid.resize(total_size);
-						std::copy(next_oid.begin() + begin, next_oid.begin() + end, bucketed_oid.begin() + old_total_size);
 					}
 
-					buffer.resize(total_size);
-
-					size_t bucket_size = utils::nearest_power_of_two(total_size*bucket_ratio);
-					bucket_begin.resize(bucket_size + 1);
-					std::fill(bucket_begin.begin(), bucket_begin.end(), 0);
-
-					const int bucket_rotate = 64 - utils::log_2_upper_bound(bucket_size);
-
-					utils::generalized_partition(bucketed_oid.begin(), bucketed_oid.begin() + total_size, buffer.begin(),
-						bucket_begin.begin(), bucket_begin.begin() + bucket_size + 1,
-						[&](size_t oid) {
-							return hash[oid] >> bucket_rotate;
-						});
-
-					for (size_t i = 0; i < bucket_size; ++i) {
-						size_t begin = bucket_begin[i];
-						size_t end = bucket_begin[i + 1];
-
-						for (size_t k = begin; k < end; ++k) {
-							size_t this_oid = bucketed_oid[k];
-							size_t this_hash = hash[this_oid];
-							is_unique[this_oid] = true;
-
-							for (size_t l = k + 1; l < end; ++l) {
-								size_t other_oid = bucketed_oid[l];
-								size_t other_hash = hash[other_oid];
-
-								if (other_hash == this_hash) {
-									magnitude[other_oid] += magnitude[this_oid];
-									is_unique[this_oid] = false;
-									break;
-								}
-							}
-						}
-					}
-
-
-					/*elimination_map.reserve(total_size);
+					elimination_map.reserve(total_size);
 
 					for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
 						size_t other_oid_begin = load_begin[other_thread_id];
@@ -587,16 +540,16 @@ namespace iqs {
 							size_t oid = next_oid[i];
 
 							/* accessing key */
-							/*auto [it, unique] = elimination_map.insert({hash[oid], oid});
+							auto [it, unique] = elimination_map.insert({hash[oid], oid});
 							if (!unique)
 								/* if it exist add the probabilities */
-								/*magnitude[it->second] += magnitude[oid];
+								magnitude[it->second] += magnitude[oid];
 							/* keep the object if it is unique */
-							/*is_unique[oid] = unique;
+							is_unique[oid] = unique;
 						}
 					}
 
-					elimination_map.clear();*/
+					elimination_map.clear();
 				}
 			}
 

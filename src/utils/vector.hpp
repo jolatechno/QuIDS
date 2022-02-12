@@ -39,6 +39,10 @@ public:
     	resize(n);
     	std::fill(begin(), begin() + n, v);
 	}
+
+	~fast_vector() {
+		//free(ptr);
+	}
  
     // NOT SUPPORTED !!!
     size_t push_back(value_type) {
