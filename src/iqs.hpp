@@ -610,7 +610,7 @@ namespace iqs {
 		if (max_num_object > utils::min_vector_size && num_object_after_interferences > max_num_object) {
 			if (simple_truncation) {
 				/* select graphs according to random selectors */
-				__gnu_parallel::nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
+				utils::parallel_aprox_nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
 				[&](size_t const &oid1, size_t const &oid2) {
 					return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
 				});
@@ -626,7 +626,7 @@ namespace iqs {
 				}
 
 				/* select graphs according to random selectors */
-				__gnu_parallel::nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
+				utils::parallel_aprox_nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
 				[&](size_t const &oid1, size_t const &oid2) {
 					return random_selector[oid1] < random_selector[oid2];
 				});

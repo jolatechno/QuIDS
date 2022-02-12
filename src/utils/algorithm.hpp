@@ -3,6 +3,13 @@
 #include <vector>
 #include "vector.hpp"
 
+#ifndef NTH_ELEMENT_SEGMENT_RATIO
+	#define NTH_ELEMENT_SEGMENT_RATIO 4
+#endif
+
+// global variable definition
+int nth_element_segment_ratio = NTH_ELEMENT_SEGMENT_RATIO;
+
 /*
 closest power of two
 */
@@ -21,7 +28,6 @@ int log_2_upper_bound(int n) {
 /* 
 parallel iota
 */
-
 template <class iteratorType, class valueType>
 void parallel_iota(iteratorType begin, iteratorType end, const valueType value_begin) {
 	size_t distance = std::distance(begin, end);
@@ -34,6 +40,34 @@ void parallel_iota(iteratorType begin, iteratorType end, const valueType value_b
 		#pragma omp parallel for 
 		for (size_t i = 0; i < distance; ++i)
 			begin[i] = value_begin + i;
+}
+
+/*
+approximate nth element
+*/
+template <class idIteratorType, class functionType>
+void aprox_nth_element(idIteratorType begin, idIteratorType middle, idIteratorType end, functionType comparator) {
+	size_t const n_select = std::distance(begin, middle);
+	size_t const size = std::distance(begin, end);
+
+	size_t const segment_size = (size*nth_element_segment_ratio) / n_select;
+	size_t const n_segment = size / n_segment;
+	size_t const per_segment_select = nth_element_segment_ratio;
+
+	for (size_t i = 0; i < n_segment; ++i) {
+		size_t this_begin = segment_size * i;
+		size_t this_end = segment_size * (i + 1);
+
+		std::nth_element(begin + this_begin, begin + this_begin + per_segment_select, begin + this_end, comparator);
+	}
+
+	for (size_t i = 1; i < n_segment; ++i) {
+		size_t segment_begin = segment_size * i;
+		size_t segment_end = segment_size * (i + 1);
+		size_t segment_destination = per_segment_select * i;
+
+		std::copy(begin + segment_begin, begin + segment_begin, begin + segment_destination);
+	}
 }
 
 /*
@@ -107,6 +141,36 @@ void generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_i
 		idx_in[--offset[key]] = i;
 	}
 }
+
+/*
+parallel approximate nth element
+*/
+template <class idIteratorType, class functionType>
+void parallel_aprox_nth_element(idIteratorType begin, idIteratorType middle, idIteratorType end, functionType comparator) {
+	size_t const n_select = std::distance(begin, middle);
+	size_t const size = std::distance(begin, end);
+
+	size_t const segment_size = (size*nth_element_segment_ratio) / n_select;
+	size_t const n_segment = size / segment_size;
+	size_t const per_segment_select = nth_element_segment_ratio;
+
+	#pragma omp parallel for
+	for (size_t i = 0; i < n_segment; ++i) {
+		size_t this_begin = segment_size * i;
+		size_t this_end = segment_size * (i + 1);
+
+		std::nth_element(begin + this_begin, begin + this_begin + per_segment_select, begin + this_end, comparator);
+	}
+
+	for (size_t i = 1; i < n_segment; ++i) {
+		size_t segment_begin = segment_size * i;
+		size_t segment_end = segment_size * (i + 1);
+		size_t segment_destination = per_segment_select * i;
+
+		std::copy(begin + segment_begin, begin + segment_begin, begin + segment_destination);
+	}
+}
+
 
 /*
 function to partition into n section
