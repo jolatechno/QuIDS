@@ -35,10 +35,6 @@
 	#define LOAD_BALANCING_BUCKET_PER_THREAD 8
 #endif
 
-#ifndef BUCKET_RATIO
-	#define BUCKET_RATIO 0.2;
-#endif
-
 /*
 defining openmp function's return values if openmp isn't installed or loaded
 */ 
@@ -74,8 +70,6 @@ namespace iqs {
 	#else
 		bool simple_truncation = false;
 	#endif
-
-	float bucket_ratio = BUCKET_RATIO;
 
 	/* forward typedef */
 	typedef std::complex<PROBA_TYPE> mag_t;
