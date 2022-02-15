@@ -241,7 +241,7 @@ namespace iqs {
 			random_selector.resize(num_object);
 			next_oid_partitioner_buffer.resize(num_object);
 
-			utils::parallel_iota(next_oid.begin(), next_oid.begin() + num_object, 0);
+			utils::parallel_iota(&next_oid[0], &next_oid[num_object], 0);
 		}
 		void inline reserve(size_t max_size) {
 			int num_threads;
@@ -371,7 +371,7 @@ namespace iqs {
 			max_symbolic_object_size = std::max(max_symbolic_object_size, size);
 		}
 
-		__gnu_parallel::partial_sum(num_childs.begin() + 1, num_childs.begin() + num_object + 1, num_childs.begin() + 1);
+		__gnu_parallel::partial_sum(&num_childs[1], &num_childs[num_object + 1], &num_childs[1]);
 	}
 
 	/*
@@ -404,11 +404,11 @@ namespace iqs {
 			#pragma omp for 
 			for (size_t oid = 0; oid < num_object; ++oid) {
 				/* assign parent ids and child ids for each child */
-				std::fill(symbolic_iteration.parent_oid.begin() + num_childs[oid],
-					symbolic_iteration.parent_oid.begin() + num_childs[oid + 1],
+				std::fill(&symbolic_iteration.parent_oid[num_childs[oid]],
+					&symbolic_iteration.parent_oid[num_childs[oid + 1]],
 					oid);
-				std::iota(symbolic_iteration.child_id.begin() + num_childs[oid],
-					symbolic_iteration.child_id.begin() + num_childs[oid + 1],
+				std::iota(&symbolic_iteration.child_id[num_childs[oid]],
+					&symbolic_iteration.child_id[num_childs[oid + 1]],
 					0);
 			}
 
@@ -456,10 +456,10 @@ namespace iqs {
 		
 		elimination_maps.resize(num_threads);
 
-		const auto compute_interferences = [&](/*size_t * */std::vector<long unsigned int>::iterator end_iterator, bool first) {
+		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
 			mid_step_function("compute_collisions - prepare");
 
-			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
+			size_t oid_end = std::distance(&next_oid[0], end_iterator);
 
 			std::vector<size_t> modulo_offset(num_threads*(num_threads + 1) + 1, 0);
 
@@ -490,12 +490,12 @@ namespace iqs {
 				size_t this_oid_end = load_begin[thread_id + 1];
 
 				if (first) {
-					utils::generalized_partition_from_iota(next_oid.begin() + this_oid_begin, next_oid.begin() + this_oid_end, this_oid_begin,
-						partition_begin.begin() + (num_bucket + 1)*thread_id, partition_begin.begin() + (num_bucket + 1)*(thread_id + 1),
+					utils::generalized_partition_from_iota(&next_oid[this_oid_begin], &next_oid[this_oid_end], this_oid_begin,
+						&partition_begin[(num_bucket + 1)*thread_id], &partition_begin[(num_bucket + 1)*(thread_id + 1)],
 						partitioner);
 				} else
-					utils::generalized_partition(next_oid.begin() + this_oid_begin, next_oid.begin() + this_oid_end, next_oid_partitioner_buffer.begin() + this_oid_begin,
-						partition_begin.begin() + (num_bucket + 1)*thread_id, partition_begin.begin() + (num_bucket + 1)*(thread_id + 1),
+					utils::generalized_partition(&next_oid[this_oid_begin], &next_oid[this_oid_end], &next_oid_partitioner_buffer[this_oid_begin],
+						&partition_begin[(num_bucket + 1)*thread_id], &partition_begin[(num_bucket + 1)*(thread_id + 1)],
 						partitioner);
 
 				/* compute total partition for load balancing */
@@ -550,7 +550,7 @@ namespace iqs {
 			mid_step_function("compute_collisions - finalize");
 
 			/* check for zero probability */
-			return __gnu_parallel::partition(next_oid.begin(), end_iterator,
+			return __gnu_parallel::partition(&next_oid[0], end_iterator,
 				[&](size_t const &oid) {
 					if (!is_unique[oid])
 						return false;
@@ -566,7 +566,7 @@ namespace iqs {
 		bool fast = false;
 		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || num_object < min_collision_size;
 		size_t test_size = num_object*collision_test_proportion;
-		auto partitioned_it = next_oid.begin() + (skip_test ? num_object : test_size);
+		size_t *partitioned_it = &next_oid[0] + (skip_test ? num_object : test_size);
 
 		/* get all unique graphs with a non zero probability */
 		if (!skip_test) {
@@ -575,12 +575,12 @@ namespace iqs {
 			size_t number_of_collision = std::distance(test_partitioned_it, partitioned_it);
 			fast = number_of_collision < test_size*collision_tolerance;
 
-			partitioned_it = std::rotate(test_partitioned_it, partitioned_it, next_oid.begin() + num_object);
+			partitioned_it = std::rotate(test_partitioned_it, partitioned_it, &next_oid[num_object]);
 		}
 		if (!fast)
 			partitioned_it = compute_interferences(partitioned_it, skip_test);
 			
-		num_object_after_interferences = std::distance(next_oid.begin(), partitioned_it);
+		num_object_after_interferences = std::distance(&next_oid[0], partitioned_it);
 	}
 
 	/*
@@ -604,7 +604,7 @@ namespace iqs {
 		if (max_num_object > utils::min_vector_size && num_object_after_interferences > max_num_object) {
 			if (simple_truncation) {
 				/* select graphs according to random selectors */
-				utils::parallel_aprox_nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
+				utils::parallel_aprox_nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[num_object_after_interferences],
 				[&](size_t const &oid1, size_t const &oid2) {
 					return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
 				});
@@ -620,7 +620,7 @@ namespace iqs {
 				}
 
 				/* select graphs according to random selectors */
-				utils::parallel_aprox_nth_element(next_oid.begin(), next_oid.begin() + max_num_object, next_oid.begin() + num_object_after_interferences,
+				utils::parallel_aprox_nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[num_object_after_interferences],
 				[&](size_t const &oid1, size_t const &oid2) {
 					return random_selector[oid1] < random_selector[oid2];
 				});
@@ -637,7 +637,7 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 
 		/* sort to make memory access more continuous */
-		__gnu_parallel::sort(next_oid.begin(), next_oid.begin() + next_iteration.num_object);
+		__gnu_parallel::sort(&next_oid[0], &next_oid[next_iteration.num_object]);
 
 		/* resize new step variables */
 		next_iteration.resize(next_iteration.num_object);
@@ -652,9 +652,9 @@ namespace iqs {
 			next_iteration.magnitude[oid] = magnitude[id];
 		}
 
-		__gnu_parallel::partial_sum(next_iteration.object_begin.begin() + 1,
-			next_iteration.object_begin.begin() + next_iteration.num_object + 1,
-			next_iteration.object_begin.begin() + 1);
+		__gnu_parallel::partial_sum(&next_iteration.object_begin[1],
+			&next_iteration.object_begin[next_iteration.num_object + 1],
+			&next_iteration.object_begin[1]);
 
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
