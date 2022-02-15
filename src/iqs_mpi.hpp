@@ -91,19 +91,19 @@ namespace iqs::mpi {
 					object_begin[i] -= send_object_begin;
 
 				/* send properties */
-				MPI_Send(magnitude.begin() + begin, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator);
-				MPI_Send(object_begin.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+				MPI_Send(&magnitude[begin], num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator);
+				MPI_Send(&object_begin[begin + 1], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 
 				/* send objects */
 				size_t send_object_size = object_begin[num_object];
 				while (send_object_size > max_int) {
-					MPI_Send(objects.begin() + send_object_begin, max_int, MPI_CHAR, node, 0 /* tag */, communicator);
+					MPI_Send(&objects[send_object_begin], max_int, MPI_CHAR, node, 0 /* tag */, communicator);
 
 					send_object_size -= max_int;
 					send_object_begin += max_int;
 				}
 
-				MPI_Send(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator);
+				MPI_Send(&objects[send_object_begin], send_object_size, MPI_CHAR, node, 0 /* tag */, communicator);
 
 				if (send_num_child) {
 					/* prepare send */
@@ -113,7 +113,7 @@ namespace iqs::mpi {
 						num_childs[i] -= child_begin;
 
 					/* send num child */
-					MPI_Send(num_childs.begin() + begin + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+					MPI_Send(&num_childs[begin + 1], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 				}
 
 				/* pop */
@@ -132,8 +132,8 @@ namespace iqs::mpi {
 				resize(num_object + num_object_sent);
 
 				/* receive properties */
-				MPI_Recv(magnitude.begin() + num_object, num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-				MPI_Recv(object_begin.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+				MPI_Recv(&magnitude[num_object], num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+				MPI_Recv(&object_begin[num_object + 1], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 				/* prepare receive objects */
 				size_t send_object_begin = object_begin[num_object];
@@ -143,13 +143,13 @@ namespace iqs::mpi {
 
 				/* receive objects */
 				while (send_object_size > max_int) {
-					MPI_Recv(objects.begin() + send_object_begin, max_int, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+					MPI_Recv(&objects[send_object_begin], max_int, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 					send_object_size -= max_int;
 					send_object_begin += max_int;
 				}
 				
-				MPI_Recv(objects.begin() + send_object_begin, send_object_size, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+				MPI_Recv(&objects[send_object_begin], send_object_size, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 				/* correct values */
 				#pragma omp parallel for 
@@ -158,7 +158,7 @@ namespace iqs::mpi {
 
 				if (receive_num_child) {
 					/* receive num child */
-					MPI_Recv(num_childs.begin() + num_object + 1, num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+					MPI_Recv(&num_childs[num_object + 1], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 					/* correct num child */
 					size_t child_begin = num_childs[num_object];
@@ -181,14 +181,14 @@ namespace iqs::mpi {
 		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function); 
 
 	protected:
-		iqs::utils::fast_vector<mag_t> partitioned_mag;
-		iqs::utils::fast_vector<size_t> partitioned_hash;
-		iqs::utils::fast_vector<bool> partitioned_is_unique;
+		std::vector<mag_t> partitioned_mag;
+		std::vector<size_t> partitioned_hash;
+		std::vector<char /*bool*/> partitioned_is_unique;
 
-		iqs::utils::fast_vector<mag_t> mag_buffer;
-		iqs::utils::fast_vector<size_t> hash_buffer;
-		iqs::utils::fast_vector<int> node_id_buffer;
-		iqs::utils::fast_vector<bool> is_unique_buffer;
+		std::vector<mag_t> mag_buffer;
+		std::vector<size_t> hash_buffer;
+		std::vector<int> node_id_buffer;
+		std::vector<char /*bool*/> is_unique_buffer;
 
 		void compute_collisions(MPI_Comm communicator, iqs::debug_t mid_step_function=[](const char*){});
 		void mpi_resize(size_t size) {
@@ -392,7 +392,7 @@ namespace iqs::mpi {
 
 		elimination_maps.resize(num_threads);
 
-		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
+		const auto compute_interferences = [&](/*size_t * */ std::vector<long unsigned int>::iterator end_iterator, bool first) {
 			mid_step_function("compute_collisions - prepare");
 
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
@@ -534,10 +534,10 @@ namespace iqs::mpi {
 						if (thread == 0)
 							mid_step_function("compute_collisions - com");
 
-						MPI_Alltoallv(partitioned_hash.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
-							hash_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
-						MPI_Alltoallv(partitioned_mag.begin()  + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype,
-							mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
+						MPI_Alltoallv(&partitioned_hash[this_oid_begin], &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
+							&hash_buffer[this_oid_buffer_begin], &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
+						MPI_Alltoallv(&partitioned_mag[this_oid_begin], &send_count[0], &send_disp[0], mag_MPI_Datatype,
+							&mag_buffer[this_oid_buffer_begin], &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
 
 						if (thread == num_threads - 1)
 							mid_step_function("compute_collisions - insert");
@@ -611,10 +611,10 @@ namespace iqs::mpi {
 						if (thread == 0)
 							mid_step_function("compute_collisions - com");
 
-						MPI_Alltoallv(mag_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
-							partitioned_mag.begin() + this_oid_begin, &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
-						MPI_Alltoallv(is_unique_buffer.begin() + this_oid_buffer_begin, &receive_count[0], &receive_disp[0], MPI_CHAR,
-							partitioned_is_unique.begin() + this_oid_begin, &send_count[0], &send_disp[0], MPI_CHAR, communicator);
+						MPI_Alltoallv(&mag_buffer[this_oid_buffer_begin], &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
+							&partitioned_mag[this_oid_begin], &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
+						MPI_Alltoallv(&is_unique_buffer[this_oid_buffer_begin], &receive_count[0], &receive_disp[0], MPI_CHAR,
+							&partitioned_is_unique[this_oid_begin], &send_count[0], &send_disp[0], MPI_CHAR, communicator);
 
 						if (thread == num_threads - 1)
 							mid_step_function("compute_collisions - finalize");
@@ -646,7 +646,7 @@ namespace iqs::mpi {
 		bool fast = false;
 		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || get_total_num_object(communicator) < min_collision_size;
 		size_t test_size = num_object*collision_test_proportion;
-		size_t *partitioned_it = next_oid.begin() + (skip_test ? num_object : test_size);
+		auto partitioned_it = next_oid.begin() + (skip_test ? num_object : test_size);
 
 		/* get all unique graphs with a non zero probability */
 		if (!skip_test) {

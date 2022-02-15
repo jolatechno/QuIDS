@@ -3,6 +3,13 @@
 #include <vector>
 #include "vector.hpp"
 
+#ifndef NTH_ELEMENT_SEGMENT_RATIO
+	#define NTH_ELEMENT_SEGMENT_RATIO 100
+#endif
+
+// global variable definition
+int nth_element_segment_ratio = NTH_ELEMENT_SEGMENT_RATIO;
+
 /*
 closest power of two
 */
@@ -36,43 +43,30 @@ void parallel_iota(iteratorType begin, iteratorType end, const valueType value_b
 }
 
 /*
-parallel approximate nth element
+approximate nth element
 */
 template <class idIteratorType, class functionType>
-void parallel_aprox_nth_element(idIteratorType begin, idIteratorType middle, idIteratorType end, functionType comparator) {
-	/* number of threads */
-	int num_threads;
-	#pragma omp parallel
-	#pragma omp single
-	num_threads = omp_get_num_threads();
-
+void aprox_nth_element(idIteratorType begin, idIteratorType middle, idIteratorType end, functionType comparator) {
 	size_t const n_select = std::distance(begin, middle);
 	size_t const size = std::distance(begin, end);
 
-	#pragma omp parallel
-	{
-		int thread_id = omp_get_thread_num();
+	size_t const segment_size = std::min(size, (size*nth_element_segment_ratio) / n_select);
+	size_t const n_segment = size / segment_size;
+	size_t const per_segment_select = n_select / n_segment;
 
-		size_t this_begin = (thread_id * size) / num_threads;
-		size_t this_end = ((thread_id + 1) * size) / num_threads;
+	for (size_t i = 0; i < n_segment; ++i) {
+		size_t this_begin = segment_size * i;
+		size_t this_end = segment_size * (i + 1);
 
-		size_t this_middle_begin = (thread_id * n_select) / num_threads;
-		size_t this_middle_end = ((thread_id + 1) * n_select) / num_threads;
-
-		size_t this_middle = this_begin + this_middle_end - this_middle_begin;
-
-		std::nth_element(begin + this_begin, begin + this_middle, begin + this_end, comparator);
+		std::nth_element(begin + this_begin, begin + this_begin + per_segment_select, begin + this_end, comparator);
 	}
 
-	for (int thread_id = 1; thread_id < num_threads; ++thread_id) {
-		size_t this_begin = (thread_id * size) / num_threads;
+	for (size_t i = 1; i < n_segment; ++i) {
+		size_t segment_begin = segment_size * i;
+		size_t segment_end = segment_size * (i + 1);
+		size_t segment_destination = per_segment_select * i;
 
-		size_t this_middle_begin = (thread_id * n_select) / num_threads;
-		size_t this_middle_end = ((thread_id + 1) * n_select) / num_threads;
-
-		size_t this_middle = this_begin + this_middle_end - this_middle_begin;
-
-		std::copy(begin + this_begin, begin + this_middle, begin + this_middle_begin);
+		std::copy(begin + segment_begin, begin + segment_begin, begin + segment_destination);
 	}
 }
 
@@ -149,6 +143,42 @@ void generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_i
 }
 
 /*
+parallel approximate nth element
+*/
+template <class idIteratorType, class functionType>
+void parallel_aprox_nth_element(idIteratorType begin, idIteratorType middle, idIteratorType end, functionType comparator) {
+	size_t const n_select = std::distance(begin, middle);
+	size_t const size = std::distance(begin, end);
+
+	/* number of threads */
+	int num_threads;
+	#pragma omp parallel
+	#pragma omp single
+	num_threads = omp_get_num_threads();
+
+	size_t const segment_size = std::min(size / num_threads, (size*nth_element_segment_ratio) / n_select);
+	size_t const n_segment = size / segment_size;
+	size_t const per_segment_select = n_select / n_segment;
+
+	#pragma omp parallel for
+	for (size_t i = 0; i < n_segment; ++i) {
+		size_t this_begin = segment_size * i;
+		size_t this_end = segment_size * (i + 1);
+
+		std::nth_element(begin + this_begin, begin + this_begin + per_segment_select, begin + this_end, comparator);
+	}
+
+	for (size_t i = 1; i < n_segment; ++i) {
+		size_t segment_begin = segment_size * i;
+		size_t segment_end = segment_size * (i + 1);
+		size_t segment_destination = per_segment_select * i;
+
+		std::copy(begin + segment_begin, begin + segment_begin, begin + segment_destination);
+	}
+}
+
+
+/*
 function to partition into n section
 */
 template <class idIteratorType, class countIteratorType, class functionType>
@@ -176,7 +206,7 @@ void parallel_generalized_partition(idIteratorType idx_in, idIteratorType idx_in
 	#pragma omp single
 	num_threads = omp_get_num_threads();
 
-	fast_vector<size_t> count(n_segment*num_threads, 0);
+	std::vector<size_t> count(n_segment*num_threads, 0);
 
 	#pragma omp parallel
 	{

@@ -110,10 +110,10 @@ namespace iqs {
 	protected:
 		mutable size_t max_symbolic_object_size = 0;
 
-		utils::fast_vector<mag_t> magnitude;
-		utils::fast_vector<char> objects;
-		utils::fast_vector<size_t> object_begin;
-		mutable utils::fast_vector<size_t> num_childs;
+		mutable std::vector<mag_t> magnitude;
+		mutable std::vector<char> objects;
+		mutable std::vector<size_t> object_begin;
+		mutable std::vector<size_t> num_childs;
 
 		void inline resize(size_t num_object) const {
 			magnitude.resize(num_object);
@@ -198,13 +198,13 @@ namespace iqs {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
 			mag = &magnitude[object_id];
-			object_begin_ = objects.begin() + this_object_begin;
+			object_begin_ = &objects[this_object_begin];
 		}
 		void get_object(size_t const object_id, char const *& object_begin_, size_t &object_size, mag_t &mag) const {
 			size_t this_object_begin = object_begin[object_id];
 			object_size = object_begin[object_id + 1] - this_object_begin;
 			mag = magnitude[object_id];
-			object_begin_ = objects.begin() + this_object_begin;
+			object_begin_ = &objects[this_object_begin];
 		}
 	};
 
@@ -220,15 +220,15 @@ namespace iqs {
 		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
 		std::vector<char*> placeholder;
 
-		utils::fast_vector<mag_t> magnitude;
-		utils::fast_vector<size_t> next_oid;
-		utils::fast_vector<bool> is_unique;
-		utils::fast_vector<size_t> size;
-		utils::fast_vector<size_t> hash;
-		utils::fast_vector<size_t> parent_oid;
-		utils::fast_vector<uint32_t> child_id;
-		utils::fast_vector<double> random_selector;
-		utils::fast_vector<size_t> next_oid_partitioner_buffer;
+		std::vector<mag_t> magnitude;
+		std::vector<size_t> next_oid;
+		std::vector<bool> is_unique;
+		std::vector<size_t> size;
+		std::vector<size_t> hash;
+		std::vector<size_t> parent_oid;
+		std::vector<uint32_t> child_id;
+		std::vector<double> random_selector;
+		std::vector<size_t> next_oid_partitioner_buffer;
 
 		void inline resize(size_t num_object) {
 			magnitude.resize(num_object);
@@ -365,8 +365,8 @@ namespace iqs {
 		#pragma omp parallel for  reduction(max:max_symbolic_object_size)
 		for (size_t oid = 0; oid < num_object; ++oid) {
 			size_t size;
-			rule->get_num_child(objects.begin() + object_begin[oid],
-				objects.begin() + object_begin[oid + 1],
+			rule->get_num_child(&objects[object_begin[oid]],
+				&objects[object_begin[oid + 1]],
 				num_childs[oid + 1], size);
 			max_symbolic_object_size = std::max(max_symbolic_object_size, size);
 		}
@@ -425,8 +425,8 @@ namespace iqs {
 
 				/* generate graph */
 				symbolic_iteration.magnitude[oid] = magnitude[id];
-				rule->populate_child(objects.begin() + object_begin[id],
-					objects.begin() + object_begin[id + 1],
+				rule->populate_child(&objects[object_begin[id]],
+					&objects[object_begin[id + 1]],
 					symbolic_iteration.placeholder[thread_id], symbolic_iteration.child_id[oid],
 					symbolic_iteration.size[oid], symbolic_iteration.magnitude[oid]);
 
@@ -456,7 +456,7 @@ namespace iqs {
 		
 		elimination_maps.resize(num_threads);
 
-		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
+		const auto compute_interferences = [&](/*size_t * */std::vector<long unsigned int>::iterator end_iterator, bool first) {
 			mid_step_function("compute_collisions - prepare");
 
 			size_t oid_end = std::distance(next_oid.begin(), end_iterator);
@@ -566,7 +566,7 @@ namespace iqs {
 		bool fast = false;
 		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || num_object < min_collision_size;
 		size_t test_size = num_object*collision_test_proportion;
-		size_t *partitioned_it = next_oid.begin() + (skip_test ? num_object : test_size);
+		auto partitioned_it = next_oid.begin() + (skip_test ? num_object : test_size);
 
 		/* get all unique graphs with a non zero probability */
 		if (!skip_test) {
@@ -669,9 +669,9 @@ namespace iqs {
 			auto id = next_oid[oid];
 			auto this_parent_oid = parent_oid[id];
 				
-			rule->populate_child_simple(last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid],
-				last_iteration.objects.begin() + last_iteration.object_begin[this_parent_oid + 1],
-				next_iteration.objects.begin() + next_iteration.object_begin[oid],
+			rule->populate_child_simple(&last_iteration.objects[last_iteration.object_begin[this_parent_oid]],
+				&last_iteration.objects[last_iteration.object_begin[this_parent_oid + 1]],
+				&next_iteration.objects[next_iteration.object_begin[oid]],
 				child_id[id]);
 		}
 	}
@@ -683,8 +683,8 @@ namespace iqs {
 		#pragma omp parallel for 
 		for (size_t oid = 0; oid < num_object; ++oid)
 			/* generate graph */
-			rule(objects.begin() + object_begin[oid],
-				objects.begin() + object_begin[oid + 1],
+			rule(&objects[object_begin[oid]],
+				&objects[object_begin[oid + 1]],
 				magnitude[oid]);
 	}
 

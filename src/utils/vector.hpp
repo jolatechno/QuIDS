@@ -41,7 +41,7 @@ public:
 	}
 
 	~fast_vector() {
-		//free(ptr);
+		if (ptr != NULL) free(ptr);
 	}
  
     // NOT SUPPORTED !!!
