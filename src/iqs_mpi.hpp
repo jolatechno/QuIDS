@@ -192,18 +192,37 @@ namespace iqs::mpi {
 
 		void compute_collisions(MPI_Comm communicator, iqs::debug_t mid_step_function=[](const char*){});
 		void mpi_resize(size_t size) {
-			partitioned_mag.resize(size);
-			partitioned_hash.resize(size);
-			partitioned_is_unique.resize(size);
+			#pragma omp parallel sections
+			{
+				#pragma omp section
+				iqs::utils::smart_resize(partitioned_mag, size);
+
+				#pragma omp section
+				iqs::utils::smart_resize(partitioned_hash, size);
+
+				#pragma omp section
+				iqs::utils::smart_resize(partitioned_is_unique, size);
+			}
 		}
 		void buffer_resize(size_t size) {
-			mag_buffer.resize(size);
-			hash_buffer.resize(size);
-			node_id_buffer.resize(size);
-			is_unique_buffer.resize(size);
+			#pragma omp parallel sections
+			{
+				#pragma omp section
+				iqs::utils::smart_resize(mag_buffer, size);
 
-			if (size > next_oid_partitioner_buffer.size())
-				next_oid_partitioner_buffer.resize(size);
+				#pragma omp section
+				iqs::utils::smart_resize(hash_buffer, size);
+
+				#pragma omp section
+				iqs::utils::smart_resize(node_id_buffer, size);
+
+				#pragma omp section
+				iqs::utils::smart_resize(is_unique_buffer, size);
+
+				#pragma omp section
+				if (size > next_oid_partitioner_buffer.size())
+					iqs::utils::smart_resize(next_oid_partitioner_buffer, size);
+			}
 		}
 
 	public:

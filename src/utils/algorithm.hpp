@@ -1,14 +1,44 @@
 #pragma once
 
 #include <vector>
-#include "vector.hpp"
 
 #ifndef NTH_ELEMENT_SEGMENT_RATIO
 	#define NTH_ELEMENT_SEGMENT_RATIO 100
 #endif
+#ifndef UPSIZE_POLICY
+	#define UPSIZE_POLICY 1.1
+#endif
+#ifndef DOWNSIZE_POLICY
+	#define DOWNSIZE_POLICY 0.85
+#endif
+#ifndef MIN_VECTOR_SIZE
+	#define MIN_VECTOR_SIZE 1000
+#endif
 
 // global variable definition
 int nth_element_segment_ratio = NTH_ELEMENT_SEGMENT_RATIO;
+float upsize_policy = UPSIZE_POLICY;
+float downsize_policy = DOWNSIZE_POLICY;
+size_t min_vector_size = MIN_VECTOR_SIZE;
+
+/*
+smarter resize
+*/
+template<class VectorType>
+void smart_resize(VectorType &vector, size_t size) {
+	if (size < min_vector_size)
+		size = min_vector_size;
+
+	if (size <= vector.size()) {
+		vector.resize(size);
+
+		if (size*upsize_policy < vector.capacity()*downsize_policy)
+			vector.reserve(size);
+	} else {
+		vector.reserve(size*upsize_policy);
+		vector.resize(size);
+	}
+}
 
 /*
 closest power of two

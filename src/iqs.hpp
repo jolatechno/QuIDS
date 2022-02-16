@@ -52,7 +52,6 @@ namespace iqs {
 		#include "utils/algorithm.hpp"
 		#include "utils/memory.hpp"
 		#include "utils/random.hpp"
-		#include "utils/vector.hpp"
 	}
 
 	/*
@@ -116,9 +115,17 @@ namespace iqs {
 		mutable std::vector<size_t> num_childs;
 
 		void inline resize(size_t num_object) const {
-			magnitude.resize(num_object);
-			num_childs.resize(num_object + 1);
-			object_begin.resize(num_object + 1);
+			#pragma omp parallel sections
+			{
+				#pragma omp section
+				utils::smart_resize(magnitude, num_object);
+
+				#pragma omp section
+				utils::smart_resize(num_childs, num_object + 1);
+
+				#pragma omp section
+				utils::smart_resize(object_begin, num_object + 1);
+			}
 		}
 		void inline allocate(size_t size) const {
 			objects.resize(size);
@@ -231,15 +238,35 @@ namespace iqs {
 		std::vector<size_t> next_oid_partitioner_buffer;
 
 		void inline resize(size_t num_object) {
-			magnitude.resize(num_object);
-			next_oid.resize(num_object);
-			is_unique.resize(num_object);
-			size.resize(num_object);
-			hash.resize(num_object);
-			parent_oid.resize(num_object);
-			child_id.resize(num_object);
-			random_selector.resize(num_object);
-			next_oid_partitioner_buffer.resize(num_object);
+			#pragma omp parallel sections
+			{
+				#pragma omp section
+				magnitude.resize(num_object);
+
+				#pragma omp section
+				next_oid.resize(num_object);
+
+				#pragma omp section
+				is_unique.resize(num_object);
+
+				#pragma omp section
+				size.resize(num_object);
+
+				#pragma omp section
+				hash.resize(num_object);
+
+				#pragma omp section
+				parent_oid.resize(num_object);
+
+				#pragma omp section
+				child_id.resize(num_object);
+
+				#pragma omp section
+				random_selector.resize(num_object);
+
+				#pragma omp section
+				next_oid_partitioner_buffer.resize(num_object);
+			}
 
 			utils::parallel_iota(&next_oid[0], &next_oid[num_object], 0);
 		}
@@ -286,13 +313,13 @@ namespace iqs {
 		utils::get_free_mem(free_mem);
 
 		// get each size
-		size_t next_iteration_object_size = next_iteration.objects.size();
-		size_t last_iteration_object_size = last_iteration.objects.size();
+		size_t next_iteration_object_size = next_iteration.objects.capacity();
+		size_t last_iteration_object_size = last_iteration.objects.capacity();
 
-		size_t next_iteration_property_size = next_iteration.magnitude.size();
-		size_t last_iteration_property_size = last_iteration.magnitude.size();
+		size_t next_iteration_property_size = next_iteration.magnitude.capacity();
+		size_t last_iteration_property_size = last_iteration.magnitude.capacity();
 
-		size_t symbolic_iteration_size = symbolic_iteration.magnitude.size();
+		size_t symbolic_iteration_size = symbolic_iteration.magnitude.capacity();
 
 		size_t last_iteration_num_object = last_iteration.num_object;
 		size_t symbolic_iteration_num_object = symbolic_iteration.num_object;
