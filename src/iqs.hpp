@@ -128,7 +128,7 @@ namespace iqs {
 			}
 		}
 		void inline allocate(size_t size) const {
-			objects.resize(size);
+			utils::smart_resize(objects, size);
 		}
 
 		void compute_num_child(rule_t const *rule, debug_t mid_step_function=[](const char*){}) const;
@@ -241,31 +241,31 @@ namespace iqs {
 			#pragma omp parallel sections
 			{
 				#pragma omp section
-				magnitude.resize(num_object);
+				utils::smart_resize(magnitude, num_object);
 
 				#pragma omp section
-				next_oid.resize(num_object);
+				utils::smart_resize(next_oid, num_object);
 
 				#pragma omp section
-				is_unique.resize(num_object);
+				utils::smart_resize(is_unique, num_object);
 
 				#pragma omp section
-				size.resize(num_object);
+				utils::smart_resize(size, num_object);
 
 				#pragma omp section
-				hash.resize(num_object);
+				utils::smart_resize(hash, num_object);
 
 				#pragma omp section
-				parent_oid.resize(num_object);
+				utils::smart_resize(parent_oid, num_object);
 
 				#pragma omp section
-				child_id.resize(num_object);
+				utils::smart_resize(child_id, num_object);
 
 				#pragma omp section
-				random_selector.resize(num_object);
+				utils::smart_resize(random_selector, num_object);
 
 				#pragma omp section
-				next_oid_partitioner_buffer.resize(num_object);
+				utils::smart_resize(next_oid_partitioner_buffer, num_object);
 			}
 
 			utils::parallel_iota(&next_oid[0], &next_oid[num_object], 0);
@@ -284,7 +284,6 @@ namespace iqs {
 				if (buffer == NULL)
 					free(buffer);
 				buffer = new char[max_size];
-				for (size_t i = 0; i < max_size; ++i) ((volatile char*)buffer)[i] = 0; // touch
 			}
 		}
 
@@ -355,6 +354,9 @@ namespace iqs {
 	/*
 	simulation function
 	*/
+	void inline simulate(it_t &iteration, modifier_t const rule) {
+		iteration.apply_modifier(rule);
+	}
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
 		iteration.compute_num_child(rule, mid_step_function);
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
@@ -369,9 +371,6 @@ namespace iqs {
 		iteration_buffer.normalize(mid_step_function);
 
 		std::swap(iteration_buffer, iteration);
-	}
-	void inline simulate(it_t &iteration, modifier_t const rule) {
-		iteration.apply_modifier(rule);
 	}
 
 	/*
