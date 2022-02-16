@@ -251,17 +251,17 @@ namespace iqs::mpi {
 		static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 4)*sizeof(PROBA_TYPE) + (7 + 2)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
 		// get each size
-		size_t next_iteration_object_size = next_iteration.objects.size();
-		size_t last_iteration_object_size = last_iteration.objects.size();
+		size_t next_iteration_object_size = next_iteration.objects.capacity();
+		size_t last_iteration_object_size = last_iteration.objects.capacity();
 		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
-		size_t next_iteration_property_size = next_iteration.magnitude.size();
-		size_t last_iteration_property_size = last_iteration.magnitude.size();
+		size_t next_iteration_property_size = next_iteration.magnitude.capacity();
+		size_t last_iteration_property_size = last_iteration.magnitude.capacity();
 		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
-		size_t symbolic_iteration_size = symbolic_iteration.magnitude.size();
+		size_t symbolic_iteration_size = symbolic_iteration.magnitude.capacity();
 		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
 		size_t last_iteration_num_object = last_iteration.num_object;
