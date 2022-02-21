@@ -6,7 +6,7 @@
 	#define NTH_ELEMENT_SEGMENT_RATIO 100
 #endif
 #ifndef UPSIZE_POLICY
-	#define UPSIZE_POLICY 1.1
+	#define UPSIZE_POLICY 1.15
 #endif
 #ifndef DOWNSIZE_POLICY
 	#define DOWNSIZE_POLICY 0.85

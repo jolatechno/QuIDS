@@ -411,6 +411,9 @@ namespace iqs::mpi {
 
 		elimination_maps.resize(num_threads);
 
+		int const num_bucket = iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads);
+		size_t const offset = 8*sizeof(size_t) - iqs::utils::log_2_upper_bound(num_bucket);
+
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
 			mid_step_function("compute_collisions - prepare");
 
@@ -423,7 +426,6 @@ namespace iqs::mpi {
 			std::vector<int> global_disp(num_threads*(n_segment + 1), 0);
 			std::vector<int> global_count(num_threads*n_segment, 0);
 
-			int const num_bucket = iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*n_segment);
 			std::vector<int> load_balancing_begin(n_segment + 1, 0);
 			std::vector<int> partition_begin(num_threads*(num_bucket + 1), 0);
 			std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
@@ -431,9 +433,8 @@ namespace iqs::mpi {
 			std::vector<size_t> local_load_begin(num_threads + 1, 0);
 			std::vector<size_t> global_load_begin(num_threads + 1, 0);
 
-			size_t const bitmask = num_bucket - 1;
 			const auto partitioner = [&](size_t const oid) {
-				return hash[oid] & bitmask;
+				return hash[oid] >> offset;
 			};
 			
 			local_load_begin[0] = 0; global_load_begin[0] = 0;
