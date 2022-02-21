@@ -35,8 +35,8 @@ void smart_resize(VectorType &vector, size_t size) {
 		if (size*upsize_policy < vector.capacity()*downsize_policy)
 			vector.reserve(size);
 	} else {
-		vector.reserve(size*upsize_policy);
 		vector.resize(size);
+		vector.shrink_to_fit();
 	}
 }
 
