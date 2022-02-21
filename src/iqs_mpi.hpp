@@ -410,7 +410,7 @@ namespace iqs::mpi {
 
 		elimination_maps.resize(num_threads);
 
-		int const num_bucket = iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads);
+		int const num_bucket = iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads*size);
 		size_t const offset = 8*sizeof(size_t) - iqs::utils::log_2_upper_bound(num_bucket);
 
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
@@ -547,7 +547,7 @@ namespace iqs::mpi {
 
 				/* share actual partition */
 				#pragma omp for ordered
-				for (int thread = 0; thread < num_threads; ++thread) {
+				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
 					{
 						if (thread == 0)
@@ -562,18 +562,17 @@ namespace iqs::mpi {
 							mid_step_function("compute_collisions - insert");
 					}
 
-					/* prepare node_id buffer */
-					for (int node = 0; node < size; ++node)
-						for (size_t i = receive_disp[node] + this_oid_buffer_begin; i < receive_disp[node + 1] + this_oid_buffer_begin; ++i)
-							node_id_buffer[i] = node;
+				/* prepare node_id buffer */
+				for (int node = 0; node < size; ++node)
+					for (size_t i = receive_disp[node] + this_oid_buffer_begin; i < receive_disp[node + 1] + this_oid_buffer_begin; ++i)
+						node_id_buffer[i] = node;
+				
+				size_t total_size = 0;
+				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id)
+					for (int node_id = 0; node_id < size; ++node_id)
+						total_size += global_count[other_thread_id*n_segment + node_id*num_threads + thread_id];
 
-					size_t total_size = 0;
-					for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id)
-						for (int node_id = 0; node_id < size; ++node_id)
-							total_size += global_count[other_thread_id*n_segment + node_id*num_threads + thread_id];
-
-					elimination_map.reserve(total_size);
-				}
+				elimination_map.reserve(total_size);
 
 				#pragma omp barrier
 
@@ -624,7 +623,7 @@ namespace iqs::mpi {
 				/* share back partition */
 				#pragma omp barrier
 				#pragma omp for ordered
-				for (int thread = 0; thread < num_threads; ++thread) {
+				for (int thread = 0; thread < num_threads; ++thread)
 					#pragma omp ordered
 					{
 						if (thread == 0)
@@ -639,15 +638,14 @@ namespace iqs::mpi {
 							mid_step_function("compute_collisions - finalize");
 					}
 
-					elimination_map.clear();
+				elimination_map.clear();
 
-					/* un-partition magnitude */
-					for (size_t id = this_oid_begin; id < this_oid_end; ++id) {
-						size_t oid = next_oid[id];
+				/* un-partition magnitude */
+				for (size_t id = this_oid_begin; id < this_oid_end; ++id) {
+					size_t oid = next_oid[id];
 
-						is_unique[oid] = partitioned_is_unique[id];
-						magnitude[oid] = partitioned_mag[id];
-					}
+					is_unique[oid] = partitioned_is_unique[id];
+					magnitude[oid] = partitioned_mag[id];
 				}
 			}
 
