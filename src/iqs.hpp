@@ -48,6 +48,7 @@ defining openmp function's return values if openmp isn't installed or loaded
 
 namespace iqs {
 	namespace utils {
+		#include "utils/vector.hpp"
 		#include "utils/load_balancing.hpp"
 		#include "utils/algorithm.hpp"
 		#include "utils/memory.hpp"
@@ -103,33 +104,35 @@ namespace iqs {
 	class iteration {
 		friend symbolic_iteration;
 		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
-		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function);  
+		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function);  
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
 	protected:
 		mutable size_t max_symbolic_object_size = 0;
 
-		mutable std::vector<mag_t> magnitude;
-		mutable std::vector<char> objects;
-		mutable std::vector<size_t> object_begin;
-		mutable std::vector<size_t> num_childs;
+		mutable utils::fast_vector<mag_t> magnitude;
+		mutable utils::fast_vector<char> objects;
+		mutable utils::fast_vector<size_t> object_begin;
+		mutable utils::fast_vector<size_t> num_childs;
 
 		void inline resize(size_t num_object) const {
 			#pragma omp parallel sections
 			{
 				#pragma omp section
-				utils::smart_resize(magnitude, num_object);
+				magnitude.resize(num_object);
 
 				#pragma omp section
-				utils::smart_resize(num_childs, num_object + 1);
+				num_childs.resize(num_object + 1);
 
 				#pragma omp section
-				utils::smart_resize(object_begin, num_object + 1);
+				object_begin.resize(num_object + 1);
 			}
 		}
 		void inline allocate(size_t size) const {
-			utils::smart_resize(objects, size);
+			objects.resize(size);
 		}
+
+
 
 		void compute_num_child(rule_t const *rule, debug_t mid_step_function=[](const char*){}) const;
 		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](const char*){}) const;
@@ -221,51 +224,51 @@ namespace iqs {
 	class symbolic_iteration {
 		friend iteration;
 		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
-		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function); 
+		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function); 
 
 	protected:
 		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
 		std::vector<char*> placeholder;
 
-		std::vector<mag_t> magnitude;
-		std::vector<size_t> next_oid;
-		std::vector<bool> is_unique;
-		std::vector<size_t> size;
-		std::vector<size_t> hash;
-		std::vector<size_t> parent_oid;
-		std::vector<uint32_t> child_id;
-		std::vector<double> random_selector;
-		std::vector<size_t> next_oid_partitioner_buffer;
+		utils::fast_vector<mag_t> magnitude;
+		utils::fast_vector<size_t> next_oid;
+		utils::fast_vector<bool> is_unique;
+		utils::fast_vector<size_t> size;
+		utils::fast_vector<size_t> hash;
+		utils::fast_vector<size_t> parent_oid;
+		utils::fast_vector<uint32_t> child_id;
+		utils::fast_vector<double> random_selector;
+		utils::fast_vector<size_t> next_oid_partitioner_buffer;
 
 		void inline resize(size_t num_object) {
 			#pragma omp parallel sections
 			{
 				#pragma omp section
-				utils::smart_resize(magnitude, num_object);
+				magnitude.resize(num_object);
 
 				#pragma omp section
-				utils::smart_resize(next_oid, num_object);
+				next_oid.resize(num_object);
 
 				#pragma omp section
-				utils::smart_resize(is_unique, num_object);
+				is_unique.resize(num_object);
 
 				#pragma omp section
-				utils::smart_resize(size, num_object);
+				size.resize(num_object);
 
 				#pragma omp section
-				utils::smart_resize(hash, num_object);
+				hash.resize(num_object);
 
 				#pragma omp section
-				utils::smart_resize(parent_oid, num_object);
+				parent_oid.resize(num_object);
 
 				#pragma omp section
-				utils::smart_resize(child_id, num_object);
+				child_id.resize(num_object);
 
 				#pragma omp section
-				utils::smart_resize(random_selector, num_object);
+				random_selector.resize(num_object);
 
 				#pragma omp section
-				utils::smart_resize(next_oid_partitioner_buffer, num_object);
+				next_oid_partitioner_buffer.resize(num_object);
 			}
 
 			utils::parallel_iota(&next_oid[0], &next_oid[num_object], 0);
@@ -312,13 +315,13 @@ namespace iqs {
 		utils::get_free_mem(free_mem);
 
 		// get each size
-		size_t next_iteration_object_size = next_iteration.objects.capacity();
-		size_t last_iteration_object_size = last_iteration.objects.capacity();
+		size_t next_iteration_object_size = next_iteration.objects.size();
+		size_t last_iteration_object_size = last_iteration.objects.size();
 
-		size_t next_iteration_property_size = next_iteration.magnitude.capacity();
-		size_t last_iteration_property_size = last_iteration.magnitude.capacity();
+		size_t next_iteration_property_size = next_iteration.magnitude.size();
+		size_t last_iteration_property_size = last_iteration.magnitude.size();
 
-		size_t symbolic_iteration_size = symbolic_iteration.magnitude.capacity();
+		size_t symbolic_iteration_size = symbolic_iteration.magnitude.size();
 
 		size_t last_iteration_num_object = last_iteration.num_object;
 		size_t symbolic_iteration_num_object = symbolic_iteration.num_object;
@@ -357,20 +360,18 @@ namespace iqs {
 	void inline simulate(it_t &iteration, modifier_t const rule) {
 		iteration.apply_modifier(rule);
 	}
-	void inline simulate(it_t &iteration, rule_t const *rule, it_t &iteration_buffer, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
+	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
 		iteration.compute_num_child(rule, mid_step_function);
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(mid_step_function);
 
 		if (max_num_object == 0) {
 			mid_step_function("get_max_num_object");
-			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration)/2;
+			max_num_object = get_max_num_object(next_iteration, iteration, symbolic_iteration)/2;
 		}
 
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object, mid_step_function);
-		iteration_buffer.normalize(mid_step_function);
-
-		std::swap(iteration_buffer, iteration);
+		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object, mid_step_function);
+		next_iteration.normalize(mid_step_function);
 	}
 
 	/*
@@ -632,7 +633,7 @@ namespace iqs {
 		if (max_num_object > utils::min_vector_size && num_object_after_interferences > max_num_object) {
 			if (simple_truncation) {
 				/* select graphs according to random selectors */
-				utils::parallel_aprox_nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[num_object_after_interferences],
+				__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[num_object_after_interferences],
 				[&](size_t const &oid1, size_t const &oid2) {
 					return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
 				});
@@ -648,7 +649,7 @@ namespace iqs {
 				}
 
 				/* select graphs according to random selectors */
-				utils::parallel_aprox_nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[num_object_after_interferences],
+				__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[num_object_after_interferences],
 				[&](size_t const &oid1, size_t const &oid2) {
 					return random_selector[oid1] < random_selector[oid2];
 				});

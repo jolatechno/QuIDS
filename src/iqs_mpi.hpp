@@ -36,7 +36,7 @@ namespace iqs::mpi {
 	class mpi_iteration : public iqs::iteration {
 		friend mpi_symbolic_iteration;
 		friend size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm communicator);
-		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function);
+		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function);
 
 	protected:
 		void equalize_symbolic(MPI_Comm communicator);
@@ -178,50 +178,50 @@ namespace iqs::mpi {
 	class mpi_symbolic_iteration : public iqs::symbolic_iteration {
 		friend mpi_iteration;
 		friend size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm communicator);
-		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function); 
+		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function); 
 
 	protected:
-		std::vector<mag_t> partitioned_mag;
-		std::vector<size_t> partitioned_hash;
-		std::vector<char /*bool*/> partitioned_is_unique;
+		iqs::utils::fast_vector<mag_t> partitioned_mag;
+		iqs::utils::fast_vector<size_t> partitioned_hash;
+		iqs::utils::fast_vector<char /*bool*/> partitioned_is_unique;
 
-		std::vector<mag_t> mag_buffer;
-		std::vector<size_t> hash_buffer;
-		std::vector<int> node_id_buffer;
-		std::vector<char /*bool*/> is_unique_buffer;
+		iqs::utils::fast_vector<mag_t> mag_buffer;
+		iqs::utils::fast_vector<size_t> hash_buffer;
+		iqs::utils::fast_vector<int> node_id_buffer;
+		iqs::utils::fast_vector<char /*bool*/> is_unique_buffer;
 
 		void compute_collisions(MPI_Comm communicator, iqs::debug_t mid_step_function=[](const char*){});
 		void mpi_resize(size_t size) {
 			#pragma omp parallel sections
 			{
 				#pragma omp section
-				iqs::utils::smart_resize(partitioned_mag, size);
+				partitioned_mag.resize(size);
 
 				#pragma omp section
-				iqs::utils::smart_resize(partitioned_hash, size);
+				partitioned_hash.resize(size);
 
 				#pragma omp section
-				iqs::utils::smart_resize(partitioned_is_unique, size);
+				partitioned_is_unique.resize(size);
 			}
 		}
 		void buffer_resize(size_t size) {
 			#pragma omp parallel sections
 			{
 				#pragma omp section
-				iqs::utils::smart_resize(mag_buffer, size);
+				mag_buffer.resize(size);
 
 				#pragma omp section
-				iqs::utils::smart_resize(hash_buffer, size);
+				hash_buffer.resize(size);
 
 				#pragma omp section
-				iqs::utils::smart_resize(node_id_buffer, size);
+				node_id_buffer.resize(size);
 
 				#pragma omp section
-				iqs::utils::smart_resize(is_unique_buffer, size);
+				is_unique_buffer.resize(size);
 
 				#pragma omp section
 				if (size > next_oid_partitioner_buffer.size())
-					iqs::utils::smart_resize(next_oid_partitioner_buffer, size);
+					next_oid_partitioner_buffer.resize(size);
 			}
 		}
 
@@ -251,17 +251,17 @@ namespace iqs::mpi {
 		static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 4)*sizeof(PROBA_TYPE) + (7 + 2)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
 
 		// get each size
-		size_t next_iteration_object_size = next_iteration.objects.capacity();
-		size_t last_iteration_object_size = last_iteration.objects.capacity();
+		size_t next_iteration_object_size = next_iteration.objects.size();
+		size_t last_iteration_object_size = last_iteration.objects.size();
 		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
-		size_t next_iteration_property_size = next_iteration.magnitude.capacity();
-		size_t last_iteration_property_size = last_iteration.magnitude.capacity();
+		size_t next_iteration_property_size = next_iteration.magnitude.size();
+		size_t last_iteration_property_size = last_iteration.magnitude.size();
 		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
-		size_t symbolic_iteration_size = symbolic_iteration.magnitude.capacity();
+		size_t symbolic_iteration_size = symbolic_iteration.magnitude.size();
 		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 
 		size_t last_iteration_num_object = last_iteration.num_object;
@@ -342,7 +342,7 @@ namespace iqs::mpi {
 	/*
 	simulation function
 	*/
-	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &iteration_buffer, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](const char*){}) {
+	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](const char*){}) {
 		/* get local size */
 		MPI_Comm localComm;
 		int rank, size, local_size;
@@ -352,7 +352,7 @@ namespace iqs::mpi {
 		MPI_Comm_size(localComm, &local_size);
 
 		if (size == 1)
-			return iqs::simulate(iteration, rule, iteration_buffer, symbolic_iteration, max_num_object, mid_step_function);
+			return iqs::simulate(iteration, rule, next_iteration, symbolic_iteration, max_num_object, mid_step_function);
 
 		/* start actual simulation */
 		iteration.compute_num_child(rule, mid_step_function);
@@ -372,23 +372,22 @@ namespace iqs::mpi {
 
 		if (max_num_object == 0) {
 			mid_step_function("get_max_num_object");
-			max_num_object = get_max_num_object(iteration_buffer, iteration, symbolic_iteration, localComm)/2;
+			max_num_object = get_max_num_object(next_iteration, iteration, symbolic_iteration, localComm)/2;
 		}
 
 		/* finalize simulation */
-		symbolic_iteration.finalize(rule, iteration, iteration_buffer, max_num_object / local_size, mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object / local_size, mid_step_function);
 		mid_step_function("equalize");
-		std::swap(iteration_buffer, iteration);
 
 		/* equalize and/or normalize */
 		max_equalize = iqs::utils::log_2_upper_bound(size);
-		while((max_n_object = get_max_num_object_per_task(iteration, communicator)) > min_equalize_size &&
-			((float)(max_n_object - get_min_num_object_per_task(iteration, communicator)))/((float)max_n_object)/max_n_object > equalize_imablance &&
+		while((max_n_object = get_max_num_object_per_task(next_iteration, communicator)) > min_equalize_size &&
+			((float)(max_n_object - get_min_num_object_per_task(next_iteration, communicator)))/((float)max_n_object)/max_n_object > equalize_imablance &&
 			--max_equalize >= 0)
-				iteration.equalize(communicator); 
+				next_iteration.equalize(communicator); 
 
 		/* finish by normalizing */
-		iteration.normalize(communicator, mid_step_function);
+		next_iteration.normalize(communicator, mid_step_function);
 
 		MPI_Comm_free(&localComm);
 	}

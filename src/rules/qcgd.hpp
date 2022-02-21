@@ -1029,10 +1029,8 @@ namespace iqs::rules::qcgd {
 			return {n_iters, reversed_n_iters, max_num_object};
 		}
 
-		iqs::it_t read_state(const char* argv) {
+		void read_state(const char* argv, iqs::it_t &state) {
 			std::string string_args = argv;
-
-			iqs::it_t state;
 
 			std::string string_arg;
 			while ((string_arg = strip(string_args, ";")) != "") {
@@ -1049,8 +1047,6 @@ namespace iqs::rules::qcgd {
 			}
 
 			utils::randomize(state);
-
-			return state;
 		}
 
 		simulator_t read_rule(const char* argv, debug_t mid_step_function=[](const char*){}) {
@@ -1082,14 +1078,14 @@ namespace iqs::rules::qcgd {
 			return simulator;
 		}
 
-		std::tuple<uint, uint, it_t, simulator_t, size_t> parse_simulation(const char* argv, debug_t mid_step_function=[](const char*){}) {
+		std::tuple<uint, uint, simulator_t, size_t> parse_simulation(const char* argv, it_t &state, debug_t mid_step_function=[](const char*){}) {
 			std::string string_args = argv;
 
 			auto [n_iter, reversed_n_iters, max_num_object] = read_n_iter(strip(string_args, "|").c_str());
-			it_t state = read_state(strip(string_args, "|").c_str());
+			read_state(strip(string_args, "|").c_str(), state);
 			auto simulator = read_rule(string_args.c_str(), mid_step_function);
 
-			return {n_iter, reversed_n_iters, state, simulator, max_num_object};
+			return {n_iter, reversed_n_iters, simulator, max_num_object};
 		}
 	}
 }

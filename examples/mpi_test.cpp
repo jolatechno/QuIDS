@@ -52,29 +52,29 @@ int main(int argc, char* argv[]) {
 	if (rank == 0) std::cout << "initial state:\n"; print_all(state, MPI_COMM_WORLD);
 
 	iqs::simulate(state, H1, buffer, sy_it);
-	iqs::simulate(state, H2, buffer, sy_it);
+	iqs::simulate(buffer, H2, state, sy_it);
 	iqs::simulate(state, H0, buffer, sy_it);
-	iqs::simulate(state, X2);
+	iqs::simulate(buffer, X2);
 
-	if (rank == 0) std::cout << "\napplied some gates:\n"; print_all(state, MPI_COMM_WORLD);
+	if (rank == 0) std::cout << "\napplied some gates:\n"; print_all(buffer, MPI_COMM_WORLD);
 
-	state.distribute_objects(MPI_COMM_WORLD, master_node_id);
+	buffer.distribute_objects(MPI_COMM_WORLD, master_node_id);
 
-	if (rank == 0) std::cout << "\ndistributed all objects:\n"; print_all(state, MPI_COMM_WORLD);
+	if (rank == 0) std::cout << "\ndistributed all objects:\n"; print_all(buffer, MPI_COMM_WORLD);
 
-	float average_size = state.average_value(
+	float average_size = buffer.average_value(
 		(std::function<float(const char*, const char*)>)[](const char *begin, const char *end) {
 			return (float)std::distance(begin, end);
 		}, MPI_COMM_WORLD);
 	if (rank == 0) std::cout << "\nthe average size is " << average_size << "\n";
 
-	size_t total_num_object = state.get_total_num_object(MPI_COMM_WORLD);
+	size_t total_num_object = buffer.get_total_num_object(MPI_COMM_WORLD);
 	if (rank == 0) std::cout << "the total number of objects is " << total_num_object << "\n";
 
-	iqs::simulate(state, X2);
-	iqs::mpi::simulate(state, H0, buffer, sy_it, MPI_COMM_WORLD);
+	iqs::simulate(buffer, X2);
+	iqs::mpi::simulate(buffer, H0, state, sy_it, MPI_COMM_WORLD);
 	iqs::mpi::simulate(state, H2, buffer, sy_it, MPI_COMM_WORLD);
-	iqs::mpi::simulate(state, H1, buffer, sy_it, MPI_COMM_WORLD);
+	iqs::mpi::simulate(buffer, H1, state, sy_it, MPI_COMM_WORLD);
 
 	if (rank == 0) std::cout << "\napplied all gate in reverse other (" << state.total_proba << "=P):\n"; print_all(state, MPI_COMM_WORLD);
 
