@@ -403,14 +403,15 @@ namespace iqs::mpi {
 		if (size == 1)
 			return iqs::symbolic_iteration::compute_collisions(mid_step_function);
 
-		int num_threads;
+		/*int num_threads;
 		#pragma omp parallel
 		#pragma omp single
-		num_threads = omp_get_num_threads();
+		num_threads = omp_get_num_threads();*/
 
-		elimination_maps.resize(num_threads);
+		elimination_maps.resize(/*num_threads*/ 1);
 
-		int const num_bucket = iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads*size);
+		int const n_segment = size; //*num_threads;
+		int const num_bucket = iqs::utils::nearest_power_of_two(load_balancing_bucket_per_thread*n_segment);
 		size_t const offset = 8*sizeof(size_t) - iqs::utils::log_2_upper_bound(num_bucket);
 
 		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
@@ -419,235 +420,163 @@ namespace iqs::mpi {
 			size_t oid_end = std::distance(&next_oid[0], end_iterator);
 			mpi_resize(oid_end);
 
-			int n_segment = size*num_threads;
-			std::vector<int> local_disp(num_threads*(n_segment + 1), 0);
-			std::vector<int> local_count(num_threads*n_segment, 0);
-			std::vector<int> global_disp(num_threads*(n_segment + 1), 0);
-			std::vector<int> global_count(num_threads*n_segment, 0);
-
 			std::vector<int> load_balancing_begin(n_segment + 1, 0);
-			std::vector<int> partition_begin(num_threads*(num_bucket + 1), 0);
+			std::vector<int> partition_begin(num_bucket + 1, 0);
 			std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
 
-			std::vector<size_t> local_load_begin(num_threads + 1, 0);
-			std::vector<size_t> global_load_begin(num_threads + 1, 0);
+			std::vector<int> send_disp(size + 1, 0);
+			std::vector<int> send_count(size, 0);
+			std::vector<int> receive_disp(size + 1, 0);
+			std::vector<int> receive_count(size, 0);
 
+			
+
+			/* partition nodes */
 			const auto partitioner = [&](size_t const oid) {
 				return hash[oid] >> offset;
 			};
-			
-			local_load_begin[0] = 0; global_load_begin[0] = 0;
+			if (first) {
+				iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[oid_end], 0,
+					&partition_begin[0], &partition_begin[num_bucket + 1],
+					partitioner);
+			} else
+				iqs::utils::/*complete_*/parallel_generalized_partition(&next_oid[0], &next_oid[oid_end], &next_oid_partitioner_buffer[0],
+					&partition_begin[0], &partition_begin[num_bucket + 1],
+					partitioner);
 
-			#pragma omp parallel
-			{
-				std::vector<int> send_disp(size + 1, 0);
-				std::vector<int> send_count(size, 0);
-				std::vector<int> receive_disp(size + 1, 0);
-				std::vector<int> receive_count(size, 0);
 
-				std::vector<int> global_num_object_after_interferences(size, 0);
-				int thread_id = omp_get_thread_num();
-				auto &elimination_map = elimination_maps[thread_id];
 
-				local_load_begin[thread_id + 1] = (thread_id + 1) * oid_end / num_threads;
+			/* generate partitioned hash */
+			#pragma omp parallel for
+			for (size_t id = 0; id < oid_end; ++id) {
+				size_t oid = next_oid[id];
 
-				#pragma omp barrier
+				partitioned_mag[id] = magnitude[oid];
+				partitioned_hash[id] = hash[oid];
+			}
 
-				size_t this_oid_begin = local_load_begin[thread_id];
-				size_t this_oid_end = local_load_begin[thread_id + 1];
 
-				int disp_offset_begin = thread_id*(n_segment + 1);
-				int disp_offset_end = (thread_id + 1)*(n_segment + 1);
-				int count_offset_begin = thread_id*n_segment;
 
-				/* partition nodes */
-				if (first) {
-					iqs::utils::generalized_partition_from_iota(&next_oid[this_oid_begin], &next_oid[this_oid_end], this_oid_begin,
-						&partition_begin[thread_id*(num_bucket + 1)], &partition_begin[(thread_id + 1)*(num_bucket + 1)],
-						partitioner);
-				} else
-					iqs::utils::/*complete_*/generalized_partition(&next_oid[this_oid_begin], &next_oid[this_oid_end], &next_oid_partitioner_buffer[this_oid_begin],
-						&partition_begin[thread_id*(num_bucket + 1)], &partition_begin[(thread_id + 1)*(num_bucket + 1)],
-						partitioner);
-
-				/* compute total partition for load balancing */
-				for (int i = 1; i <= num_bucket; ++i)
-					#pragma omp atomic
-					total_partition_begin[i] += partition_begin[(num_bucket + 1)*thread_id + i];
-
-				/* compute load balancing */
-				#pragma omp barrier
-				#pragma omp single
-				{
-					MPI_Reduce(rank == 0 ? MPI_IN_PLACE : &total_partition_begin[1], &total_partition_begin[1],
+			/* compute load balancing */
+			mid_step_function("compute_collisions - com");
+			MPI_Reduce(rank == 0 ? MPI_IN_PLACE : &total_partition_begin[1], &total_partition_begin[1],
 						num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
+			mid_step_function("compute_collisions - prepare");
 
-					if (rank == 0)
-						iqs::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
-							load_balancing_begin.begin(), load_balancing_begin.end());
+			if (rank == 0)
+				iqs::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
+					load_balancing_begin.begin(), load_balancing_begin.end());
 
-					MPI_Bcast(&load_balancing_begin[1], n_segment, MPI_INT, 0, communicator);
-				}
+			mid_step_function("compute_collisions - com");
+			MPI_Bcast(&load_balancing_begin[1], n_segment, MPI_INT, 0, communicator);
+			mid_step_function("compute_collisions - prepare");
 
-				/* rework indexes */
-				for (int i = 1; i <= n_segment; ++i)
-					local_disp[(n_segment + 1)*thread_id + i] = partition_begin[(num_bucket + 1)*thread_id + load_balancing_begin[i]];
 
-				/* compute count */
-				std::adjacent_difference(&local_disp[disp_offset_begin + 1], &local_disp[disp_offset_end], &local_count[count_offset_begin]);
 
-				/* generate partitioned hash */
-				for (size_t id = this_oid_begin; id < this_oid_end; ++id) {
-					size_t oid = next_oid[id];
+			/* recompute send count and disp */
+			for (int i = 1; i <= n_segment; ++i) {
+				send_disp[i] = partition_begin[load_balancing_begin[i]];
+				send_count[i - 1] = send_disp[i] - send_disp[i - 1];
+			}
 
-					partitioned_mag[id] = magnitude[oid];
-					partitioned_hash[id] = hash[oid];
-				}
 
-				/* send partition size */
-				#pragma omp for ordered
-				for (int thread = 0; thread < num_threads; ++thread)
-					#pragma omp ordered
-					{
-						if (thread == 0)
-							mid_step_function("compute_collisions - com");
 
-						MPI_Alltoall(&local_count[count_offset_begin], num_threads, MPI_INT, &global_count[count_offset_begin], num_threads, MPI_INT, communicator);
+			/* share receive count and disp */
+			mid_step_function("compute_collisions - com");
+			MPI_Alltoall(&send_count[0], 1, MPI_INT, &receive_count[0], 1, MPI_INT, communicator);
+			mid_step_function("compute_collisions - prepare");
 
-						if (thread == num_threads - 1)
-							mid_step_function("compute_collisions - prepare");
-					}
-				std::partial_sum(&global_count[count_offset_begin], &global_count[count_offset_begin + n_segment], &global_disp[disp_offset_begin + 1]);
+			std::partial_sum(&receive_count[0], &receive_count[n_segment], &receive_disp[1]);
 
-				/* rework counts */
-				send_disp[0] = 0; receive_disp[0] = 0;
-				for (int i = 0; i < size; ++i) {
-					/* send disp and count */
-					send_disp[i + 1] = local_disp[disp_offset_begin + (i + 1)*num_threads];
-					send_count[i] = send_disp[i + 1] - send_disp[i];
 
-					/* receive disp and count */
-					receive_disp[i + 1] = global_disp[disp_offset_begin + (i + 1)*num_threads];
-					receive_count[i] = receive_disp[i + 1] - receive_disp[i];
-				}
 
-				global_load_begin[thread_id + 1] = receive_disp[size];
+			/* resize */
+			buffer_resize(receive_disp[n_segment]);
 
-				#pragma omp barrier
-				#pragma omp single
-				{
-					__gnu_parallel::partial_sum(&global_load_begin[1], &global_load_begin[num_threads + 1], &global_load_begin[1]);
 
-					/* resize */
-					buffer_resize(global_load_begin[num_threads]);
-				}
 
-				size_t this_oid_buffer_begin = global_load_begin[thread_id];
-				size_t this_oid_buffer_end = global_load_begin[thread_id + 1];
+			/* prepare node_id buffer */
+			for (int node = 0; node < size; ++node)
+				#pragma omp parallel for
+				for (size_t i = receive_disp[node]; i < receive_disp[node + 1]; ++i)
+					node_id_buffer[i] = node;
 
-				/* share actual partition */
-				#pragma omp for ordered
-				for (int thread = 0; thread < num_threads; ++thread)
-					#pragma omp ordered
-					{
-						if (thread == 0)
-							mid_step_function("compute_collisions - com");
 
-						MPI_Alltoallv(&partitioned_hash[this_oid_begin], &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
-							&hash_buffer[this_oid_buffer_begin], &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
-						MPI_Alltoallv(&partitioned_mag[this_oid_begin], &send_count[0], &send_disp[0], mag_MPI_Datatype,
-							&mag_buffer[this_oid_buffer_begin], &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
 
-						if (thread == num_threads - 1)
-							mid_step_function("compute_collisions - insert");
-					}
 
-				/* prepare node_id buffer */
-				for (int node = 0; node < size; ++node)
-					for (size_t i = receive_disp[node] + this_oid_buffer_begin; i < receive_disp[node + 1] + this_oid_buffer_begin; ++i)
-						node_id_buffer[i] = node;
-				
-				size_t total_size = 0;
-				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id)
-					for (int node_id = 0; node_id < size; ++node_id)
-						total_size += global_count[other_thread_id*n_segment + node_id*num_threads + thread_id];
+			/* actualy share partition */
+			mid_step_function("compute_collisions - com");
+			MPI_Alltoallv(&partitioned_hash[0], &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
+				&hash_buffer[0], &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
+			MPI_Alltoallv(&partitioned_mag[0], &send_count[0], &send_disp[0], mag_MPI_Datatype,
+				&mag_buffer[0], &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
+			mid_step_function("compute_collisions -	insert");
 
-				elimination_map.reserve(total_size);
 
-				#pragma omp barrier
 
-				for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
-					size_t other_oid_begin = global_load_begin[other_thread_id];
+			/* insert into hashmap */
+			auto &elimination_map = elimination_maps[0];
+			elimination_map.reserve(receive_disp[n_segment]);
+			std::vector<int> global_num_object_after_interferences(size, 0);
+			for (int node_id = 0; node_id < size; ++node_id) {
+				size_t begin = receive_disp[node_id], end = receive_disp[node_id + 1];
+				for (size_t oid = begin; oid < end; ++oid) {
 
-					for (int node_id = 0; node_id < size; ++node_id) {
-						size_t begin = global_disp[other_thread_id*(n_segment + 1) + node_id*num_threads + thread_id] + other_oid_begin;
-						size_t end = global_disp[other_thread_id*(n_segment + 1) + node_id*num_threads + thread_id + 1] + other_oid_begin;
+					/* accessing key */
+					auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
+					if (unique) {
+						/* increment values */
+						++global_num_object_after_interferences[node_id];
+						is_unique_buffer[oid] = true;
+					} else {
+						auto other_oid = it->second;
+						auto other_node_id = node_id_buffer[other_oid];
 
-						for (size_t oid = begin; oid < end; ++oid) {
-							int node_id = node_id_buffer[oid];
+						bool is_greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
+						if (is_greater) {
+							/* if it exist add the probabilities */
+							mag_buffer[other_oid] += mag_buffer[oid];
+							is_unique_buffer[oid] = false;
+						} else {
+							/* keep this graph */
+							it->second = oid;
 
-							/* accessing key */
-							auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
-							if (unique) {
-								/* increment values */
-								++global_num_object_after_interferences[node_id];
-								is_unique_buffer[oid] = true;
-							} else {
-								auto other_oid = it->second;
-								auto other_node_id = node_id_buffer[other_oid];
+							/* if the size aren't balanced, add the probabilities */
+							mag_buffer[oid] += mag_buffer[other_oid];
+							is_unique_buffer[oid] = true;
+							is_unique_buffer[other_oid] = false;
 
-								bool is_greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
-								if (is_greater) {
-									/* if it exist add the probabilities */
-									mag_buffer[other_oid] += mag_buffer[oid];
-									is_unique_buffer[oid] = false;
-								} else {
-									/* keep this graph */
-									it->second = oid;
-
-									/* if the size aren't balanced, add the probabilities */
-									mag_buffer[oid] += mag_buffer[other_oid];
-									is_unique_buffer[oid] = true;
-									is_unique_buffer[other_oid] = false;
-
-									/* increment values */
-									++global_num_object_after_interferences[node_id];
-									--global_num_object_after_interferences[other_node_id];
-								}
-							}
+							/* increment values */
+							++global_num_object_after_interferences[node_id];
+							--global_num_object_after_interferences[other_node_id];
 						}
 					}
 				}
-
-
-				/* share back partition */
-				#pragma omp barrier
-				#pragma omp for ordered
-				for (int thread = 0; thread < num_threads; ++thread)
-					#pragma omp ordered
-					{
-						if (thread == 0)
-							mid_step_function("compute_collisions - com");
-
-						MPI_Alltoallv(&mag_buffer[this_oid_buffer_begin], &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
-							&partitioned_mag[this_oid_begin], &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
-						MPI_Alltoallv(&is_unique_buffer[this_oid_buffer_begin], &receive_count[0], &receive_disp[0], MPI_CHAR,
-							&partitioned_is_unique[this_oid_begin], &send_count[0], &send_disp[0], MPI_CHAR, communicator);
-
-						if (thread == num_threads - 1)
-							mid_step_function("compute_collisions - finalize");
-					}
-
-				elimination_map.clear();
-
-				/* un-partition magnitude */
-				for (size_t id = this_oid_begin; id < this_oid_end; ++id) {
-					size_t oid = next_oid[id];
-
-					is_unique[oid] = partitioned_is_unique[id];
-					magnitude[oid] = partitioned_mag[id];
-				}
 			}
+			elimination_map.clear();
+
+
+
+			/* send back results */
+			mid_step_function("compute_collisions - com");
+			MPI_Alltoallv(&mag_buffer[0], &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
+				&partitioned_mag[0], &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
+			MPI_Alltoallv(&is_unique_buffer[0], &receive_count[0], &receive_disp[0], MPI_CHAR,
+				&partitioned_is_unique[0], &send_count[0], &send_disp[0], MPI_CHAR, communicator);
+			mid_step_function("compute_collisions - finalize");
+
+
+
+			/* un-partition magnitude */
+			#pragma omp parallel for
+			for (size_t id = 0; id < oid_end; ++id) {
+				size_t oid = next_oid[id];
+
+				is_unique[oid] = partitioned_is_unique[id];
+				magnitude[oid] = partitioned_mag[id];
+			}
+
+
 
 			/* keep only unique objects */
 			return __gnu_parallel::partition(&next_oid[0], end_iterator,

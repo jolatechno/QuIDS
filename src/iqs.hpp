@@ -490,92 +490,59 @@ namespace iqs {
 			mid_step_function("compute_collisions - prepare");
 
 			size_t oid_end = std::distance(&next_oid[0], end_iterator);
-
-			std::vector<size_t> modulo_offset(num_threads*(num_threads + 1) + 1, 0);
-
 			
 			std::vector<int> load_balancing_begin(num_threads + 1, 0);
-			std::vector<size_t> partition_begin(num_threads*(num_bucket + 1), 0);
-			std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
+			std::vector<size_t> partition_begin(num_bucket + 1, 0);
 
-			std::vector<size_t> load_begin(num_threads + 1, 0);
-			load_begin[0] = 0;
 
+
+			/* partition nodes */
 			const auto partitioner = [&](size_t const oid) {
 				return hash[oid] >> offset;
 			};
+			if (first) {
+				iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[oid_end], 0,
+					&partition_begin[0], &partition_begin[num_bucket + 1],
+					partitioner);
+			} else
+				iqs::utils::/*complete_*/parallel_generalized_partition(&next_oid[0], &next_oid[oid_end], &next_oid_partitioner_buffer[0],
+					&partition_begin[0], &partition_begin[num_bucket + 1],
+					partitioner);
+
+
+
+			/* compute load balancing */
+			utils::load_balancing_from_prefix_sum(partition_begin.begin(), partition_begin.end(),
+				load_balancing_begin.begin(), load_balancing_begin.end());
+
+
 			
-			/* partition to limit collisions */
+			/* actually insert into map */
+			mid_step_function("compute_collisions - insert");
 			#pragma omp parallel
 			{
 				int thread_id = omp_get_thread_num();
 				auto &elimination_map = elimination_maps[thread_id];
 
-				load_begin[thread_id + 1] = (thread_id + 1) * oid_end / num_threads;
+				int load_begin = load_balancing_begin[thread_id], load_end = load_balancing_begin[thread_id + 1];
+				for (int j = load_begin; j < load_end; ++j) {
+					size_t begin = partition_begin[j], end = partition_begin[j + 1];
 
-				#pragma omp barrier
+					elimination_map.reserve(end - begin);
+					for (size_t i = begin; i < end; ++i) {
+						size_t oid = next_oid[i];
 
-				size_t this_oid_begin = load_begin[thread_id];
-				size_t this_oid_end = load_begin[thread_id + 1];
-
-				if (first) {
-					utils::generalized_partition_from_iota(&next_oid[this_oid_begin], &next_oid[this_oid_end], this_oid_begin,
-						&partition_begin[(num_bucket + 1)*thread_id], &partition_begin[(num_bucket + 1)*(thread_id + 1)],
-						partitioner);
-				} else
-					utils::generalized_partition(&next_oid[this_oid_begin], &next_oid[this_oid_end], &next_oid_partitioner_buffer[this_oid_begin],
-						&partition_begin[(num_bucket + 1)*thread_id], &partition_begin[(num_bucket + 1)*(thread_id + 1)],
-						partitioner);
-
-				/* compute total partition for load balancing */
-				for (int i = 1; i <= num_bucket; ++i)
-					#pragma omp atomic
-					total_partition_begin[i] += partition_begin[(num_bucket + 1)*thread_id + i];
-
-				/* compute load balancing */
-				#pragma omp barrier
-				#pragma omp single 
-					utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
-						load_balancing_begin.begin(), load_balancing_begin.end());
-
-				if (thread_id == 0)
-					mid_step_function("compute_collisions - insert");
-
-				/* insert into separate hashmaps */
-				for (int j = load_balancing_begin[thread_id]; j < load_balancing_begin[thread_id + 1]; ++j) {
-					size_t total_size = 0;
-					for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
-						size_t begin = partition_begin[(num_bucket + 1)*other_thread_id + j];
-						size_t end = partition_begin[(num_bucket + 1)*other_thread_id + j + 1];
-
-						total_size += end - begin;
+						/* accessing key */
+						auto [it, unique] = elimination_map.insert({hash[oid], oid});
+						if (!unique)
+							/* if it exist add the probabilities */
+							magnitude[it->second] += magnitude[oid];
+						/* keep the object if it is unique */
+						is_unique[oid] = unique;
 					}
-
-					elimination_map.reserve(total_size);
-
-					for (int other_thread_id = 0; other_thread_id < num_threads; ++other_thread_id) {
-						size_t other_oid_begin = load_begin[other_thread_id];
-
-						size_t begin = partition_begin[(num_bucket + 1)*other_thread_id + j] + other_oid_begin;
-						size_t end = partition_begin[(num_bucket + 1)*other_thread_id + j + 1] + other_oid_begin;
-
-						for (size_t i = begin; i < end; ++i) {
-							size_t oid = next_oid[i];
-
-							/* accessing key */
-							auto [it, unique] = elimination_map.insert({hash[oid], oid});
-							if (!unique)
-								/* if it exist add the probabilities */
-								magnitude[it->second] += magnitude[oid];
-							/* keep the object if it is unique */
-							is_unique[oid] = unique;
-						}
-					}
-
 					elimination_map.clear();
 				}
 			}
-
 			mid_step_function("compute_collisions - finalize");
 
 			/* check for zero probability */
