@@ -421,8 +421,8 @@ namespace iqs::mpi {
 			mpi_resize(oid_end);
 
 			std::vector<int> load_balancing_begin(n_segment + 1, 0);
-			std::vector<int> partition_begin(num_bucket + 1, 0);
-			std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
+			std::vector<size_t> partition_begin(num_bucket + 1, 0);
+			std::vector<size_t> total_partition_begin(rank == 0 ? num_bucket + 1 : 2, 0);
 
 			std::vector<int> send_disp(size + 1, 0);
 			std::vector<int> send_count(size, 0);
@@ -436,12 +436,12 @@ namespace iqs::mpi {
 				return hash[oid] >> offset;
 			};
 			if (first) {
-				iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[oid_end], 0,
-					&partition_begin[0], &partition_begin[num_bucket + 1],
+				iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], end_iterator, 0,
+					partition_begin.begin(), partition_begin.end(),
 					partitioner);
 			} else
-				iqs::utils::/*complete_*/parallel_generalized_partition(&next_oid[0], &next_oid[oid_end], &next_oid_partitioner_buffer[0],
-					&partition_begin[0], &partition_begin[num_bucket + 1],
+				iqs::utils::/*complete_*/parallel_generalized_partition(&next_oid[0], end_iterator, &next_oid_partitioner_buffer[0],
+					partition_begin.begin(), partition_begin.end(),
 					partitioner);
 
 
@@ -459,8 +459,8 @@ namespace iqs::mpi {
 
 			/* compute load balancing */
 			mid_step_function("compute_collisions - com");
-			MPI_Reduce(rank == 0 ? MPI_IN_PLACE : &total_partition_begin[1], &total_partition_begin[1],
-						num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
+			MPI_Reduce(&partition_begin[1], &total_partition_begin[1],
+				num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
 			mid_step_function("compute_collisions - prepare");
 
 			if (rank == 0)
@@ -491,7 +491,7 @@ namespace iqs::mpi {
 
 
 			/* resize */
-			buffer_resize(receive_disp[n_segment]);
+			buffer_resize(receive_disp[size]);
 
 
 
@@ -510,7 +510,7 @@ namespace iqs::mpi {
 				&hash_buffer[0], &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
 			MPI_Alltoallv(&partitioned_mag[0], &send_count[0], &send_disp[0], mag_MPI_Datatype,
 				&mag_buffer[0], &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
-			mid_step_function("compute_collisions -	insert");
+			mid_step_function("compute_collisions - insert");
 
 
 
