@@ -378,14 +378,13 @@ namespace iqs {
 	compute num child
 	*/
 	void iteration::compute_num_child(rule_t const *rule, debug_t mid_step_function) const {
+		/* !!!!!!!!!!!!!!!!
+		num_child
+		 !!!!!!!!!!!!!!!! */
 		mid_step_function("num_child");
 
 		if (num_object == 0)
 			return;
-
-		/* !!!!!!!!!!!!!!!!
-		step (1)
-		 !!!!!!!!!!!!!!!! */
 
 		max_symbolic_object_size = 0;
 
@@ -412,11 +411,12 @@ namespace iqs {
 			return;
 		}
 
-		mid_step_function("prepare_index");
+		
 
 		/* !!!!!!!!!!!!!!!!
-		step (2)
+		prepare_index
 		 !!!!!!!!!!!!!!!! */
+		mid_step_function("prepare_index");
 
 		symbolic_iteration.num_object = get_num_symbolic_object();
 
@@ -439,12 +439,14 @@ namespace iqs {
 					0);
 			}
 
-			#pragma omp single
-			mid_step_function("symbolic_iteration");
+
+
 
 			/* !!!!!!!!!!!!!!!!
-			step (3)
+			symbolic_iteration
 			 !!!!!!!!!!!!!!!! */
+			#pragma omp single
+			mid_step_function("symbolic_iteration");
 
 			#pragma omp for 
 			for (size_t oid = 0; oid < symbolic_iteration.num_object; ++oid) {
@@ -486,96 +488,81 @@ namespace iqs {
 		int const num_bucket = utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads);
 		size_t const offset = 8*sizeof(size_t) - utils::log_2_upper_bound(num_bucket);
 
-		const auto compute_interferences = [&](size_t *end_iterator, bool first) {
-			mid_step_function("compute_collisions - prepare");
-
-			size_t oid_end = std::distance(&next_oid[0], end_iterator);
-			
-			std::vector<int> load_balancing_begin(num_threads + 1, 0);
-			std::vector<size_t> partition_begin(num_bucket + 1, 0);
+		std::vector<int> load_balancing_begin(num_threads + 1, 0);
+		std::vector<size_t> partition_begin(num_bucket + 1, 0);
 
 
 
-			/* partition nodes */
-			const auto partitioner = [&](size_t const oid) {
-				return hash[oid] >> offset;
-			};
-			if (first) {
-				iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[oid_end], 0,
-					&partition_begin[0], &partition_begin[num_bucket + 1],
-					partitioner);
-			} else
-				iqs::utils::/*complete_*/parallel_generalized_partition(&next_oid[0], &next_oid[oid_end], &next_oid_partitioner_buffer[0],
-					&partition_begin[0], &partition_begin[num_bucket + 1],
-					partitioner);
 
-
-
-			/* compute load balancing */
-			utils::load_balancing_from_prefix_sum(partition_begin.begin(), partition_begin.end(),
-				load_balancing_begin.begin(), load_balancing_begin.end());
-
-
-			
-			/* actually insert into map */
-			mid_step_function("compute_collisions - insert");
-			#pragma omp parallel
-			{
-				int thread_id = omp_get_thread_num();
-				auto &elimination_map = elimination_maps[thread_id];
-
-				int load_begin = load_balancing_begin[thread_id], load_end = load_balancing_begin[thread_id + 1];
-				for (int j = load_begin; j < load_end; ++j) {
-					size_t begin = partition_begin[j], end = partition_begin[j + 1];
-
-					elimination_map.reserve(end - begin);
-					for (size_t i = begin; i < end; ++i) {
-						size_t oid = next_oid[i];
-
-						/* accessing key */
-						auto [it, unique] = elimination_map.insert({hash[oid], oid});
-						if (!unique)
-							/* if it exist add the probabilities */
-							magnitude[it->second] += magnitude[oid];
-						/* keep the object if it is unique */
-						is_unique[oid] = unique;
-					}
-					elimination_map.clear();
-				}
-			}
-			mid_step_function("compute_collisions - finalize");
-
-			/* check for zero probability */
-			return __gnu_parallel::partition(&next_oid[0], end_iterator,
-				[&](size_t const &oid) {
-					if (!is_unique[oid])
-						return false;
-
-					return std::norm(magnitude[oid]) > tolerance;
-				});
-		};
 
 		/* !!!!!!!!!!!!!!!!
-		step (4)
-		 !!!!!!!!!!!!!!!! */
+		partition
+		!!!!!!!!!!!!!!!! */
+		iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[0] + num_object, 0,
+			&partition_begin[0], &partition_begin[num_bucket + 1],
+			[&](size_t const oid) {
+				return hash[oid] >> offset;
+			});
 
-		bool fast = false;
-		bool skip_test = collision_test_proportion == 0 || collision_tolerance == 0 || num_object < min_collision_size;
-		size_t test_size = num_object*collision_test_proportion;
-		size_t *partitioned_it = &next_oid[0] + (skip_test ? num_object : test_size);
 
-		/* get all unique graphs with a non zero probability */
-		if (!skip_test) {
-			auto test_partitioned_it = compute_interferences(partitioned_it, true);
 
-			size_t number_of_collision = std::distance(test_partitioned_it, partitioned_it);
-			fast = number_of_collision < test_size*collision_tolerance;
 
-			partitioned_it = std::rotate(test_partitioned_it, partitioned_it, &next_oid[num_object]);
+
+		/* !!!!!!!!!!!!!!!!
+		load-balance
+		!!!!!!!!!!!!!!!! */
+		utils::load_balancing_from_prefix_sum(partition_begin.begin(), partition_begin.end(),
+			load_balancing_begin.begin(), load_balancing_begin.end());
+
+
+
+
+
+
+		/* !!!!!!!!!!!!!!!!
+		compute-collision
+		!!!!!!!!!!!!!!!! */
+		mid_step_function("compute_collisions - insert");
+		#pragma omp parallel
+		{
+			int thread_id = omp_get_thread_num();
+			auto &elimination_map = elimination_maps[thread_id];
+
+			int load_begin = load_balancing_begin[thread_id], load_end = load_balancing_begin[thread_id + 1];
+			for (int j = load_begin; j < load_end; ++j) {
+				size_t begin = partition_begin[j], end = partition_begin[j + 1];
+
+				elimination_map.reserve(end - begin);
+				for (size_t i = begin; i < end; ++i) {
+					size_t oid = next_oid[i];
+
+					/* accessing key */
+					auto [it, unique] = elimination_map.insert({hash[oid], oid});
+					if (!unique)
+						/* if it exist add the probabilities */
+						magnitude[it->second] += magnitude[oid];
+					/* keep the object if it is unique */
+					is_unique[oid] = unique;
+				}
+				elimination_map.clear();
+			}
 		}
-		if (!fast)
-			partitioned_it = compute_interferences(partitioned_it, skip_test);
-			
+		mid_step_function("compute_collisions - finalize");
+
+
+
+
+
+		/* !!!!!!!!!!!!!!!!
+		partition
+		!!!!!!!!!!!!!!!! */
+		size_t* partitioned_it = __gnu_parallel::partition(&next_oid[0], &next_oid[0] + num_object,
+			[&](size_t const &oid) {
+				if (!is_unique[oid])
+					return false;
+
+				return std::norm(magnitude[oid]) > tolerance;
+			});
 		num_object_after_interferences = std::distance(&next_oid[0], partitioned_it);
 	}
 
@@ -591,11 +578,13 @@ namespace iqs {
 			return;
 		}
 		
-		mid_step_function("truncate");
+
+
 
 		/* !!!!!!!!!!!!!!!!
-		step (5)
+		truncate
 		 !!!!!!!!!!!!!!!! */
+		mid_step_function("truncate");
 
 		if (max_num_object > utils::min_vector_size && num_object_after_interferences > max_num_object) {
 			if (simple_truncation) {
@@ -626,11 +615,14 @@ namespace iqs {
 		} else
 			next_iteration.num_object = num_object_after_interferences;
 
-		mid_step_function("prepare_final");
+
+
+
 
 		/* !!!!!!!!!!!!!!!!
-		step (6)
+		prepare_final
 		 !!!!!!!!!!!!!!!! */
+		mid_step_function("prepare_final");
 
 		/* sort to make memory access more continuous */
 		__gnu_parallel::sort(&next_oid[0], &next_oid[next_iteration.num_object]);
@@ -654,11 +646,13 @@ namespace iqs {
 
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
-		mid_step_function("final");
+		
+
 
 		/* !!!!!!!!!!!!!!!!
-		step (7)
+		final
 		 !!!!!!!!!!!!!!!! */
+		mid_step_function("final");
 
 		#pragma omp parallel for 
 		for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
@@ -696,11 +690,13 @@ namespace iqs {
 			return;
 		}
 
-		mid_step_function("normalize");
+
+
 
 		/* !!!!!!!!!!!!!!!!
-		step (8)
+		normalize
 		 !!!!!!!!!!!!!!!! */
+		mid_step_function("normalize");
 
 		#pragma omp parallel
 		{
