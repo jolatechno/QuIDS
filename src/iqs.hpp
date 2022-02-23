@@ -91,7 +91,6 @@ namespace iqs {
 	*/
 	class iteration {
 		friend symbolic_iteration;
-		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function);  
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
@@ -102,6 +101,7 @@ namespace iqs {
 		mutable utils::fast_vector<char> objects;
 		mutable utils::fast_vector<size_t> object_begin;
 		mutable utils::fast_vector<size_t> num_childs;
+		mutable utils::fast_vector<size_t> child_begin;
 
 		void inline resize(size_t num_object) const {
 			#pragma omp parallel sections
@@ -110,20 +110,35 @@ namespace iqs {
 				magnitude.resize(num_object);
 
 				#pragma omp section
-				num_childs.resize(num_object + 1);
+				num_childs.resize(num_object);
 
 				#pragma omp section
 				object_begin.resize(num_object + 1);
+
+				#pragma omp section
+				child_begin.resize(num_object + 1);
 			}
 		}
 		void inline allocate(size_t size) const {
 			objects.resize(size);
 		}
 
+		size_t get_mem_size() {
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 3*sizeof(size_t);
+			return magnitude.size()*iteration_memory_size + objects.size();
+		}
+		float get_average_num_child() {
+			return (float)get_num_symbolic_object() / (float)num_object;
+		}
+		float get_average_object_size() {
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 3*sizeof(size_t);
+			return (float)iteration_memory_size + (float)object_begin[num_object]/(float)num_object;
+		}
+
 
 
 		void compute_num_child(rule_t const *rule, debug_t mid_step_function=[](const char*){}) const;
-		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](const char*){}) const;
+		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, const size_t max_num_object, debug_t mid_step_function=[](const char*){}) const;
 		void apply_modifier(modifier_t const rule);
 		void normalize(debug_t mid_step_function=[](const char*){});
 
@@ -135,13 +150,12 @@ namespace iqs {
 			resize(0);
 			allocate(0);
 			object_begin[0] = 0;
-			num_childs[0] = 0;
 		}
 		iteration(char* object_begin_, char* object_end_) : iteration() {
 			append(object_begin_, object_end_);
 		}
 		size_t get_num_symbolic_object() const {
-			return num_childs[num_object];
+			return __gnu_parallel::accumulate(&num_childs[0], &num_childs[0] + num_object, 0);
 		}
 		void append(char const *object_begin_, char const *object_end_, mag_t const mag=1) {
 			size_t offset = object_begin[num_object];
@@ -211,7 +225,6 @@ namespace iqs {
 	*/
 	class symbolic_iteration {
 		friend iteration;
-		friend size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration);
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function); 
 
 	protected:
@@ -278,6 +291,16 @@ namespace iqs {
 			}
 		}
 
+		float get_average_object_size() {
+			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 7*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+			return (float)symbolic_iteration_memory_size;
+		}
+		
+		size_t get_mem_size() {
+			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 7*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+			return magnitude.size()*symbolic_iteration_memory_size;
+		}
+
 		void compute_collisions(debug_t mid_step_function=[](const char*){});
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object=0xffffffff, debug_t mid_step_function=[](const char*){});
 
@@ -289,75 +312,26 @@ namespace iqs {
 	};
 
 	/*
-	for memory managment
-	*/
-	size_t inline get_max_num_object(it_t const &next_iteration, it_t const &last_iteration, sy_it_t const &symbolic_iteration) {
-		if (symbolic_iteration.num_object_after_interferences == 0)
-			return -1;
-		
-		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 2*sizeof(size_t);
-		static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 7*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
-
-		// get the free memory and the total amount of memory...
-		size_t free_mem;
-		utils::get_free_mem(free_mem);
-
-		// get each size
-		size_t next_iteration_object_size = next_iteration.objects.size();
-		size_t last_iteration_object_size = last_iteration.objects.size();
-
-		size_t next_iteration_property_size = next_iteration.magnitude.size();
-		size_t last_iteration_property_size = last_iteration.magnitude.size();
-
-		size_t symbolic_iteration_size = symbolic_iteration.magnitude.size();
-
-		size_t last_iteration_num_object = last_iteration.num_object;
-		size_t symbolic_iteration_num_object = symbolic_iteration.num_object;
-
-		// get the total memory
-		size_t total_useable_memory = next_iteration_object_size + last_iteration_object_size + // size of objects
-			(last_iteration_property_size + next_iteration_property_size)*iteration_memory_size + // size of properties
-			symbolic_iteration_size*symbolic_iteration_memory_size + // size of symbolic properties
-			free_mem; // free memory per shared memory simulation
-
-		// compute average object size
-		size_t iteration_size_per_object = 0;
-
-		// compute the average size of an object for the next iteration:
-		size_t test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.num_object_after_interferences));
-		#pragma omp parallel for reduction(+:iteration_size_per_object)
-		for (size_t oid = 0; oid < test_size; ++oid)
-			iteration_size_per_object += symbolic_iteration.size[oid];
-		iteration_size_per_object /= test_size;
-
-		// add the cost of the symbolic iteration in itself
-		iteration_size_per_object += symbolic_iteration_memory_size*symbolic_iteration_num_object/last_iteration_num_object/2; // size for symbolic iteration
-		
-		// and the constant size per object
-		iteration_size_per_object += iteration_memory_size;
-
-		// and the cost of unused space
-		iteration_size_per_object *= utils::upsize_policy;
-
-		return total_useable_memory / iteration_size_per_object * (1 - safety_margin);
-	}
-
-	/*
 	simulation function
 	*/
 	void inline simulate(it_t &iteration, modifier_t const rule) {
 		iteration.apply_modifier(rule);
 	}
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
+		/* compute the number of child */
 		iteration.compute_num_child(rule, mid_step_function);
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
-		symbolic_iteration.compute_collisions(mid_step_function);
 
+		/* max_num_object */
 		if (max_num_object == 0) {
 			mid_step_function("get_max_num_object");
-			max_num_object = get_max_num_object(next_iteration, iteration, symbolic_iteration)/2;
+			max_num_object = (float)(utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size() + /*to remove*/ iteration.get_mem_size()) /
+				(iteration.get_average_object_size() + iteration.get_average_num_child()*symbolic_iteration.get_average_object_size() /*to remove*/ /2) *
+				(1 - safety_margin)/utils::upsize_policy /*to remove*/ /2;
 		}
 
+		/* rest of simulation*/
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, max_num_object, mid_step_function);
+		symbolic_iteration.compute_collisions(mid_step_function);
 		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object, mid_step_function);
 		next_iteration.normalize(mid_step_function);
 	}
@@ -381,17 +355,15 @@ namespace iqs {
 			size_t size;
 			rule->get_num_child(&objects[object_begin[oid]],
 				&objects[object_begin[oid + 1]],
-				num_childs[oid + 1], size);
+				num_childs[oid], size);
 			max_symbolic_object_size = std::max(max_symbolic_object_size, size);
 		}
-
-		__gnu_parallel::partial_sum(&num_childs[1], &num_childs[num_object + 1], &num_childs[1]);
 	}
 
 	/*
 	generate symbolic iteration
 	*/
-	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const {
+	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, const size_t max_num_object, debug_t mid_step_function) const {
 		if (num_object == 0) {
 			symbolic_iteration.num_object = 0;
 			mid_step_function("prepare_index");
@@ -406,7 +378,9 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 		mid_step_function("prepare_index");
 
-		symbolic_iteration.num_object = get_num_symbolic_object();
+		child_begin[0] = 0;
+		__gnu_parallel::partial_sum(&num_childs[0], &num_childs[0] + num_object, &child_begin[1]);
+		symbolic_iteration.num_object = child_begin[num_object];
 
 		/* resize symbolic iteration */
 		symbolic_iteration.resize(symbolic_iteration.num_object);
@@ -419,11 +393,11 @@ namespace iqs {
 			#pragma omp for 
 			for (size_t oid = 0; oid < num_object; ++oid) {
 				/* assign parent ids and child ids for each child */
-				std::fill(&symbolic_iteration.parent_oid[num_childs[oid]],
-					&symbolic_iteration.parent_oid[num_childs[oid + 1]],
+				std::fill(&symbolic_iteration.parent_oid[child_begin[oid]],
+					&symbolic_iteration.parent_oid[child_begin[oid + 1]],
 					oid);
-				std::iota(&symbolic_iteration.child_id[num_childs[oid]],
-					&symbolic_iteration.child_id[num_childs[oid + 1]],
+				std::iota(&symbolic_iteration.child_id[child_begin[oid]],
+					&symbolic_iteration.child_id[child_begin[oid + 1]],
 					0);
 			}
 

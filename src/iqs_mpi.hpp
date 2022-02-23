@@ -35,12 +35,30 @@ namespace iqs::mpi {
 	*/
 	class mpi_iteration : public iqs::iteration {
 		friend mpi_symbolic_iteration;
-		friend size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm communicator);
 		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function);
 
 	protected:
 		void equalize_symbolic(MPI_Comm communicator);
 		void normalize(MPI_Comm communicator, iqs::debug_t mid_step_function=[](const char*){});
+
+		size_t get_mem_size(MPI_Comm communicator) {
+			static const size_t mpi_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 3*sizeof(size_t);
+			size_t total_size, local_size = mpi_iteration_memory_size*magnitude.size() + objects.size();
+			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return total_size;
+		}
+		float get_average_num_child(MPI_Comm communicator) {
+			size_t total_size = get_num_symbolic_object();
+			MPI_Allreduce(MPI_IN_PLACE, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return (float)total_size / (float)get_total_num_object(communicator);
+		}
+		float get_average_object_size(MPI_Comm communicator) {
+			static const size_t mpi_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 3*sizeof(size_t);
+
+			size_t total_object_size;
+			MPI_Allreduce(&object_begin[num_object], &total_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return (float)mpi_iteration_memory_size + (float)total_object_size/(float)get_total_num_object(communicator);
+		}
 
 	public:
 		PROBA_TYPE node_total_proba = 0;
@@ -105,16 +123,9 @@ namespace iqs::mpi {
 
 				MPI_Send(&objects[send_object_begin], send_object_size, MPI_CHAR, node, 0 /* tag */, communicator);
 
-				if (send_num_child) {
-					/* prepare send */
-					size_t child_begin = num_childs[begin];
-					#pragma omp parallel for 
-					for (size_t i = begin + 1; i <= num_object; ++i)
-						num_childs[i] -= child_begin;
-
+				if (send_num_child)
 					/* send num child */
-					MPI_Send(&num_childs[begin + 1], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
-				}
+					MPI_Send(&num_childs[begin], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 
 				/* pop */
 				pop(num_object_sent, false);
@@ -156,16 +167,9 @@ namespace iqs::mpi {
 				for (size_t i = num_object + 1; i <= num_object + num_object_sent; ++i)
 					object_begin[i] += object_offset;
 
-				if (receive_num_child) {
+				if (receive_num_child)
 					/* receive num child */
-					MPI_Recv(&num_childs[num_object + 1], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-
-					/* correct num child */
-					size_t child_begin = num_childs[num_object];
-					#pragma omp parallel for 
-					for (size_t i = num_object + 1; i <= num_object + num_object_sent; ++i)
-						num_childs[i] += child_begin;
-				}
+					MPI_Recv(&num_childs[num_object], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 				num_object += num_object_sent;
 			}
@@ -177,7 +181,6 @@ namespace iqs::mpi {
 
 	class mpi_symbolic_iteration : public iqs::symbolic_iteration {
 		friend mpi_iteration;
-		friend size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm communicator);
 		friend void inline simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqs::debug_t mid_step_function); 
 
 	protected:
@@ -225,6 +228,17 @@ namespace iqs::mpi {
 			}
 		}
 
+		float get_average_object_size(MPI_Comm communicator) {
+			static const size_t mpi_symbolic_iteration_memory_size = (1 + 1) + (2 + 4)*sizeof(PROBA_TYPE) + (7 + 2)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
+			return (float)mpi_symbolic_iteration_memory_size;
+		}
+		size_t get_mem_size(MPI_Comm communicator) {
+			static const size_t mpi_symbolic_iteration_memory_size = (1 + 1) + (2 + 4)*sizeof(PROBA_TYPE) + (7 + 2)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
+			size_t total_size, local_size = mpi_symbolic_iteration_memory_size*magnitude.size();
+			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return total_size;
+		}
+
 	public:
 		size_t get_total_num_object(MPI_Comm communicator) const {
 			/* accumulate number of node */
@@ -242,76 +256,6 @@ namespace iqs::mpi {
 		}
 		mpi_symbolic_iteration() {}
 	};
-
-	/*
-	for memory managment
-	*/
-	size_t inline get_max_num_object(mpi_it_t const &next_iteration, mpi_it_t const &last_iteration, mpi_sy_it_t const &symbolic_iteration, MPI_Comm localComm) {
-		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 2*sizeof(size_t);
-		static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 4)*sizeof(PROBA_TYPE) + (7 + 2)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
-
-		// get each size
-		size_t next_iteration_object_size = next_iteration.objects.size();
-		size_t last_iteration_object_size = last_iteration.objects.size();
-		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-
-		size_t next_iteration_property_size = next_iteration.magnitude.size();
-		size_t last_iteration_property_size = last_iteration.magnitude.size();
-		MPI_Allreduce(MPI_IN_PLACE, &next_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_property_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-
-		size_t symbolic_iteration_size = symbolic_iteration.magnitude.size();
-		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-
-		size_t last_iteration_num_object = last_iteration.num_object;
-		size_t symbolic_iteration_num_object = symbolic_iteration.num_object;
-		MPI_Allreduce(MPI_IN_PLACE, &last_iteration_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-		MPI_Allreduce(MPI_IN_PLACE, &symbolic_iteration_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-
-		size_t num_object_after_interferences = symbolic_iteration.num_object_after_interferences;
-		MPI_Allreduce(MPI_IN_PLACE, &num_object_after_interferences, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-		if (num_object_after_interferences == 0)
-			return -1;
-
-		// get the free memory and the total amount of memory...
-		size_t free_mem;
-		iqs::utils::get_free_mem(free_mem);
-
-		// get the total memory
-		size_t total_useable_memory = next_iteration_object_size + last_iteration_object_size + // size of objects
-			(last_iteration_property_size + next_iteration_property_size)*iteration_memory_size + // size of properties
-			symbolic_iteration_size*symbolic_iteration_memory_size + // size of symbolic properties
-			free_mem; // free memory per shared memory simulation
-
-		// compute average object size
-		size_t iteration_size_per_object = 0;
-
-		// compute the average size of an object for the next iteration:
-		size_t test_size = 0;
-		if (symbolic_iteration.num_object_after_interferences > 0) {
-			test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.num_object_after_interferences));
-			#pragma omp parallel for reduction(+:iteration_size_per_object)
-			for (size_t oid = 0; oid < test_size; ++oid)
-				iteration_size_per_object += symbolic_iteration.size[oid];
-		}
-
-		// get total average
-		size_t total_test_size = std::max((size_t)1, (size_t)(size_average_proportion*symbolic_iteration.get_total_num_object_after_interferences(localComm)));
-		MPI_Allreduce(MPI_IN_PLACE, &iteration_size_per_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-		iteration_size_per_object /= total_test_size;
-
-		// add the cost of the symbolic iteration in itself
-		iteration_size_per_object += symbolic_iteration_memory_size*symbolic_iteration_num_object/last_iteration_num_object/2; // size for symbolic iteration
-		
-		// and the constant size per object
-		iteration_size_per_object += iteration_memory_size;
-
-		// and the cost of unused space
-		iteration_size_per_object *= iqs::utils::upsize_policy;
-
-		return total_useable_memory / iteration_size_per_object * (1 - safety_margin);
-	}
 
 	/*
 	function to compute the maximum and minimum per node size
@@ -363,17 +307,20 @@ namespace iqs::mpi {
 			--max_equalize >= 0)
 				iteration.equalize_symbolic(communicator);
 
-		/* rest of the simulation */
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
-		symbolic_iteration.compute_collisions(communicator, mid_step_function);
-
+		/* compute max_num_object */
 		if (max_num_object == 0) {
 			mid_step_function("get_max_num_object");
-			max_num_object = get_max_num_object(next_iteration, iteration, symbolic_iteration, localComm)/2;
+			max_num_object = (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm) + /*to remove*/ iteration.get_mem_size(localComm)) /
+				(iteration.get_average_object_size(localComm) + iteration.get_average_num_child(localComm)*symbolic_iteration.get_average_object_size(localComm) /*to remove*/ /2) *
+				(1 - safety_margin)/iqs::utils::upsize_policy /*to remove*/ /2;
 		}
 
+		/* rest of the simulation */
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, max_num_object/local_size, mid_step_function);
+		symbolic_iteration.compute_collisions(communicator, mid_step_function);
+
 		/* finalize simulation */
-		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object / local_size, mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object/local_size, mid_step_function);
 		mid_step_function("equalize");
 
 		/* equalize and/or normalize */
@@ -761,10 +708,7 @@ namespace iqs::mpi {
 		/* equalize amoung pairs */
 		if (num_symbolic_object > other_num_object) {
 			size_t num_symbolic_object_to_send = (num_symbolic_object - other_num_object) / 2;
-			size_t num_object_sent = num_object - 
-				std::distance(&num_childs[0],
-					std::upper_bound(&num_childs[0], &num_childs[num_object],
-						num_symbolic_object - num_symbolic_object_to_send));
+			size_t num_object_sent = num_symbolic_object_to_send / iqs::it_t::get_average_num_child();
 
 			send_objects(num_object_sent, this_pair_id, communicator, true);
 		} else if (num_symbolic_object < other_num_object)
