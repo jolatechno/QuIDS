@@ -1021,8 +1021,6 @@ namespace iqs::rules::qcgd {
 
 			iqs::tolerance = parse_float_with_default(string_arg, "tolerance=", ",", iqs::tolerance);
 			iqs::safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", iqs::safety_margin);
-			iqs::collision_test_proportion = parse_float_with_default(string_arg, "collision_test_proportion=", ",", iqs::collision_test_proportion);
-			iqs::collision_tolerance = parse_float_with_default(string_arg, "collision_tolerance=", ",", iqs::collision_tolerance);
 
 			size_t max_num_object = parse_int_with_default(string_arg, "max_num_object=", ",", 0);
 

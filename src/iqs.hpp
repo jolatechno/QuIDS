@@ -22,17 +22,8 @@
 #ifndef SIZE_AVERAGE_PROPORTION
 	#define SIZE_AVERAGE_PROPORTION 0.1
 #endif
-#ifndef MIN_COLLISION_SIZE
-	#define MIN_COLLISION_SIZE MIN_VECTOR_SIZE
-#endif
-#ifndef COLLISION_TEST_PROPORTION
-	#define COLLISION_TEST_PROPORTION 0.1
-#endif
-#ifndef COLLISION_TOLERANCE
-	#define COLLISION_TOLERANCE 0.05
-#endif
 #ifndef LOAD_BALANCING_BUCKET_PER_THREAD
-	#define LOAD_BALANCING_BUCKET_PER_THREAD 8
+	#define LOAD_BALANCING_BUCKET_PER_THREAD 32
 #endif
 
 /*
@@ -60,9 +51,6 @@ namespace iqs {
 	*/
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
-	size_t min_collision_size = MIN_COLLISION_SIZE;
-	float collision_test_proportion = COLLISION_TEST_PROPORTION;
-	float collision_tolerance = COLLISION_TOLERANCE;
 	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
 	#ifdef SIMPLE_TRUNCATION
