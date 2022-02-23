@@ -377,6 +377,7 @@ namespace iqs::mpi {
 		mid_step_function("equalize");
 
 		/* equalize and/or normalize */
+		max_equalize = iqs::utils::log_2_upper_bound(size);
 		while((max_n_object = get_max_num_object_per_task(next_iteration, communicator)) > min_equalize_size &&
 			((float)max_n_object - (float)next_iteration.get_total_num_object(communicator)/(float)size)/(float)max_n_object > equalize_imablance &&
 			--max_equalize >= 0)
