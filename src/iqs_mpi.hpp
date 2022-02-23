@@ -42,7 +42,7 @@ namespace iqs::mpi {
 		void normalize(MPI_Comm communicator, iqs::debug_t mid_step_function=[](const char*){});
 
 		size_t get_mem_size(MPI_Comm communicator) {
-			static const size_t mpi_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 3*sizeof(size_t);
+			static const size_t mpi_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
 			size_t total_size, local_size = mpi_iteration_memory_size*magnitude.size() + objects.size();
 			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 			return total_size;
@@ -53,7 +53,7 @@ namespace iqs::mpi {
 			return (float)total_size / (float)get_total_num_object(communicator);
 		}
 		float get_average_object_size(MPI_Comm communicator) {
-			static const size_t mpi_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 3*sizeof(size_t);
+			static const size_t mpi_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
 
 			size_t total_object_size;
 			MPI_Allreduce(&object_begin[num_object], &total_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
@@ -310,9 +310,9 @@ namespace iqs::mpi {
 		/* compute max_num_object */
 		if (max_num_object == 0) {
 			mid_step_function("get_max_num_object");
-			max_num_object = (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm) + /*to remove*/ iteration.get_mem_size(localComm)) /
-				(iteration.get_average_object_size(localComm) + iteration.get_average_num_child(localComm)*symbolic_iteration.get_average_object_size(localComm) /*to remove*/ /2) *
-				(1 - safety_margin)/iqs::utils::upsize_policy /*to remove*/ /2;
+			max_num_object = (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm)) /
+				(iteration.get_average_object_size(localComm) + iteration.get_average_num_child(localComm)*symbolic_iteration.get_average_object_size(localComm)) *
+				(1 - safety_margin)/iqs::utils::upsize_policy;
 		}
 
 		/* rest of the simulation */
@@ -423,6 +423,7 @@ namespace iqs::mpi {
 		}
 
 		mid_step_function("compute_collisions - com");
+
 		MPI_Bcast(&load_balancing_begin[1], n_segment, MPI_INT, 0, communicator);
 		mid_step_function("compute_collisions - prepare");
 
