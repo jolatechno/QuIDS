@@ -330,12 +330,6 @@ namespace iqs::mpi {
 		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object / local_size, mid_step_function);
 		mid_step_function("equalize");
 
-		
-		float max = get_max_num_object_per_task(next_iteration, communicator);
-		float avg = (float)next_iteration.get_total_num_object(communicator)/(float)size;
-		if (rank == 0)
-			std::cout << max << ", " << (max - avg)/max << "\n";
-
 		/* equalize and/or normalize */
 		size_t max_n_object;
 		int max_equalize = iqs::utils::log_2_upper_bound(size);
@@ -636,10 +630,6 @@ namespace iqs::mpi {
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
-
-
-		if (rank == 0)
-			std::cout << "	equalize!!\n";
 
 		/* gather sizes */
 		size_t *sizes;
