@@ -416,17 +416,16 @@ namespace iqs::mpi {
 
 		std::vector<int> load_balancing_begin(n_segment + 1, 0);
 		std::vector<size_t> partition_begin(num_bucket + 1, 0);
-		std::vector<size_t> total_partition_begin(rank == 0 ? num_bucket + 1 : 2, 0);
 
-		std::vector<int> local_disp(n_segment + 1, 0);
-		std::vector<int> local_count(n_segment + 1, 0);
+		std::vector<int> local_disp(n_segment + 1);
+		std::vector<int> local_count(n_segment);
 		std::vector<int> global_disp(n_segment + 1, 0);
-		std::vector<int> global_count(n_segment + 1, 0);
+		std::vector<int> global_count(n_segment);
 
-		std::vector<int> send_disp(size + 1, 0);
-		std::vector<int> send_count(size, 0);
-		std::vector<int> receive_disp(size + 1, 0);
-		std::vector<int> receive_count(size, 0);
+		std::vector<int> send_disp(size + 1);
+		std::vector<int> send_count(size);
+		std::vector<int> receive_disp(size + 1);
+		std::vector<int> receive_count(size);
 
 		mid_step_function("compute_collisions - prepare");
 		mpi_resize(num_object);
@@ -462,20 +461,29 @@ namespace iqs::mpi {
 		/* !!!!!!!!!!!!!!!!
 		load-balance
 		!!!!!!!!!!!!!!!! */
-		mid_step_function("compute_collisions - com");
-		MPI_Reduce(&partition_begin[1], &total_partition_begin[1],
-			num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
-		mid_step_function("compute_collisions - prepare");
+		if (rank == 0) {
+			std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
 
-		if (rank == 0)
+			mid_step_function("compute_collisions - com");
+			MPI_Reduce(&partition_begin[1], &total_partition_begin[1],
+				num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
+			mid_step_function("compute_collisions - prepare");
+
 			iqs::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
 				load_balancing_begin.begin(), load_balancing_begin.end());
+		} else {
+			mid_step_function("compute_collisions - com");
+			MPI_Reduce(&partition_begin[1], NULL,
+				num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
+			mid_step_function("compute_collisions - prepare");
+		}
 
 		mid_step_function("compute_collisions - com");
 		MPI_Bcast(&load_balancing_begin[1], n_segment, MPI_INT, 0, communicator);
 		mid_step_function("compute_collisions - prepare");
 
 		/* recompute local count and disp */
+		local_disp[0] = 0;
 		for (int i = 1; i <= n_segment; ++i) {
 			local_disp[i] = partition_begin[load_balancing_begin[i]];
 			local_count[i - 1] = local_disp[i] - local_disp[i - 1];
@@ -493,9 +501,10 @@ namespace iqs::mpi {
 		MPI_Alltoall(&local_count[0], num_threads, MPI_INT, &global_count[0], num_threads, MPI_INT, communicator);
 		mid_step_function("compute_collisions - prepare");
 
-		std::partial_sum(&global_count[0], &global_count[n_segment], &global_disp[1]);
+		std::partial_sum(&global_count[0], &global_count[0] + n_segment, &global_disp[1]);
 
 		/* recompute send and receive count and disp */
+		send_disp[0] = 0; receive_count[0] = 0;
 		for (int i = 1; i <= size; ++i) {
 			send_disp[i] = local_disp[i*num_threads];
 			send_count[i - 1] = send_disp[i] - send_disp[i - 1];
