@@ -4,6 +4,13 @@
 #include <parallel/numeric>
 #include <limits>
 
+
+
+#include <iostream>
+
+
+
+
 #include <complex>
 #include <cstddef>
 #include <vector>
@@ -96,7 +103,6 @@ namespace iqs {
 
 	protected:
 		mutable size_t max_symbolic_object_size = 0;
-		mutable size_t truncated_num_object = 0;
 
 		mutable utils::fast_vector<mag_t> magnitude;
 		mutable utils::fast_vector<char> objects;
@@ -131,22 +137,29 @@ namespace iqs {
 			objects.resize(size);
 		}
 
-		size_t get_mem_size() {
+
+		/*
+		utils functions
+		*/
+		size_t get_mem_size() const {
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
 			return magnitude.size()*iteration_memory_size + objects.size();
 		}
-		float get_average_num_child() {
+		float get_average_num_child() const {
 			return (float)get_num_symbolic_object() / (float)num_object;
 		}
-		float get_average_object_size() {
+		size_t get_object_length() const {
+			return object_begin[num_object];
+		}
+		float get_average_object_size() const {
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
-			return (float)iteration_memory_size + (float)object_begin[num_object]/(float)num_object;
+			return (float)iteration_memory_size + (float)get_object_length()/(float)num_object;
 		}
 
 
 
 		void compute_num_child(rule_t const *rule, debug_t mid_step_function=[](const char*){}) const;
-		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, const size_t max_num_object, debug_t mid_step_function=[](const char*){}) const;
+		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, it_t const &next_iteration, const size_t max_num_object, debug_t mid_step_function=[](const char*){}) const;
 		void apply_modifier(modifier_t const rule);
 		void normalize(debug_t mid_step_function=[](const char*){});
 
@@ -299,11 +312,14 @@ namespace iqs {
 			}
 		}
 
+
+		/*
+		utils functions
+		*/
 		float get_average_object_size() {
 			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 7*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 			return (float)symbolic_iteration_memory_size;
 		}
-		
 		size_t get_mem_size() {
 			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 7*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
 			return magnitude.size()*symbolic_iteration_memory_size;
@@ -338,7 +354,7 @@ namespace iqs {
 		}
 
 		/* rest of simulation*/
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration, max_num_object, mid_step_function);
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, next_iteration, max_num_object, mid_step_function);
 		symbolic_iteration.compute_collisions(mid_step_function);
 		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object, mid_step_function);
 		next_iteration.normalize(mid_step_function);
@@ -371,7 +387,7 @@ namespace iqs {
 	/*
 	generate symbolic iteration
 	*/
-	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, const size_t max_num_object, debug_t mid_step_function) const {
+	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, it_t const &next_iteration, const size_t max_num_object, debug_t mid_step_function) const {
 		if (num_object == 0) {
 			symbolic_iteration.num_object = 0;
 			mid_step_function("truncate");
@@ -387,7 +403,7 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 		mid_step_function("truncate");
 
-		truncated_num_object = num_object;
+		size_t truncated_num_object = num_object;
 		if (max_num_object > utils::min_vector_size && num_object > max_num_object) {
 			//if (simple_truncation) {
 				/* select graphs according to random selectors */
@@ -421,6 +437,17 @@ namespace iqs {
 
 			truncated_num_object = max_num_object;
 		}
+
+		/* downsize if needed */
+		size_t next_object_size = truncated_num_object*get_object_length()/num_object;
+		if (next_object_size < next_iteration.get_object_length())
+			next_iteration.allocate(next_object_size);
+
+		/* downsize if needed */
+		if (truncated_num_object < next_iteration.num_object)
+			next_iteration.resize(truncated_num_object);
+
+		
 
 
 
