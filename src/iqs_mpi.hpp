@@ -47,8 +47,9 @@ namespace iqs::mpi {
 		utils functions
 		*/
 		size_t inline get_mem_size(MPI_Comm communicator) const {
-			static const size_t mpi_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
-			size_t total_size, local_size = mpi_iteration_memory_size*magnitude.size() + objects.size();
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
+
+			size_t total_size, local_size = iteration_memory_size*magnitude.size() + objects.size();
 			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 			return total_size;
 		}
@@ -58,11 +59,11 @@ namespace iqs::mpi {
 			return (float)total_size / (float)get_total_num_object(communicator);
 		}
 		float inline get_average_object_size(MPI_Comm communicator) const {
-			static const size_t mpi_iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
 
 			size_t total_object_size;
 			MPI_Allreduce(&object_begin[num_object], &total_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			return (float)mpi_iteration_memory_size + (float)total_object_size/(float)get_total_num_object(communicator);
+			return (float)iteration_memory_size + (float)total_object_size/(float)get_total_num_object(communicator);
 		}
 
 	public:
@@ -239,14 +240,37 @@ namespace iqs::mpi {
 		utils functions
 		*/
 		float inline get_average_object_size(MPI_Comm communicator) const {
-			static const size_t mpi_symbolic_iteration_memory_size = (1 + 1) + (2 + 4)*sizeof(PROBA_TYPE) + (7 + 2)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
-			return (float)mpi_symbolic_iteration_memory_size;
+			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
+
+			static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+
+			static const size_t mpi_symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 1*sizeof(size_t) + sizeof(int);
+			return (float)symbolic_iteration_memory_size + (float)mpi_symbolic_iteration_memory_size + hash_map_size;
 		}
 		size_t inline get_mem_size(MPI_Comm communicator) const {
-			static const size_t mpi_symbolic_iteration_memory_size = (1 + 1) + (2 + 4)*sizeof(PROBA_TYPE) + (7 + 2)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double) + sizeof(int);
-			size_t total_size, local_size = mpi_symbolic_iteration_memory_size*magnitude.size();
-			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
+
+			size_t memory_size = 0;
+			for (auto &map : elimination_maps)
+				memory_size += elimination_maps.capacity();
+			memory_size *= hash_map_size;
+
+			static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+			memory_size += magnitude.size()*symbolic_iteration_memory_size;
+
+			static const size_t mpi_symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 1*sizeof(size_t) + sizeof(int);
+			memory_size += mag_buffer.size()*mpi_symbolic_iteration_memory_size;
+
+			size_t total_size = mpi_symbolic_iteration_memory_size*magnitude.size();
+			MPI_Allreduce(MPI_IN_PLACE, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 			return total_size;
+		}
+		float get_average_child_size(MPI_Comm communicator) const {
+			size_t total_size = __gnu_parallel::accumulate(size.begin(), size.begin() + num_object, 0);
+			MPI_Allreduce(MPI_IN_PLACE, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
+			return (float)iteration_memory_size + (float)total_size / (float)get_total_num_object(communicator);
 		}
 
 	public:
@@ -328,6 +352,14 @@ namespace iqs::mpi {
 		/* rest of the simulation */
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, next_iteration, max_num_object/local_size, mid_step_function);
 		symbolic_iteration.compute_collisions(communicator, mid_step_function);
+
+		/* second max_num_object */
+		if (max_num_object == 0) {
+			mid_step_function("get_max_num_object");
+			max_num_object = (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm)) /
+				symbolic_iteration.get_average_child_size(localComm) *
+				(1 - safety_margin)/iqs::utils::upsize_policy;
+		}
 
 		/* finalize simulation */
 		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object/local_size, mid_step_function);

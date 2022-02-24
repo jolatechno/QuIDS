@@ -20,6 +20,9 @@
 #ifndef PROBA_TYPE
 	#define PROBA_TYPE double
 #endif
+#ifndef HASH_MAP_OVERHEAD
+	#define HASH_MAP_OVERHEAD 1.7
+#endif
 #ifndef TOLERANCE
 	#define TOLERANCE 1e-30;
 #endif
@@ -254,7 +257,7 @@ namespace iqs {
 
 		utils::fast_vector<mag_t> magnitude;
 		utils::fast_vector<size_t> next_oid;
-		utils::fast_vector<bool> is_unique;
+		utils::fast_vector<char /*bool*/> is_unique;
 		utils::fast_vector<size_t> size;
 		utils::fast_vector<size_t> hash;
 		utils::fast_vector<size_t> parent_oid;
@@ -317,12 +320,28 @@ namespace iqs {
 		utils functions
 		*/
 		float get_average_object_size() {
-			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 7*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
-			return (float)symbolic_iteration_memory_size;
+			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
+			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+			return (float)hash_map_size + hash_map_size;
 		}
 		size_t get_mem_size() {
-			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 7*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
-			return magnitude.size()*symbolic_iteration_memory_size;
+			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
+
+			size_t memory_size = 0;
+			for (auto &map : elimination_maps)
+				memory_size += elimination_maps.capacity();
+			memory_size *= hash_map_size;
+
+			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+			memory_size += magnitude.size()*symbolic_iteration_memory_size;
+
+			return memory_size;
+		}
+		float get_average_child_size() const {
+			float average_size = (float)__gnu_parallel::accumulate(size.begin(), size.begin() + num_object, 0) / (float)num_object;
+
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
+			return (float)iteration_memory_size + average_size;
 		}
 
 		void compute_collisions(debug_t mid_step_function=[](const char*){});
@@ -353,9 +372,19 @@ namespace iqs {
 				(1 - safety_margin)/utils::upsize_policy;
 		}
 
-		/* rest of simulation*/
+		/* generate symbolic iteration */
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, next_iteration, max_num_object, mid_step_function);
 		symbolic_iteration.compute_collisions(mid_step_function);
+
+		/* second max_num_object */
+		if (max_num_object == 0) {
+			mid_step_function("get_max_num_object");
+			max_num_object = (float)(utils::get_free_mem() + next_iteration.get_mem_size()) /
+				symbolic_iteration.get_average_child_size() *
+				(1 - safety_margin)/utils::upsize_policy;
+		}
+
+		/* finish simulation */
 		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object, mid_step_function);
 		next_iteration.normalize(mid_step_function);
 	}
