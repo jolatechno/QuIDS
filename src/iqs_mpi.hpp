@@ -292,6 +292,29 @@ namespace iqs::mpi {
 	};
 
 	/*
+	function to compute the maximum and minimum per node size
+	*/
+	float get_avg_num_symbolic_object_per_task(mpi_it_t const &iteration, MPI_Comm communicator) {
+		size_t total_num_object_per_node, num_symbolic_object = iteration.get_num_symbolic_object();
+		MPI_Allreduce(&num_symbolic_object, &total_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+
+		int size;
+		MPI_Comm_size(communicator, &size);
+
+		return (float)total_num_object_per_node/(float)size;
+	}
+	size_t get_max_num_symbolic_object_per_task(mpi_it_t const &iteration, MPI_Comm communicator) {
+		size_t max_num_object_per_node, num_symbolic_object = iteration.get_num_symbolic_object();
+		MPI_Allreduce(&num_symbolic_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
+		return max_num_object_per_node;
+	}
+	size_t get_max_num_object_per_task(mpi_it_t const &iteration, MPI_Comm communicator) {
+		size_t max_num_object_per_node;
+		MPI_Allreduce(&iteration.num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
+		return max_num_object_per_node;
+	}
+
+	/*
 	simulation function
 	*/
 	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](const char*){}) {
@@ -303,46 +326,6 @@ namespace iqs::mpi {
 		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
 		MPI_Comm_size(localComm, &local_size);
 
-		/*
-		function to compute the maximum and minimum per node size
-		*/
-		auto const get_avg_num_symbolic_object_per_task = [&]() {
-			size_t total_num_object_per_node = iteration.get_num_symbolic_object();
-			MPI_Allreduce(MPI_IN_PLACE, &total_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
-
-			return (float)total_num_object_per_node/(float)size;
-		};
-		auto const get_max_num_symbolic_object_per_task = [&]() {
-			size_t max_num_object_per_node = iteration.get_num_symbolic_object();
-			MPI_Allreduce(MPI_IN_PLACE, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, localComm);
-			return max_num_object_per_node;
-		};
-		auto const get_max_num_object_per_task = [&]() {
-			size_t max_num_object_per_node;
-			MPI_Allreduce(&iteration.num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, localComm);
-			return max_num_object_per_node;
-		};
-		/*
-		function to compute the maximum number of objects
-		*/
-		auto const get_first_max_num_object = [&]() {
-			MPI_Barrier(localComm);
-			return (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm)) /
-				(iteration.get_average_object_size(localComm) + iteration.get_average_num_child(localComm)*symbolic_iteration.get_average_object_size(localComm)) *
-				(1 - safety_margin)/iqs::utils::upsize_policy;
-		};
-		auto const get_second_max_num_object = [&]() {
-			MPI_Barrier(localComm);
-			return (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm)) /
-				symbolic_iteration.get_average_child_size(localComm) *
-				(1 - safety_margin)/iqs::utils::upsize_policy;
-		};
-
-
-
-
-
-
 		if (size == 1)
 			return iqs::simulate(iteration, rule, next_iteration, symbolic_iteration, max_num_object, mid_step_function);
 
@@ -353,15 +336,17 @@ namespace iqs::mpi {
 		mid_step_function("equalize_child");
 		size_t max_n_object;
 		int max_equalize = iqs::utils::log_2_upper_bound(size);
-		while((max_n_object = get_max_num_symbolic_object_per_task()) > min_equalize_size &&
-			((float)max_n_object - get_avg_num_symbolic_object_per_task())/(float)max_n_object > equalize_imablance &&
+		while((max_n_object = get_max_num_symbolic_object_per_task(iteration, communicator)) > min_equalize_size &&
+			((float)max_n_object - get_avg_num_symbolic_object_per_task(iteration, communicator))/(float)max_n_object > equalize_imablance &&
 			--max_equalize >= 0)
 				iteration.equalize_symbolic(communicator);
 
 		/* compute max_num_object */
 		if (max_num_object == 0) {
 			mid_step_function("get_max_num_object");
-			max_num_object = get_first_max_num_object();
+			max_num_object = (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm)) /
+				(iteration.get_average_object_size(localComm) + iteration.get_average_num_child(localComm)*symbolic_iteration.get_average_object_size(localComm)) *
+				(1 - safety_margin)/iqs::utils::upsize_policy;
 		}
 
 		/* rest of the simulation */
@@ -371,7 +356,9 @@ namespace iqs::mpi {
 		/* second max_num_object */
 		if (max_num_object == 0) {
 			mid_step_function("get_max_num_object");
-			max_num_object = get_second_max_num_object();
+			max_num_object = (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm)) /
+				symbolic_iteration.get_average_child_size(localComm) *
+				(1 - safety_margin)/iqs::utils::upsize_policy;
 		}
 
 		/* finalize simulation */
@@ -380,7 +367,7 @@ namespace iqs::mpi {
 
 		/* equalize and/or normalize */
 		max_equalize = iqs::utils::log_2_upper_bound(size);
-		while((max_n_object = get_max_num_object_per_task()) > min_equalize_size &&
+		while((max_n_object = get_max_num_object_per_task(next_iteration, communicator)) > min_equalize_size &&
 			((float)max_n_object - (float)next_iteration.get_total_num_object(communicator)/(float)size)/(float)max_n_object > equalize_imablance &&
 			--max_equalize >= 0)
 				next_iteration.equalize(communicator); 
