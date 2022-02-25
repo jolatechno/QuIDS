@@ -674,7 +674,6 @@ namespace iqs {
 		/* !!!!!!!!!!!!!!!!
 		truncate
 		 !!!!!!!!!!!!!!!! */
-		mid_step_function("truncate");
 
 		if (next_iteration_num_object > max_num_object) {
 			if (simple_truncation) {
