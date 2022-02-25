@@ -7,8 +7,8 @@
 #ifndef MIN_EQUALIZE_SIZE
 	#define MIN_EQUALIZE_SIZE 100
 #endif
-#ifndef EQUALIZE_IMBALANCE
-	#define EQUALIZE_IMBALANCE 0.01
+#ifndef EQUALIZE_INBALANCE
+	#define EQUALIZE_INBALANCE 0.01
 #endif
 
 namespace iqs::mpi {
@@ -24,7 +24,7 @@ namespace iqs::mpi {
 	global variables
 	*/
 	size_t min_equalize_size = MIN_EQUALIZE_SIZE;
-	float equalize_imablance = EQUALIZE_IMBALANCE;
+	float equalize_inbalance = EQUALIZE_INBALANCE;
 
 	/* forward typedef */
 	typedef class mpi_iteration mpi_it_t;
@@ -376,9 +376,9 @@ namespace iqs::mpi {
 		/* equalize symbolic objects */
 		mid_step_function("equalize_child");
 		size_t max_n_object;
-		int max_equalize = iqs::utils::log_2_upper_bound(size);
+		int max_equalize = iqs::utils::log_2_upper_bound(size) * iqs::utils::log_2_upper_bound(1/equalize_inbalance);
 		while((max_n_object = iteration.get_max_num_symbolic_object_per_task(communicator)) > min_equalize_size &&
-			((float)max_n_object - iteration.get_avg_num_symbolic_object_per_task(communicator))/(float)max_n_object > equalize_imablance &&
+			((float)max_n_object - iteration.get_avg_num_symbolic_object_per_task(communicator))/(float)max_n_object > equalize_inbalance &&
 			--max_equalize >= 0) {
 				iteration.equalize_symbolic(communicator);
 				iteration.truncated_num_object = iteration.num_object;
@@ -388,10 +388,11 @@ namespace iqs::mpi {
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
+			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
 			do {
 				max_truncated_num_object = get_max_num_object_initial();
 				iteration.truncate(max_truncated_num_object/local_size);
-			} while (iteration.get_total_truncated_num_object(localComm) > max_truncated_num_object*iqs::utils::upsize_policy);
+			} while (iteration.get_total_truncated_num_object(localComm) > max_truncated_num_object*iqs::utils::upsize_policy && --max_truncate > 0);
 		} else
 			iteration.truncate(max_num_object/local_size);
 
@@ -413,10 +414,11 @@ namespace iqs::mpi {
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
+			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
 			do {
 				max_truncated_num_object = get_max_num_object_final();
 				symbolic_iteration.truncate(max_truncated_num_object/local_size);
-			} while (symbolic_iteration.get_total_next_iteration_num_object(localComm) > max_truncated_num_object*iqs::utils::upsize_policy);
+			} while (symbolic_iteration.get_total_next_iteration_num_object(localComm) > max_truncated_num_object*iqs::utils::upsize_policy && --max_truncate > 0);
 		} else
 			symbolic_iteration.truncate(max_num_object/local_size);
 
@@ -425,9 +427,9 @@ namespace iqs::mpi {
 		mid_step_function("equalize");
 
 		/* equalize and/or normalize */
-		max_equalize = iqs::utils::log_2_upper_bound(size);
+		max_equalize = iqs::utils::log_2_upper_bound(size) * iqs::utils::log_2_upper_bound(1/equalize_inbalance);
 		while((max_n_object = next_iteration.get_max_num_object_per_task(communicator)) > min_equalize_size &&
-			((float)max_n_object - (float)next_iteration.get_total_num_object(communicator)/(float)size)/(float)max_n_object > equalize_imablance &&
+			((float)max_n_object - (float)next_iteration.get_total_num_object(communicator)/(float)size)/(float)max_n_object > equalize_inbalance &&
 			--max_equalize >= 0)
 				next_iteration.equalize(communicator); 
 
