@@ -389,8 +389,9 @@ namespace iqs::mpi {
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (iteration.get_total_truncated_num_object(localComm) > (max_truncated_num_object = get_max_num_object_initial())*iqs::utils::upsize_policy && --max_truncate > 0)
-				iteration.truncate(max_truncated_num_object/local_size, mid_step_function);
+			while (iteration.get_total_truncated_num_object(localComm) > (max_truncated_num_object = get_max_num_object_initial())*iqs::utils::upsize_policy && 
+				--max_truncate >= 0)
+					iteration.truncate(max_truncated_num_object/local_size, mid_step_function);
 		} else
 			iteration.truncate(max_num_object/local_size, mid_step_function);
 
@@ -413,16 +414,17 @@ namespace iqs::mpi {
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (symbolic_iteration.get_total_next_iteration_num_object(localComm) > (max_truncated_num_object = get_max_num_object_final())*iqs::utils::upsize_policy && --max_truncate > 0)
-				symbolic_iteration.truncate(max_truncated_num_object/local_size, mid_step_function);
+			while (symbolic_iteration.get_total_next_iteration_num_object(localComm) > (max_truncated_num_object = get_max_num_object_final())*iqs::utils::upsize_policy &&
+				--max_truncate >= 0)
+					symbolic_iteration.truncate(max_truncated_num_object/local_size, mid_step_function);
 		} else
 			symbolic_iteration.truncate(max_num_object/local_size, mid_step_function);
 
 		/* finalize simulation */
 		symbolic_iteration.finalize(rule, iteration, next_iteration, mid_step_function);
-		mid_step_function("equalize");
 
 		/* equalize and/or normalize */
+		mid_step_function("equalize");
 		max_equalize = iqs::utils::log_2_upper_bound(size) * iqs::utils::log_2_upper_bound(1/equalize_inbalance);
 		while((max_n_object = next_iteration.get_max_num_object_per_task(communicator)) > min_equalize_size &&
 			((float)max_n_object - (float)next_iteration.get_total_num_object(communicator)/(float)size)/(float)max_n_object > equalize_inbalance &&
@@ -723,22 +725,26 @@ namespace iqs::mpi {
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 
-		/* gather sizes */
-		size_t *sizes;
-		if (rank == 0)
-			sizes = (size_t*)calloc(size, sizeof(size_t));
-		MPI_Gather(&num_object, 1, MPI_UNSIGNED_LONG_LONG, sizes, 1, MPI_UNSIGNED_LONG_LONG, 0, communicator);
 
-		/* compute pair_id*/
 		int this_pair_id;
-		int *pair_id = rank == 0 ? new int[size] : NULL;
-		if (rank == 0)
-			utils::make_equal_pairs(sizes, sizes + size, pair_id);
+		if (rank == 0) {
+			/* gather sizes */
+			std::vector<size_t> sizes(size, 0);
+			MPI_Gather(&num_object, 1, MPI_UNSIGNED_LONG_LONG, &sizes[0], 1, MPI_UNSIGNED_LONG_LONG, 0, communicator);
 
-		/* scatter pair_id */
-		MPI_Scatter(pair_id, 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
-		if (rank == 0)
-			delete[] pair_id;
+			/* compute pair_id*/
+			std::vector<int> pair_id(size, 0);
+			utils::make_equal_pairs(&sizes[0], &sizes[0] + size, &pair_id[0]);
+
+			/* scatter pair_id */
+			MPI_Scatter(&pair_id[0], 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
+		} else {
+			/* gather sizes */
+			MPI_Gather(&num_object, 1, MPI_UNSIGNED_LONG_LONG, NULL, 1, MPI_UNSIGNED_LONG_LONG, 0, communicator);
+
+			/* scatter pair_id */
+			MPI_Scatter(NULL, 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
+		}
 
 		/* skip if this node is alone */
 		if (this_pair_id == rank)
@@ -770,24 +776,27 @@ namespace iqs::mpi {
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 
-		/* gather sizes */
 		size_t num_symbolic_object = get_num_symbolic_object();
 
-		size_t *sizes;
-		if (rank == 0)
-			sizes = (size_t*)calloc(size, sizeof(size_t));
-		MPI_Gather(&num_symbolic_object, 1, MPI_UNSIGNED_LONG_LONG, sizes, 1, MPI_UNSIGNED_LONG_LONG, 0, communicator);
-
-		/* compute pair_id*/
 		int this_pair_id;
-		int *pair_id = rank == 0 ? new int[size] : NULL;
-		if (rank == 0)
-			utils::make_equal_pairs(sizes, sizes + size, pair_id);
+		if (rank == 0) {
+			/* gather sizes */
+			std::vector<size_t> sizes(size, 0);
+			MPI_Gather(&num_symbolic_object, 1, MPI_UNSIGNED_LONG_LONG, &sizes[0], 1, MPI_UNSIGNED_LONG_LONG, 0, communicator);
 
-		/* scatter pair_id */
-		MPI_Scatter(pair_id, 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
-		if (rank == 0)
-			delete[] pair_id;
+			/* compute pair_id*/
+			std::vector<int> pair_id(size, 0);
+			utils::make_equal_pairs(&sizes[0], &sizes[0] + size, &pair_id[0]);
+
+			/* scatter pair_id */
+			MPI_Scatter(&pair_id[0], 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
+		} else {
+			/* gather sizes */
+			MPI_Gather(&num_symbolic_object, 1, MPI_UNSIGNED_LONG_LONG, NULL, 1, MPI_UNSIGNED_LONG_LONG, 0, communicator);
+
+			/* scatter pair_id */
+			MPI_Scatter(NULL, 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
+		}
 
 		/* skip if this node is alone */
 		if (this_pair_id == rank)

@@ -402,8 +402,9 @@ namespace iqs {
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (iteration.truncated_num_object > (max_truncated_num_object = get_max_num_object_initial())*iqs::utils::upsize_policy && --max_truncate > 0)
-				iteration.truncate(max_truncated_num_object, mid_step_function);
+			while (iteration.truncated_num_object > (max_truncated_num_object = get_max_num_object_initial())*iqs::utils::upsize_policy && 
+				--max_truncate >= 0)
+					iteration.truncate(max_truncated_num_object, mid_step_function);
 		} else
 			iteration.truncate(max_num_object, mid_step_function);
 
@@ -426,8 +427,9 @@ namespace iqs {
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (symbolic_iteration.next_iteration_num_object > (max_truncated_num_object = get_max_num_object_final())*iqs::utils::upsize_policy && --max_truncate > 0)
-				symbolic_iteration.truncate(max_truncated_num_object, mid_step_function);
+			while (symbolic_iteration.next_iteration_num_object > (max_truncated_num_object = get_max_num_object_final())*iqs::utils::upsize_policy && 
+				--max_truncate >= 0)
+					symbolic_iteration.truncate(max_truncated_num_object, mid_step_function);
 		} else
 			symbolic_iteration.truncate(max_num_object, mid_step_function);
 
