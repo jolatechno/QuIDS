@@ -54,13 +54,7 @@ namespace iqs::mpi {
 			return total_size;
 		}
 		float inline get_average_num_child(MPI_Comm communicator) const {
-			size_t total_num_child = 0;
-			#pragma omp parallel for reduction(+:total_num_child)
-			for (size_t i = 0; i < truncated_num_object; ++i)
-				total_num_child += num_childs[truncated_oid[i]];
-
-			MPI_Allreduce(MPI_IN_PLACE, &total_num_child, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			return (float)total_num_child / (float)get_total_truncated_num_object(communicator);
+			return (float)get_total_truncated_num_child(communicator) / (float)get_total_truncated_num_object(communicator);
 		}
 		float inline get_average_object_size(MPI_Comm communicator) const {
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
@@ -73,6 +67,14 @@ namespace iqs::mpi {
 			size_t total_truncated_num_object;
 			MPI_Allreduce(&truncated_num_object, &total_truncated_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 			return total_truncated_num_object;
+		}
+		size_t get_total_truncated_num_child(MPI_Comm communicator) const {
+			size_t total_num_child = get_truncated_num_child();
+			MPI_Allreduce(MPI_IN_PLACE, &total_num_child, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return total_num_child;
+		}
+		float get_average_num_child() {
+			return iqs::iteration::get_average_num_child();
 		}
 
 
@@ -348,9 +350,10 @@ namespace iqs::mpi {
 
 
 		auto const get_max_num_object_initial = [&]() {
-			MPI_Barrier(localComm);
+			float average_num_child = iteration.get_average_num_child(localComm);
 			return (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm)) /
-				(iteration.get_average_object_size(localComm) + iteration.get_average_num_child(localComm)*symbolic_iteration.get_average_object_size(localComm)) *
+				(iteration.get_average_object_size(localComm) + average_num_child*symbolic_iteration.get_average_object_size(localComm)) *
+				average_num_child *
 				(1 - safety_margin)/iqs::utils::upsize_policy;
 		};
 		auto const get_max_num_object_final = [&]() {
@@ -376,7 +379,7 @@ namespace iqs::mpi {
 		/* equalize symbolic objects */
 		mid_step_function("equalize_child");
 		size_t max_n_object;
-		int max_equalize = iqs::utils::log_2_upper_bound(size) * iqs::utils::log_2_upper_bound(1/equalize_inbalance);
+		int max_equalize = iqs::utils::log_2_upper_bound(size);
 		while((max_n_object = iteration.get_max_num_symbolic_object_per_task(communicator)) > min_equalize_size &&
 			((float)max_n_object - iteration.get_avg_num_symbolic_object_per_task(communicator))/(float)max_n_object > equalize_inbalance &&
 			--max_equalize >= 0) {
@@ -387,11 +390,12 @@ namespace iqs::mpi {
 		/* max_num_object */
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			size_t max_truncated_num_object;
+			size_t max_truncated_num_symbolic_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (iteration.get_total_truncated_num_object(localComm) > (max_truncated_num_object = get_max_num_object_initial())*iqs::utils::upsize_policy && 
-				--max_truncate >= 0)
-					iteration.truncate(max_truncated_num_object/local_size, mid_step_function);
+			while (iteration.get_total_truncated_num_child(localComm) > (max_truncated_num_symbolic_object = get_max_num_object_initial())*iqs::utils::upsize_policy && 
+				--max_truncate >= 0) {
+					iteration.truncate(max_truncated_num_symbolic_object/iteration.get_average_num_child()/local_size, mid_step_function);
+				}
 		} else
 			iteration.truncate(max_num_object/local_size, mid_step_function);
 
@@ -425,7 +429,7 @@ namespace iqs::mpi {
 
 		/* equalize and/or normalize */
 		mid_step_function("equalize");
-		max_equalize = iqs::utils::log_2_upper_bound(size) * iqs::utils::log_2_upper_bound(1/equalize_inbalance);
+		max_equalize = iqs::utils::log_2_upper_bound(size);
 		while((max_n_object = next_iteration.get_max_num_object_per_task(communicator)) > min_equalize_size &&
 			((float)max_n_object - (float)next_iteration.get_total_num_object(communicator)/(float)size)/(float)max_n_object > equalize_inbalance &&
 			--max_equalize >= 0)
@@ -776,7 +780,9 @@ namespace iqs::mpi {
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 
-		size_t num_symbolic_object = get_num_symbolic_object();
+		/* compute the number of symbolic objects */
+		__gnu_parallel::partial_sum(num_childs.begin(), num_childs.begin() + num_object, child_begin.begin());
+		size_t num_symbolic_object = child_begin[num_object - 1];
 
 		int this_pair_id;
 		if (rank == 0) {
@@ -817,7 +823,10 @@ namespace iqs::mpi {
 		/* equalize amoung pairs */
 		if (num_symbolic_object > other_num_object) {
 			size_t num_symbolic_object_to_send = (num_symbolic_object - other_num_object) / 2;
-			size_t num_object_sent = num_symbolic_object_to_send / iqs::it_t::get_average_num_child();
+
+			/* find the actual number of object to send */
+			auto limit_it = std::lower_bound(child_begin.begin(), child_begin.begin() + num_object, num_symbolic_object - num_symbolic_object_to_send);
+			size_t num_object_sent = std::distance(limit_it, child_begin.begin() + num_object);
 
 			send_objects(num_object_sent, this_pair_id, communicator, true);
 		} else if (num_symbolic_object < other_num_object)

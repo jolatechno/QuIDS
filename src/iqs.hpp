@@ -150,12 +150,15 @@ namespace iqs {
 			return magnitude.size()*iteration_memory_size + objects.size();
 		}
 		float get_average_num_child() const {
+			return (float)get_truncated_num_child() / (float)truncated_num_object;
+		}
+		size_t get_truncated_num_child() const {
 			size_t total_num_child = 0;
 			#pragma omp parallel for reduction(+:total_num_child)
 			for (size_t i = 0; i < truncated_num_object; ++i)
 				total_num_child += num_childs[truncated_oid[i]];
 
-			return (float)total_num_child / (float)truncated_num_object;
+			return total_num_child;
 		}
 		size_t get_object_length() const {
 			return object_begin[num_object];
@@ -377,8 +380,10 @@ namespace iqs {
 	}
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
 		auto const get_max_num_object_initial = [&]() {
+			float average_num_child = iteration.get_average_num_child();
 			return (float)(utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size()) /
-				(iteration.get_average_object_size() + iteration.get_average_num_child()*symbolic_iteration.get_average_object_size()) *
+				(iteration.get_average_object_size() + average_num_child*symbolic_iteration.get_average_object_size()) *
+				average_num_child *
 				(1 - safety_margin)/utils::upsize_policy;
 		};
 		auto const get_max_num_object_final = [&]() {
@@ -400,11 +405,11 @@ namespace iqs {
 		/* max_num_object */
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			size_t max_truncated_num_object;
+			size_t max_truncated_num_symbolic_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (iteration.truncated_num_object > (max_truncated_num_object = get_max_num_object_initial())*iqs::utils::upsize_policy && 
+			while (iteration.get_truncated_num_child() > (max_truncated_num_symbolic_object = get_max_num_object_initial())*iqs::utils::upsize_policy && 
 				--max_truncate >= 0)
-					iteration.truncate(max_truncated_num_object, mid_step_function);
+					iteration.truncate(max_truncated_num_symbolic_object/iteration.get_average_num_child(), mid_step_function);
 		} else
 			iteration.truncate(max_num_object, mid_step_function);
 
