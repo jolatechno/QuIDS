@@ -54,9 +54,14 @@ namespace iqs::mpi {
 			return total_size;
 		}
 		float inline get_average_num_child(MPI_Comm communicator) const {
-			size_t total_size = get_num_symbolic_object();
+			size_t total_truncated_num_object, total_num_child = 0;
+			#pragma omp parallel for reduction(+:total_num_child)
+			for (size_t i = 0; i < truncated_num_object; ++i)
+				total_num_child += num_childs[truncated_oid[i]];
+
 			MPI_Allreduce(MPI_IN_PLACE, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			return (float)total_size / (float)get_total_num_object(communicator);
+			MPI_Allreduce(&total_truncated_num_object, &truncated_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return (float)total_size / (float)total_truncated_num_object;
 		}
 		float inline get_average_object_size(MPI_Comm communicator) const {
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);

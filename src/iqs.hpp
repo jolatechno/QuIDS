@@ -150,7 +150,12 @@ namespace iqs {
 			return magnitude.size()*iteration_memory_size + objects.size();
 		}
 		float get_average_num_child() const {
-			return (float)get_num_symbolic_object() / (float)num_object;
+			size_t total_num_child = 0;
+			#pragma omp parallel for reduction(+:total_num_child)
+			for (size_t i = 0; i < truncated_num_object; ++i)
+				total_num_child += num_childs[truncated_oid[i]];
+
+			return (float)total_num_child / (float)truncated_num_object;
 		}
 		size_t get_object_length() const {
 			return object_begin[num_object];
