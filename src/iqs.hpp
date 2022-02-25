@@ -361,15 +361,29 @@ namespace iqs {
 		iteration.apply_modifier(rule);
 	}
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
+		auto const get_max_num_object_initial = [&]() {
+			return (float)(utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size()) /
+				(iteration.get_average_object_size() + iteration.get_average_num_child()*symbolic_iteration.get_average_object_size()) *
+				(1 - safety_margin)/utils::upsize_policy;
+		};
+		auto const get_max_num_object_final = [&]() {
+			return (float)(utils::get_free_mem() + next_iteration.get_mem_size()) /
+				symbolic_iteration.get_average_child_size() *
+				(1 - safety_margin)/utils::upsize_policy;
+		};
+
+
+
+
+
+
+
 		/* compute the number of child */
 		iteration.compute_num_child(rule, mid_step_function);
 
 		/* max_num_object */
 		if (max_num_object == 0) {
-			mid_step_function("get_max_num_object");
-			max_num_object = (float)(utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size()) /
-				(iteration.get_average_object_size() + iteration.get_average_num_child()*symbolic_iteration.get_average_object_size()) *
-				(1 - safety_margin)/utils::upsize_policy;
+			max_num_object = get_max_num_object_initial();
 		}
 
 		/* generate symbolic iteration */
@@ -378,10 +392,7 @@ namespace iqs {
 
 		/* second max_num_object */
 		if (max_num_object == 0) {
-			mid_step_function("get_max_num_object");
-			max_num_object = (float)(utils::get_free_mem() + next_iteration.get_mem_size()) /
-				symbolic_iteration.get_average_child_size() *
-				(1 - safety_margin)/utils::upsize_policy;
+			max_num_object = get_max_num_object_final();
 		}
 
 		/* finish simulation */
