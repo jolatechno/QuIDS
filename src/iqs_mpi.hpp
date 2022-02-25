@@ -389,12 +389,10 @@ namespace iqs::mpi {
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			do {
-				max_truncated_num_object = get_max_num_object_initial();
-				iteration.truncate(max_truncated_num_object/local_size);
-			} while (iteration.get_total_truncated_num_object(localComm) > max_truncated_num_object*iqs::utils::upsize_policy && --max_truncate > 0);
+			while (iteration.get_total_truncated_num_object(localComm) > (max_truncated_num_object = get_max_num_object_initial())*iqs::utils::upsize_policy && --max_truncate > 0)
+				iteration.truncate(max_truncated_num_object/local_size, mid_step_function);
 		} else
-			iteration.truncate(max_num_object/local_size);
+			iteration.truncate(max_num_object/local_size, mid_step_function);
 
 		/* downsize if needed */
 		if (iteration.num_object > 0) {
@@ -415,12 +413,10 @@ namespace iqs::mpi {
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			do {
-				max_truncated_num_object = get_max_num_object_final();
-				symbolic_iteration.truncate(max_truncated_num_object/local_size);
-			} while (symbolic_iteration.get_total_next_iteration_num_object(localComm) > max_truncated_num_object*iqs::utils::upsize_policy && --max_truncate > 0);
+			while (symbolic_iteration.get_total_next_iteration_num_object(localComm) > (max_truncated_num_object = get_max_num_object_final())*iqs::utils::upsize_policy && --max_truncate > 0)
+				symbolic_iteration.truncate(max_truncated_num_object/local_size, mid_step_function);
 		} else
-			symbolic_iteration.truncate(max_num_object/local_size);
+			symbolic_iteration.truncate(max_num_object/local_size, mid_step_function);
 
 		/* finalize simulation */
 		symbolic_iteration.finalize(rule, iteration, next_iteration, mid_step_function);

@@ -402,12 +402,10 @@ namespace iqs {
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			do {
-				max_truncated_num_object = get_max_num_object_initial();
-				iteration.truncate(max_truncated_num_object);
-			} while (iteration.truncated_num_object> max_truncated_num_object*iqs::utils::upsize_policy && --max_truncate > 0);
+			while (iteration.truncated_num_object > (max_truncated_num_object = get_max_num_object_initial())*iqs::utils::upsize_policy && --max_truncate > 0)
+				iteration.truncate(max_truncated_num_object, mid_step_function);
 		} else
-			iteration.truncate(max_num_object);
+			iteration.truncate(max_num_object, mid_step_function);
 
 		/* downsize if needed */
 		if (iteration.num_object > 0) {
@@ -428,12 +426,10 @@ namespace iqs {
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			do {
-				max_truncated_num_object = get_max_num_object_final();
-				symbolic_iteration.truncate(max_truncated_num_object);
-			} while (symbolic_iteration.next_iteration_num_object > max_truncated_num_object*iqs::utils::upsize_policy && --max_truncate > 0);
+			while (symbolic_iteration.next_iteration_num_object > (max_truncated_num_object = get_max_num_object_final())*iqs::utils::upsize_policy && --max_truncate > 0)
+				symbolic_iteration.truncate(max_truncated_num_object, mid_step_function);
 		} else
-			symbolic_iteration.truncate(max_num_object);
+			symbolic_iteration.truncate(max_num_object, mid_step_function);
 
 		/* finish simulation */
 		symbolic_iteration.finalize(rule, iteration, next_iteration, mid_step_function);
@@ -472,7 +468,7 @@ namespace iqs {
 		pre_truncate
 		 !!!!!!!!!!!!!!!! */
 
-		if (max_num_object >= utils::min_vector_size && truncated_num_object > max_num_object) {
+		if (truncated_num_object > max_num_object) {
 			//if (simple_truncation) {
 				/* select graphs according to random selectors */
 				__gnu_parallel::nth_element(&truncated_oid[0], &truncated_oid[max_num_object], &truncated_oid[0] + truncated_num_object,
@@ -678,7 +674,7 @@ namespace iqs {
 		 !!!!!!!!!!!!!!!! */
 		mid_step_function("truncate");
 
-		if (max_num_object >= utils::min_vector_size && next_iteration_num_object > max_num_object) {
+		if (next_iteration_num_object > max_num_object) {
 			if (simple_truncation) {
 				/* select graphs according to random selectors */
 				__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[0] + next_iteration_num_object,
