@@ -291,7 +291,7 @@ namespace iqs::mpi {
 			return total_size;
 		}
 		float get_average_child_size(MPI_Comm communicator) const {
-			size_t total_size = __gnu_parallel::accumulate(size.begin(), size.begin() + num_object, 0);
+			size_t total_size = __gnu_parallel::accumulate(size.begin(), size.begin() + num_object, (size_t)0);
 			MPI_Allreduce(MPI_IN_PLACE, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
@@ -351,6 +351,7 @@ namespace iqs::mpi {
 
 		/* start actual simulation */
 		iteration.compute_num_child(rule, mid_step_function);
+		iteration.truncated_num_object = iteration.num_object;
 
 		/* equalize symbolic objects */
 		mid_step_function("equalize_child");
@@ -358,27 +359,43 @@ namespace iqs::mpi {
 		int max_equalize = iqs::utils::log_2_upper_bound(size);
 		while((max_n_object = iteration.get_max_num_symbolic_object_per_task(communicator)) > min_equalize_size &&
 			((float)max_n_object - iteration.get_avg_num_symbolic_object_per_task(communicator))/(float)max_n_object > equalize_imablance &&
-			--max_equalize >= 0)
+			--max_equalize >= 0) {
 				iteration.equalize_symbolic(communicator);
+				iteration.truncated_num_object = iteration.num_object;
+			}
 
-		/* compute max_num_object */
+		/* max_num_object */
+		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			mid_step_function("get_max_num_object");
-			max_num_object = get_max_num_object_initial();
+			size_t max_truncated_num_object = get_max_num_object_initial();
+			iteration.truncate(max_truncated_num_object/local_size);
+		} else
+			iteration.truncate(max_num_object/local_size);
+
+		/* downsize if needed */
+		if (iteration.num_object > 0) {
+			if (iteration.truncated_num_object < next_iteration.num_object)
+				next_iteration.resize(iteration.truncated_num_object);
+			size_t next_object_size = iteration.truncated_num_object*iteration.get_object_length()/iteration.num_object;
+			if (next_object_size < next_iteration.objects.size())
+				next_iteration.allocate(next_object_size);
 		}
 
 		/* rest of the simulation */
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration, next_iteration, max_num_object/local_size, mid_step_function);
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(communicator, mid_step_function);
+		symbolic_iteration.next_iteration_num_object = symbolic_iteration.num_object_after_interferences;
 
 		/* second max_num_object */
+		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			mid_step_function("get_max_num_object");
-			max_num_object = get_max_num_object_final();
-		}
+			size_t max_truncated_num_object = get_max_num_object_final();
+			symbolic_iteration.truncate(max_truncated_num_object/local_size);
+		} else
+			symbolic_iteration.truncate(max_num_object/local_size);
 
 		/* finalize simulation */
-		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object/local_size, mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, next_iteration, mid_step_function);
 		mid_step_function("equalize");
 
 		/* equalize and/or normalize */

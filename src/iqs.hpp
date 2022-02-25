@@ -105,6 +105,7 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
 	protected:
+		mutable size_t truncated_num_object = 0;
 		mutable size_t max_symbolic_object_size = 0;
 
 		mutable utils::fast_vector<mag_t> magnitude;
@@ -162,7 +163,8 @@ namespace iqs {
 
 
 		void compute_num_child(rule_t const *rule, debug_t mid_step_function=[](const char*){}) const;
-		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, it_t const &next_iteration, const size_t max_num_object, debug_t mid_step_function=[](const char*){}) const;
+		void truncate(size_t max_num_object, debug_t mid_step_function=[](const char*){}) const;
+		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](const char*){}) const;
 		void apply_modifier(modifier_t const rule);
 		void normalize(debug_t mid_step_function=[](const char*){});
 
@@ -179,7 +181,7 @@ namespace iqs {
 			append(object_begin_, object_end_);
 		}
 		size_t get_num_symbolic_object() const {
-			return __gnu_parallel::accumulate(&num_childs[0], &num_childs[0] + num_object, 0);
+			return __gnu_parallel::accumulate(&num_childs[0], &num_childs[0] + num_object, (size_t)0);
 		}
 		void append(char const *object_begin_, char const *object_end_, mag_t const mag=1) {
 			size_t offset = object_begin[num_object];
@@ -252,6 +254,8 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function); 
 
 	protected:
+		size_t next_iteration_num_object = 0;
+
 		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
 		std::vector<char*> placeholder;
 
@@ -338,14 +342,15 @@ namespace iqs {
 			return memory_size;
 		}
 		float get_average_child_size() const {
-			float average_size = (float)__gnu_parallel::accumulate(size.begin(), size.begin() + num_object, 0) / (float)num_object;
+			float average_size = (float)__gnu_parallel::accumulate(size.begin(), size.begin() + num_object, (size_t)0) / (float)num_object;
 
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
 			return (float)iteration_memory_size + average_size;
 		}
 
 		void compute_collisions(debug_t mid_step_function=[](const char*){});
-		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object=0xffffffff, debug_t mid_step_function=[](const char*){});
+		void truncate(size_t max_num_object, debug_t mid_step_function=[](const char*){});
+		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](const char*){});
 
 	public:
 		size_t num_object = 0;
@@ -380,23 +385,40 @@ namespace iqs {
 
 		/* compute the number of child */
 		iteration.compute_num_child(rule, mid_step_function);
+		iteration.truncated_num_object = iteration.num_object;
 
 		/* max_num_object */
+		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			max_num_object = get_max_num_object_initial();
+			size_t max_truncated_num_object = get_max_num_object_initial();
+			iteration.truncate(max_truncated_num_object);
+		} else
+			iteration.truncate(max_num_object);
+
+		/* downsize if needed */
+		if (iteration.num_object > 0) {
+			if (iteration.truncated_num_object < next_iteration.num_object)
+				next_iteration.resize(iteration.truncated_num_object);
+			size_t next_object_size = iteration.truncated_num_object*iteration.get_object_length()/iteration.num_object;
+			if (next_object_size < next_iteration.objects.size())
+				next_iteration.allocate(next_object_size);
 		}
 
 		/* generate symbolic iteration */
-		iteration.generate_symbolic_iteration(rule, symbolic_iteration, next_iteration, max_num_object, mid_step_function);
+		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(mid_step_function);
+		symbolic_iteration.next_iteration_num_object = symbolic_iteration.num_object_after_interferences;
 
 		/* second max_num_object */
+		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			max_num_object = get_max_num_object_final();
-		}
+			size_t max_truncated_num_object = get_max_num_object_final();
+			symbolic_iteration.truncate(max_truncated_num_object);
+		} else
+			symbolic_iteration.truncate(max_num_object);
 
 		/* finish simulation */
-		symbolic_iteration.finalize(rule, iteration, next_iteration, max_num_object, mid_step_function);
+		symbolic_iteration.finalize(rule, iteration, next_iteration, mid_step_function);
 		next_iteration.normalize(mid_step_function);
 	}
 
@@ -425,67 +447,39 @@ namespace iqs {
 	}
 
 	/*
-	generate symbolic iteration
+	truncate
 	*/
-	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, it_t const &next_iteration, const size_t max_num_object, debug_t mid_step_function) const {
-		if (num_object == 0) {
-			symbolic_iteration.num_object = 0;
-			mid_step_function("truncate");
-			mid_step_function("prepare_index");
-			mid_step_function("symbolic_iteration");
-			return;
-		}
-
-		
-
+	void iteration::truncate(size_t max_num_object, debug_t mid_step_function) const {
 		/* !!!!!!!!!!!!!!!!
 		pre_truncate
 		 !!!!!!!!!!!!!!!! */
-		mid_step_function("truncate");
 
-		size_t truncated_num_object = num_object;
-		if (max_num_object > utils::min_vector_size && num_object > max_num_object) {
+		if (max_num_object > utils::min_vector_size && truncated_num_object > max_num_object) {
 			//if (simple_truncation) {
 				/* select graphs according to random selectors */
-				__gnu_parallel::nth_element(&truncated_oid[0], &truncated_oid[max_num_object], &truncated_oid[num_object],
+				__gnu_parallel::nth_element(&truncated_oid[0], &truncated_oid[max_num_object], &truncated_oid[0] + truncated_num_object,
 				[&](size_t const &oid1, size_t const &oid2) {
 					return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
 				});
 
 			/* !!!!!!
-			TODO
+			TODO - non-simple truncation
 			!!!!!! */
-			/*} else {
-				if (symbolic_iteration.num_object < num_object)
-					symbolic_iteration.resize(num_object);
-
-				/* generate random selectors */
-				/*#pragma omp parallel for 
-				for (size_t i = 0; i < num_object; ++i)  {
-					size_t oid = next_oid[i];
-
-					double random_number = utils::unfiorm_from_hash(hash[oid]); //random_generator();
-					symbolic_iteration.random_selector[oid] = std::log( -std::log(1 - random_number) / std::norm(magnitude[oid]));
-				}
-
-				/* select graphs according to random selectors */
-				/*__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[num_object_after_interferences],
-				[&](size_t const &oid1, size_t const &oid2) {
-					return random_selector[oid1] < random_selector[oid2];
-				});
-			}*/
 
 			truncated_num_object = max_num_object;
 		}
+	}
 
-		/* downsize if needed */
-		size_t next_object_size = truncated_num_object*get_object_length()/num_object;
-		if (next_object_size < next_iteration.get_object_length())
-			next_iteration.allocate(next_object_size);
-
-		/* downsize if needed */
-		if (truncated_num_object < next_iteration.num_object)
-			next_iteration.resize(truncated_num_object);
+	/*
+	generate symbolic iteration
+	*/
+	void iteration::generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function) const {
+		if (truncated_num_object == 0) {
+			symbolic_iteration.num_object = 0;
+			mid_step_function("prepare_index");
+			mid_step_function("symbolic_iteration");
+			return;
+		}
 
 		
 
@@ -655,29 +649,21 @@ namespace iqs {
 	}
 
 	/*
-	finalize iteration
+	truncate
 	*/
-	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, const size_t max_num_object, debug_t mid_step_function) {
-		if (num_object_after_interferences == 0) {
-			next_iteration.num_object = 0;
-			mid_step_function("truncate");
-			mid_step_function("prepare_final");
-			mid_step_function("final");
+	void symbolic_iteration::truncate(size_t max_num_object, debug_t mid_step_function) {
+		if (next_iteration_num_object == 0)
 			return;
-		}
-		
-
-
 
 		/* !!!!!!!!!!!!!!!!
 		truncate
 		 !!!!!!!!!!!!!!!! */
 		mid_step_function("truncate");
 
-		if (max_num_object > utils::min_vector_size && num_object_after_interferences > max_num_object) {
+		if (max_num_object > utils::min_vector_size && next_iteration_num_object > max_num_object) {
 			if (simple_truncation) {
 				/* select graphs according to random selectors */
-				__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[num_object_after_interferences],
+				__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[0] + next_iteration_num_object,
 				[&](size_t const &oid1, size_t const &oid2) {
 					return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
 				});
@@ -685,7 +671,7 @@ namespace iqs {
 			} else {
 				/* generate random selectors */
 				#pragma omp parallel for 
-				for (size_t i = 0; i < num_object_after_interferences; ++i)  {
+				for (size_t i = 0; i < next_iteration_num_object; ++i)  {
 					size_t oid = next_oid[i];
 
 					double random_number = utils::unfiorm_from_hash(hash[oid]); //random_generator();
@@ -693,15 +679,29 @@ namespace iqs {
 				}
 
 				/* select graphs according to random selectors */
-				__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[num_object_after_interferences],
+				__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[0] + next_iteration_num_object,
 				[&](size_t const &oid1, size_t const &oid2) {
 					return random_selector[oid1] < random_selector[oid2];
 				});
 			}
 
-			next_iteration.num_object = max_num_object;
-		} else
-			next_iteration.num_object = num_object_after_interferences;
+			next_iteration_num_object = max_num_object;
+		}
+	}
+
+	/*
+	finalize iteration
+	*/
+	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function) {
+		if (next_iteration_num_object == 0) {
+			next_iteration.num_object = 0;
+			mid_step_function("prepare_final");
+			mid_step_function("final");
+			return;
+		}
+
+
+		
 
 
 
@@ -711,6 +711,8 @@ namespace iqs {
 		prepare_final
 		 !!!!!!!!!!!!!!!! */
 		mid_step_function("prepare_final");
+
+		next_iteration.num_object = next_iteration_num_object;
 
 		/* sort to make memory access more continuous */
 		__gnu_parallel::sort(&next_oid[0], &next_oid[next_iteration.num_object]);
