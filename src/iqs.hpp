@@ -401,7 +401,7 @@ namespace iqs {
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
-			int max_truncate = iqs::utils::log_2_upper_bound(1/(1 - iqs::utils::upsize_policy));
+			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
 			do {
 				max_truncated_num_object = get_max_num_object_initial();
 				iteration.truncate(max_truncated_num_object);
@@ -427,7 +427,7 @@ namespace iqs {
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
-			int max_truncate = iqs::utils::log_2_upper_bound(1/(1 - iqs::utils::upsize_policy));
+			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
 			do {
 				max_truncated_num_object = get_max_num_object_final();
 				symbolic_iteration.truncate(max_truncated_num_object);
