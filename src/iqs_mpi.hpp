@@ -54,14 +54,13 @@ namespace iqs::mpi {
 			return total_size;
 		}
 		float inline get_average_num_child(MPI_Comm communicator) const {
-			size_t total_truncated_num_object, total_num_child = 0;
+			size_t total_num_child = 0;
 			#pragma omp parallel for reduction(+:total_num_child)
 			for (size_t i = 0; i < truncated_num_object; ++i)
 				total_num_child += num_childs[truncated_oid[i]];
 
-			MPI_Allreduce(MPI_IN_PLACE, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			MPI_Allreduce(&total_truncated_num_object, &truncated_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			return (float)total_size / (float)total_truncated_num_object;
+			MPI_Allreduce(MPI_IN_PLACE, &total_num_child, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return (float)total_num_child / (float)get_total_truncated_num_object(communicator);
 		}
 		float inline get_average_object_size(MPI_Comm communicator) const {
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
@@ -69,6 +68,11 @@ namespace iqs::mpi {
 			size_t total_object_size;
 			MPI_Allreduce(&object_begin[num_object], &total_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 			return (float)iteration_memory_size + (float)total_object_size/(float)get_total_num_object(communicator);
+		}
+		size_t inline get_total_truncated_num_object(MPI_Comm communicator) const {
+			size_t total_truncated_num_object;
+			MPI_Allreduce(&truncated_num_object, &total_truncated_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return total_truncated_num_object;
 		}
 
 
@@ -296,11 +300,20 @@ namespace iqs::mpi {
 			return total_size;
 		}
 		float get_average_child_size(MPI_Comm communicator) const {
-			size_t total_size = __gnu_parallel::accumulate(size.begin(), size.begin() + num_object, (size_t)0);
+			size_t total_size = 0;
+			#pragma omp parallel for reduction(+:total_size)
+			for (size_t i = 0; i < next_iteration_num_object; ++i)
+				total_size += size[next_oid[i]];
+
 			MPI_Allreduce(MPI_IN_PLACE, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
-			return (float)iteration_memory_size + (float)total_size / (float)get_total_num_object(communicator);
+			return (float)iteration_memory_size + (float)total_size / (float)get_total_next_iteration_num_object(communicator);
+		}
+		size_t inline get_total_next_iteration_num_object(MPI_Comm communicator) const {
+			size_t total_next_iteration_num_object;
+			MPI_Allreduce(&next_iteration_num_object, &total_next_iteration_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return total_next_iteration_num_object;
 		}
 
 	public:
@@ -335,11 +348,13 @@ namespace iqs::mpi {
 
 
 		auto const get_max_num_object_initial = [&]() {
+			MPI_Barrier(localComm);
 			return (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm)) /
 				(iteration.get_average_object_size(localComm) + iteration.get_average_num_child(localComm)*symbolic_iteration.get_average_object_size(localComm)) *
 				(1 - safety_margin)/iqs::utils::upsize_policy;
 		};
 		auto const get_max_num_object_final = [&]() {
+			MPI_Barrier(localComm);
 			return (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm)) /
 				symbolic_iteration.get_average_child_size(localComm) *
 				(1 - safety_margin)/iqs::utils::upsize_policy;
@@ -372,8 +387,11 @@ namespace iqs::mpi {
 		/* max_num_object */
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			size_t max_truncated_num_object = get_max_num_object_initial();
-			iteration.truncate(max_truncated_num_object/local_size);
+			size_t max_truncated_num_object;
+			do {
+				max_truncated_num_object = get_max_num_object_initial();
+				iteration.truncate(max_truncated_num_object/local_size);
+			} while (iteration.get_total_truncated_num_object(localComm) > max_truncated_num_object*iqs::utils::upsize_policy);
 		} else
 			iteration.truncate(max_num_object/local_size);
 
@@ -394,8 +412,11 @@ namespace iqs::mpi {
 		/* second max_num_object */
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			size_t max_truncated_num_object = get_max_num_object_final();
-			symbolic_iteration.truncate(max_truncated_num_object/local_size);
+			size_t max_truncated_num_object;
+			do {
+				max_truncated_num_object = get_max_num_object_final();
+				symbolic_iteration.truncate(max_truncated_num_object/local_size);
+			} while (symbolic_iteration.get_total_next_iteration_num_object(localComm) > max_truncated_num_object*iqs::utils::upsize_policy);
 		} else
 			symbolic_iteration.truncate(max_num_object/local_size);
 

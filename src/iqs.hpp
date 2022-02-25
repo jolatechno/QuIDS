@@ -347,7 +347,12 @@ namespace iqs {
 			return memory_size;
 		}
 		float get_average_child_size() const {
-			float average_size = (float)__gnu_parallel::accumulate(size.begin(), size.begin() + num_object, (size_t)0) / (float)num_object;
+			size_t total_size = 0;
+			#pragma omp parallel for reduction(+:total_size)
+			for (size_t i = 0; i < next_iteration_num_object; ++i)
+				total_size += size[next_oid[i]];
+			
+			float average_size = (float)total_size / (float)next_iteration_num_object;
 
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
 			return (float)iteration_memory_size + average_size;
@@ -395,8 +400,11 @@ namespace iqs {
 		/* max_num_object */
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			size_t max_truncated_num_object = get_max_num_object_initial();
-			iteration.truncate(max_truncated_num_object);
+			size_t max_truncated_num_object;
+			do {
+				max_truncated_num_object = get_max_num_object_initial();
+				iteration.truncate(max_truncated_num_object);
+			} while (iteration.truncated_num_object > max_truncated_num_object*iqs::utils::upsize_policy);
 		} else
 			iteration.truncate(max_num_object);
 
@@ -417,8 +425,11 @@ namespace iqs {
 		/* second max_num_object */
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
-			size_t max_truncated_num_object = get_max_num_object_final();
-			symbolic_iteration.truncate(max_truncated_num_object);
+			size_t max_truncated_num_object;
+			do {
+				max_truncated_num_object = get_max_num_object_final();
+				symbolic_iteration.truncate(max_truncated_num_object);
+			} while (symbolic_iteration.next_iteration_num_object > max_truncated_num_object*iqs::utils::upsize_policy);
 		} else
 			symbolic_iteration.truncate(max_num_object);
 
