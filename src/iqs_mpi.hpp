@@ -401,7 +401,6 @@ namespace iqs::mpi {
 				truncated_num_child < max_truncated_num_symbolic_object*(1 - iqs::truncation_tolerance)) &&
 				--max_truncate >= 0) {
 					max_truncated_num_symbolic_object /= local_size;
-					max_truncated_num_symbolic_object = std::max(iqs::utils::min_vector_size, max_truncated_num_symbolic_object);
 
 					/* truncate num child */
 					int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);
