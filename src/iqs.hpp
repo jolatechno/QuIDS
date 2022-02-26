@@ -35,6 +35,9 @@
 #ifndef LOAD_BALANCING_BUCKET_PER_THREAD
 	#define LOAD_BALANCING_BUCKET_PER_THREAD 32
 #endif
+#ifndef TRUNCATION_TOLERANCE
+	#define TRUNCATION_TOLERANCE 0.05;
+#endif
 
 /*
 defining openmp function's return values if openmp isn't installed or loaded
@@ -63,6 +66,7 @@ namespace iqs {
 	float safety_margin = SAFETY_MARGIN;
 	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
+	float truncation_tolerance = TRUNCATION_TOLERANCE;
 	#ifdef SIMPLE_TRUNCATION
 		bool simple_truncation = true;
 	#else
@@ -412,9 +416,10 @@ namespace iqs {
 		mid_step_function("truncate");
 		iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
-			size_t max_truncated_num_symbolic_object;
-			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (iteration.get_truncated_num_child() > (max_truncated_num_symbolic_object = get_max_num_object_initial())*iqs::utils::upsize_policy && 
+			size_t max_truncated_num_symbolic_object, truncated_num_child;
+			int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);
+			while (((truncated_num_child = iteration.get_truncated_num_child()) > (max_truncated_num_symbolic_object = get_max_num_object_initial())*(1 + truncation_tolerance) || 
+				truncated_num_child < max_truncated_num_symbolic_object*(1 - truncation_tolerance)) &&
 				--max_truncate >= 0)
 					iteration.truncate(max_truncated_num_symbolic_object/iteration.get_average_num_child(), mid_step_function);
 		} else
@@ -439,8 +444,9 @@ namespace iqs {
 		symbolic_iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
-			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (symbolic_iteration.next_iteration_num_object > (max_truncated_num_object = get_max_num_object_final())*iqs::utils::upsize_policy && 
+			int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);
+			while ((symbolic_iteration.next_iteration_num_object > (max_truncated_num_object = get_max_num_object_final())*(1 + truncation_tolerance) || 
+				symbolic_iteration.next_iteration_num_object < max_truncated_num_object*(1 - truncation_tolerance)) &&
 				--max_truncate >= 0)
 					symbolic_iteration.truncate(max_truncated_num_object, mid_step_function);
 		} else
@@ -482,12 +488,8 @@ namespace iqs {
 		/* !!!!!!!!!!!!!!!!
 		pre_truncate
 		 !!!!!!!!!!!!!!!! */
-		/* !!!!
-		TODO:
-		implement probabilist truncation
-		!!!! */
 
-		if (truncated_num_object < max_num_object && num_object > max_num_object ||
+		if ((truncated_num_object < max_num_object && num_object > max_num_object) ||
 			truncated_num_object > max_num_object) {
 
 				/* delimitations */
@@ -724,40 +726,53 @@ namespace iqs {
 		truncate
 		 !!!!!!!!!!!!!!!! */
 
-		if (next_iteration_num_object > max_num_object) {
-			if (simple_truncation) {
-				/* select graphs according to random selectors */
-				__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[0] + next_iteration_num_object,
-				[&](size_t const &oid1, size_t const &oid2) {
-					return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
-				});
+		if ((next_iteration_num_object < max_num_object && num_object > max_num_object) ||
+			next_iteration_num_object > max_num_object) {
 
-			} else {
-				if (!random_selector_computed) {
-
-					/* generate random selectors */
-					#pragma omp parallel
-					{
-						utils::random_generator rng;
-
-						#pragma omp for
-						for (size_t i = 0; i < num_object_after_interferences; ++i) {
-							size_t oid = next_oid[i];
-							random_selector[oid] = std::log( -std::log(1 - rng()) / std::norm(magnitude[oid]));
-						}
-					}
-					random_selector_computed = true;
+				/* delimitations */
+				size_t *begin, *middle, *end;
+				if (next_iteration_num_object > max_num_object) {
+					begin = &next_oid[0];
+					middle = &next_oid[0] + max_num_object;
+					end = &next_oid[0] + next_iteration_num_object;
+				} else {
+					begin = &next_oid[0] + next_iteration_num_object;
+					middle = &next_oid[0] + max_num_object;
+					end = &next_oid[0] + num_object_after_interferences;
 				}
 
-				/* select graphs according to random selectors */
-				__gnu_parallel::nth_element(&next_oid[0], &next_oid[max_num_object], &next_oid[0] + next_iteration_num_object,
-				[&](size_t const &oid1, size_t const &oid2) {
-					return random_selector[oid1] < random_selector[oid2];
-				});
-			}
+				if (simple_truncation) {
+					/* truncation */
+					__gnu_parallel::nth_element(begin, middle, end,
+					[&](size_t const &oid1, size_t const &oid2) {
+						return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
+					});
+				} else {
+					/* generate random selectors */
+					if (!random_selector_computed) {
+						#pragma omp parallel
+						{
+							utils::random_generator rng;
 
-			next_iteration_num_object = max_num_object;
-		}
+							#pragma omp for
+							for (size_t i = 0; i < num_object_after_interferences; ++i) {
+								size_t oid = next_oid[i];
+
+								random_selector[oid] = std::log( -std::log(1 - rng()) / std::norm(magnitude[oid]));
+							}
+						}
+						random_selector_computed = true;
+					}
+
+					/* select graphs according to random selectors */
+					__gnu_parallel::nth_element(begin, middle, end,
+					[&](size_t const &oid1, size_t const &oid2) {
+						return random_selector[oid1] < random_selector[oid2];
+					});
+				}
+
+				next_iteration_num_object = max_num_object;
+			}
 	}
 
 	/*

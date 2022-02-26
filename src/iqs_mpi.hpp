@@ -10,9 +10,6 @@
 #ifndef EQUALIZE_INBALANCE
 	#define EQUALIZE_INBALANCE 0.01
 #endif
-#ifndef TRUNCATION_TOLERANCE
-	#define TRUNCATION_TOLERANCE 0.1;
-#endif
 
 namespace iqs::mpi {
 	namespace utils {        
@@ -28,7 +25,6 @@ namespace iqs::mpi {
 	*/
 	size_t min_equalize_size = MIN_EQUALIZE_SIZE;
 	float equalize_inbalance = EQUALIZE_INBALANCE;
-	float truncation_tolerance = TRUNCATION_TOLERANCE;
 
 	/* forward typedef */
 	typedef class mpi_iteration mpi_it_t;
@@ -395,9 +391,10 @@ namespace iqs::mpi {
 		mid_step_function("truncate");
 		iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
-			size_t max_truncated_num_symbolic_object;
-			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (iteration.get_total_truncated_num_child(localComm) > (max_truncated_num_symbolic_object = get_max_num_object_initial())*iqs::utils::upsize_policy && 
+			size_t max_truncated_num_symbolic_object, truncated_num_child;
+			int max_truncate = iqs::utils::log_2_upper_bound(1/iqs::truncation_tolerance);
+			while (((truncated_num_child = iteration.get_total_truncated_num_child(localComm)) > (max_truncated_num_symbolic_object = get_max_num_object_initial())*(1 + iqs::truncation_tolerance) || 
+				truncated_num_child < max_truncated_num_symbolic_object*(1 - iqs::truncation_tolerance)) &&
 				--max_truncate >= 0) {
 					max_truncated_num_symbolic_object /= local_size;
 
@@ -435,9 +432,10 @@ namespace iqs::mpi {
 		mid_step_function("truncate");
 		symbolic_iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
-			size_t max_truncated_num_object;
-			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
-			while (symbolic_iteration.get_total_next_iteration_num_object(localComm) > (max_truncated_num_object = get_max_num_object_final())*iqs::utils::upsize_policy &&
+			size_t max_truncated_num_object, total_num_child;
+			int max_truncate = iqs::utils::log_2_upper_bound(1/iqs::truncation_tolerance);
+			while (((total_num_child = symbolic_iteration.get_total_next_iteration_num_object(localComm)) > (max_truncated_num_object = get_max_num_object_final())*(1 + iqs::truncation_tolerance) || 
+				total_num_child < max_truncated_num_object*(1 - iqs::truncation_tolerance)) &&
 				--max_truncate >= 0)
 					symbolic_iteration.truncate(max_truncated_num_object/local_size, mid_step_function);
 		} else
