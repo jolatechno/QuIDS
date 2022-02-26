@@ -51,7 +51,7 @@ namespace iqs::mpi {
 		utils functions
 		*/
 		size_t inline get_mem_size(MPI_Comm communicator) const {
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t)  + sizeof(float);
 
 			size_t total_size, local_size = iteration_memory_size*magnitude.size() + objects.size();
 			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
@@ -61,7 +61,7 @@ namespace iqs::mpi {
 			return (float)get_total_truncated_num_child(communicator) / (float)get_total_truncated_num_object(communicator);
 		}
 		float inline get_average_object_size(MPI_Comm communicator) const {
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t)  + sizeof(float);
 
 			size_t total_object_size;
 			MPI_Allreduce(&object_begin[num_object], &total_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
@@ -282,7 +282,7 @@ namespace iqs::mpi {
 		float inline get_average_object_size(MPI_Comm communicator) const {
 			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
 
-			static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+			static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
 
 			static const size_t mpi_symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 1*sizeof(size_t) + sizeof(int);
 			return (float)symbolic_iteration_memory_size + (float)mpi_symbolic_iteration_memory_size + hash_map_size;
@@ -295,7 +295,7 @@ namespace iqs::mpi {
 				memory_size += elimination_maps.capacity();
 			memory_size *= hash_map_size;
 
-			static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+			static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
 			memory_size += magnitude.size()*symbolic_iteration_memory_size;
 
 			static const size_t mpi_symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 1*sizeof(size_t) + sizeof(int);
@@ -313,7 +313,7 @@ namespace iqs::mpi {
 
 			MPI_Allreduce(MPI_IN_PLACE, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t)  + sizeof(float);
 			return (float)iteration_memory_size + (float)total_size / (float)get_total_next_iteration_num_object(communicator);
 		}
 		size_t inline get_total_next_iteration_num_object(MPI_Comm communicator) const {
@@ -393,6 +393,7 @@ namespace iqs::mpi {
 
 		/* max_num_object */
 		mid_step_function("truncate");
+		iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
 			size_t max_truncated_num_symbolic_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
@@ -432,6 +433,7 @@ namespace iqs::mpi {
 
 		/* second max_num_object */
 		mid_step_function("truncate");
+		symbolic_iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));

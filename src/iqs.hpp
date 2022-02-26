@@ -105,6 +105,7 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
 
 	protected:
+		mutable bool random_selector_computed = false;
 		mutable size_t truncated_num_object = 0;
 		mutable size_t max_symbolic_object_size = 0;
 
@@ -114,6 +115,7 @@ namespace iqs {
 		mutable utils::fast_vector<size_t> num_childs;
 		mutable utils::fast_vector<size_t> child_begin;
 		mutable utils::fast_vector<size_t> truncated_oid;
+		mutable utils::fast_vector<float> random_selector;
 
 		void inline resize(size_t num_object) const {
 			#pragma omp parallel sections
@@ -135,6 +137,9 @@ namespace iqs {
 					truncated_oid.resize(num_object);
 					utils::parallel_iota(&truncated_oid[0], &truncated_oid[0] + num_object, 0);
 				}
+
+				#pragma omp section
+				random_selector.resize(num_object);
 			}
 		}
 		void inline allocate(size_t size) const {
@@ -146,7 +151,7 @@ namespace iqs {
 		utils functions
 		*/
 		size_t get_mem_size() const {
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
 			return magnitude.size()*iteration_memory_size + objects.size();
 		}
 		float get_average_num_child() const {
@@ -164,7 +169,7 @@ namespace iqs {
 			return object_begin[num_object];
 		}
 		float get_average_object_size() const {
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t);
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t)  + sizeof(float);
 			return (float)iteration_memory_size + (float)get_object_length()/(float)num_object;
 		}
 
@@ -262,6 +267,7 @@ namespace iqs {
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function); 
 
 	protected:
+		bool random_selector_computed = false;
 		size_t next_iteration_num_object = 0;
 
 		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
@@ -274,7 +280,7 @@ namespace iqs {
 		utils::fast_vector<size_t> hash;
 		utils::fast_vector<size_t> parent_oid;
 		utils::fast_vector<uint32_t> child_id;
-		utils::fast_vector<double> random_selector;
+		utils::fast_vector<float> random_selector;
 		utils::fast_vector<size_t> next_oid_partitioner_buffer;
 
 		void inline resize(size_t num_object) {
@@ -333,7 +339,7 @@ namespace iqs {
 		*/
 		float get_average_object_size() {
 			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
-			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
 			return (float)hash_map_size + hash_map_size;
 		}
 		size_t get_mem_size() {
@@ -344,7 +350,7 @@ namespace iqs {
 				memory_size += elimination_maps.capacity();
 			memory_size *= hash_map_size;
 
-			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(double);
+			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
 			memory_size += magnitude.size()*symbolic_iteration_memory_size;
 
 			return memory_size;
@@ -404,6 +410,7 @@ namespace iqs {
 
 		/* max_num_object */
 		mid_step_function("truncate");
+		iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
 			size_t max_truncated_num_symbolic_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
@@ -429,6 +436,7 @@ namespace iqs {
 
 		/* second max_num_object */
 		mid_step_function("truncate");
+		symbolic_iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
 			size_t max_truncated_num_object;
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
@@ -479,19 +487,48 @@ namespace iqs {
 		implement probabilist truncation
 		!!!! */
 
-		if (truncated_num_object < max_num_object && num_object > max_num_object) {
-			__gnu_parallel::nth_element(&truncated_oid[truncated_num_object], &truncated_oid[max_num_object], &truncated_oid[0] + num_object,
-			[&](size_t const &oid1, size_t const &oid2) {
-				return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
-			});
-			truncated_num_object = max_num_object;
-		} else if (truncated_num_object > max_num_object) {
-			__gnu_parallel::nth_element(&truncated_oid[0], &truncated_oid[max_num_object], &truncated_oid[0] + truncated_num_object,
-			[&](size_t const &oid1, size_t const &oid2) {
-				return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
-			});
-			truncated_num_object = max_num_object;
-		}
+		if (truncated_num_object < max_num_object && num_object > max_num_object ||
+			truncated_num_object > max_num_object) {
+
+				/* delimitations */
+				size_t *begin, *middle, *end;
+				if (truncated_num_object > max_num_object) {
+					begin = &truncated_oid[0];
+					middle = &truncated_oid[0] + max_num_object;
+					end = &truncated_oid[0] + truncated_num_object;
+				} else {
+					begin = &truncated_oid[0] + truncated_num_object;
+					middle = &truncated_oid[0] + max_num_object;
+					end = &truncated_oid[0] + num_object;
+				}
+
+				if (simple_truncation) {
+					/* truncation */
+					__gnu_parallel::nth_element(begin, middle, end,
+					[&](size_t const &oid1, size_t const &oid2) {
+						return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
+					});
+				} else {
+					/* generate random selectors */
+					if (!random_selector_computed) {
+						#pragma omp parallel for 
+						for (size_t oid = 0; oid < num_object; ++oid)  {
+							float p = std::norm(magnitude[oid]);
+							float random_number = utils::unfiorm_from_float(p); //random_generator();
+							random_selector[oid] = std::log( -std::log(1 - random_number) / p);
+						}
+						random_selector_computed = true;
+					}
+
+					/* select graphs according to random selectors */
+					__gnu_parallel::nth_element(begin, middle, end,
+					[&](size_t const &oid1, size_t const &oid2) {
+						return random_selector[oid1] < random_selector[oid2];
+					});
+				}
+
+				truncated_num_object = max_num_object;
+			}
 	}
 
 	/*
@@ -694,13 +731,16 @@ namespace iqs {
 				});
 
 			} else {
-				/* generate random selectors */
-				#pragma omp parallel for 
-				for (size_t i = 0; i < next_iteration_num_object; ++i)  {
-					size_t oid = next_oid[i];
+				if (!random_selector_computed) {
+					/* generate random selectors */
+					#pragma omp parallel for 
+					for (size_t i = 0; i < num_object_after_interferences; ++i)  {
+						size_t oid = next_oid[i];
 
-					double random_number = utils::unfiorm_from_hash(hash[oid]); //random_generator();
-					random_selector[oid] = std::log( -std::log(1 - random_number) / std::norm(magnitude[oid]));
+						float random_number = utils::unfiorm_from_hash(hash[oid]); //random_generator();
+						random_selector[oid] = std::log( -std::log(1 - random_number) / std::norm(magnitude[oid]));
+					}
+					random_selector_computed = true;
 				}
 
 				/* select graphs according to random selectors */
