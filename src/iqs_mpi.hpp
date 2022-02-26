@@ -351,16 +351,20 @@ namespace iqs::mpi {
 
 		auto const get_max_num_object_initial = [&]() {
 			float average_num_child = iteration.get_average_num_child(localComm);
-			return (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm)) /
+			size_t max_num_object = (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm)) /
 				(iteration.get_average_object_size(localComm) + average_num_child*symbolic_iteration.get_average_object_size(localComm)) *
 				average_num_child *
 				(1 - safety_margin)/iqs::utils::upsize_policy;
+
+			return std::max(iqs::utils::min_vector_size, max_num_object);
 		};
 		auto const get_max_num_object_final = [&]() {
 			MPI_Barrier(localComm);
-			return (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm)) /
+			size_t max_num_object = (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm)) /
 				symbolic_iteration.get_average_child_size(localComm) *
 				(1 - safety_margin)/iqs::utils::upsize_policy;
+
+			return std::max(iqs::utils::min_vector_size, max_num_object);
 		};
 
 
@@ -397,12 +401,14 @@ namespace iqs::mpi {
 				truncated_num_child < max_truncated_num_symbolic_object*(1 - iqs::truncation_tolerance)) &&
 				--max_truncate >= 0) {
 					max_truncated_num_symbolic_object /= local_size;
+					max_truncated_num_symbolic_object = std::max(iqs::utils::min_vector_size, max_truncated_num_symbolic_object);
 
 					/* truncate num child */
 					int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);
 					for (int i = 0; i < max_truncate; ++i) {
 						size_t num_symbolic_object = iteration.get_truncated_num_child();
 						size_t max_num_object = (float)iteration.truncated_num_object*(float)max_truncated_num_symbolic_object/(float)num_symbolic_object;
+						max_num_object = std::max(iqs::utils::min_vector_size, max_num_object);
 
 						if (num_symbolic_object > max_truncated_num_symbolic_object*(1 + truncation_tolerance) ||
 							num_symbolic_object < max_truncated_num_symbolic_object*(1 - truncation_tolerance)) {
@@ -436,8 +442,10 @@ namespace iqs::mpi {
 			int max_truncate = iqs::utils::log_2_upper_bound(1/iqs::truncation_tolerance);
 			while (((total_num_child = symbolic_iteration.get_total_next_iteration_num_object(localComm)) > (max_truncated_num_object = get_max_num_object_final())*(1 + iqs::truncation_tolerance) || 
 				total_num_child < max_truncated_num_object*(1 - iqs::truncation_tolerance)) &&
-				--max_truncate >= 0)
-					symbolic_iteration.truncate(max_truncated_num_object/local_size, mid_step_function);
+				--max_truncate >= 0) {
+					max_truncated_num_object = std::max(iqs::utils::min_vector_size, max_truncated_num_object/local_size);
+					symbolic_iteration.truncate(max_truncated_num_object, mid_step_function);
+				}
 		} else
 			symbolic_iteration.truncate(max_num_object/local_size, mid_step_function);
 

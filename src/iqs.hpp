@@ -391,15 +391,19 @@ namespace iqs {
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
 		auto const get_max_num_object_initial = [&]() {
 			float average_num_child = iteration.get_average_num_child();
-			return (float)(utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size()) /
+			size_t max_num_object = (float)(utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size()) /
 				(iteration.get_average_object_size() + average_num_child*symbolic_iteration.get_average_object_size()) *
 				average_num_child *
 				(1 - safety_margin)/utils::upsize_policy;
+
+			return std::max(utils::min_vector_size, max_num_object);
 		};
 		auto const get_max_num_object_final = [&]() {
-			return (float)(utils::get_free_mem() + next_iteration.get_mem_size()) /
+			size_t max_num_object =  (float)(utils::get_free_mem() + next_iteration.get_mem_size()) /
 				symbolic_iteration.get_average_child_size() *
 				(1 - safety_margin)/utils::upsize_policy;
+
+			return std::max(utils::min_vector_size, max_num_object);
 		};
 
 
@@ -420,8 +424,11 @@ namespace iqs {
 			int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);
 			while (((truncated_num_child = iteration.get_truncated_num_child()) > (max_truncated_num_symbolic_object = get_max_num_object_initial())*(1 + truncation_tolerance) || 
 				truncated_num_child < max_truncated_num_symbolic_object*(1 - truncation_tolerance)) &&
-				--max_truncate >= 0)
-					iteration.truncate(max_truncated_num_symbolic_object/iteration.get_average_num_child(), mid_step_function);
+				--max_truncate >= 0) {
+					size_t max_num_object = max_truncated_num_symbolic_object/iteration.get_average_num_child();
+					max_num_object = std::max(iqs::utils::min_vector_size, max_num_object);
+					iteration.truncate(max_num_object, mid_step_function);
+				}
 		} else
 			iteration.truncate(max_num_object, mid_step_function);
 
