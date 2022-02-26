@@ -493,7 +493,7 @@ namespace iqs::mpi {
 		std::vector<int> receive_disp(size + 1);
 		std::vector<int> receive_count(size);
 
-		mid_step_function("compute_collisions - prepare");
+		mid_step_function("compute_collisions - prepare (resize)");
 		mpi_resize(num_object);
 
 
@@ -503,6 +503,7 @@ namespace iqs::mpi {
 		/* !!!!!!!!!!!!!!!!
 		partition
 		!!!!!!!!!!!!!!!! */
+		mid_step_function("compute_collisions - prepare (partition)");
 		iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[0] + num_object, 0,
 			partition_begin.begin(), partition_begin.end(),
 			[&](size_t const oid) {
@@ -510,6 +511,7 @@ namespace iqs::mpi {
 			});
 
 		/* generate partitioned hash */
+		mid_step_function("compute_collisions - prepare (un-partition)");
 		#pragma omp parallel for
 		for (size_t id = 0; id < num_object; ++id) {
 			size_t oid = next_oid[id];
