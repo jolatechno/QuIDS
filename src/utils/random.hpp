@@ -1,13 +1,20 @@
-float unfiorm_from_hash(size_t hash) {
-	static float max_size_t = (float)((size_t)0xffffffffffffffff);
-	return ((float)hash) / max_size_t; 
-}
+class random_generator {
+private:
+	uint64_t shuffle_table[2];
+public:
+	random_generator() {
+		shuffle_table[0] = rand();
+		shuffle_table[1] = rand();
+	}
 
-float unfiorm_from_float(float x) {
-	float *x_ptr = &x;
-	int x_int = *(int*)x_ptr;
-	x_int = x_int ^ (x_int << 16) ^ (x_int >> 16);
-
-	static float max_int = (float)((int)0xffffffff);
-	return ((float)x_int) / max_int; 
-}
+	// The actual algorithm
+	float operator()() {
+	    uint64_t s1 = shuffle_table[0];
+	    uint64_t s0 = shuffle_table[1];
+	    uint64_t result = s0 + s1;
+	    shuffle_table[0] = s0;
+	    s1 ^= s1 << 23;
+	    shuffle_table[1] = s1 ^ s0 ^ (s1 >> 18) ^ (s0 >> 5);
+	    return (float)result / (float)((uint64_t)0xffffffff);
+	}
+};

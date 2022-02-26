@@ -511,11 +511,13 @@ namespace iqs {
 				} else {
 					/* generate random selectors */
 					if (!random_selector_computed) {
-						#pragma omp parallel for 
-						for (size_t oid = 0; oid < num_object; ++oid)  {
-							float p = std::norm(magnitude[oid]);
-							float random_number = utils::unfiorm_from_float(p); //random_generator();
-							random_selector[oid] = std::log( -std::log(1 - random_number) / p);
+						#pragma omp parallel
+						{
+							utils::random_generator rng;
+
+							#pragma omp for
+							for (size_t oid = 0; oid < num_object; ++oid)
+								random_selector[oid] = std::log( -std::log(1 - rng()) / std::norm(magnitude[oid]));
 						}
 						random_selector_computed = true;
 					}
@@ -732,13 +734,17 @@ namespace iqs {
 
 			} else {
 				if (!random_selector_computed) {
-					/* generate random selectors */
-					#pragma omp parallel for 
-					for (size_t i = 0; i < num_object_after_interferences; ++i)  {
-						size_t oid = next_oid[i];
 
-						float random_number = utils::unfiorm_from_hash(hash[oid]); //random_generator();
-						random_selector[oid] = std::log( -std::log(1 - random_number) / std::norm(magnitude[oid]));
+					/* generate random selectors */
+					#pragma omp parallel
+					{
+						utils::random_generator rng;
+
+						#pragma omp for
+						for (size_t i = 0; i < num_object_after_interferences; ++i) {
+							size_t oid = next_oid[i];
+							random_selector[oid] = std::log( -std::log(1 - rng()) / std::norm(magnitude[oid]));
+						}
 					}
 					random_selector_computed = true;
 				}
