@@ -474,19 +474,22 @@ namespace iqs {
 		/* !!!!!!!!!!!!!!!!
 		pre_truncate
 		 !!!!!!!!!!!!!!!! */
+		/* !!!!
+		TODO:
+		implement probabilist truncation
+		!!!! */
 
-		if (truncated_num_object > max_num_object) {
-			//if (simple_truncation) {
-				/* select graphs according to random selectors */
-				__gnu_parallel::nth_element(&truncated_oid[0], &truncated_oid[max_num_object], &truncated_oid[0] + truncated_num_object,
-				[&](size_t const &oid1, size_t const &oid2) {
-					return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
-				});
-
-			/* !!!!!!
-			TODO - non-simple truncation
-			!!!!!! */
-
+		if (truncated_num_object < max_num_object && num_object > max_num_object) {
+			__gnu_parallel::nth_element(&truncated_oid[truncated_num_object], &truncated_oid[max_num_object], &truncated_oid[0] + num_object,
+			[&](size_t const &oid1, size_t const &oid2) {
+				return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
+			});
+			truncated_num_object = max_num_object;
+		} else if (truncated_num_object > max_num_object) {
+			__gnu_parallel::nth_element(&truncated_oid[0], &truncated_oid[max_num_object], &truncated_oid[0] + truncated_num_object,
+			[&](size_t const &oid1, size_t const &oid2) {
+				return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
+			});
 			truncated_num_object = max_num_object;
 		}
 	}
@@ -598,9 +601,11 @@ namespace iqs {
 
 
 
+
 		/* !!!!!!!!!!!!!!!!
 		partition
 		!!!!!!!!!!!!!!!! */
+		mid_step_function("compute_collisions - prepare");
 		iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[0] + num_object, 0,
 			&partition_begin[0], &partition_begin[num_bucket + 1],
 			[&](size_t const oid) {

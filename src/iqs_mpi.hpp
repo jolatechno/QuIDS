@@ -10,6 +10,9 @@
 #ifndef EQUALIZE_INBALANCE
 	#define EQUALIZE_INBALANCE 0.01
 #endif
+#ifndef TRUNCATION_TOLERANCE
+	#define TRUNCATION_TOLERANCE 0.1;
+#endif
 
 namespace iqs::mpi {
 	namespace utils {        
@@ -25,6 +28,7 @@ namespace iqs::mpi {
 	*/
 	size_t min_equalize_size = MIN_EQUALIZE_SIZE;
 	float equalize_inbalance = EQUALIZE_INBALANCE;
+	float truncation_tolerance = TRUNCATION_TOLERANCE;
 
 	/* forward typedef */
 	typedef class mpi_iteration mpi_it_t;
@@ -394,7 +398,20 @@ namespace iqs::mpi {
 			int max_truncate = iqs::utils::log_2_upper_bound(1/(iqs::utils::upsize_policy - 1));
 			while (iteration.get_total_truncated_num_child(localComm) > (max_truncated_num_symbolic_object = get_max_num_object_initial())*iqs::utils::upsize_policy && 
 				--max_truncate >= 0) {
-					iteration.truncate(max_truncated_num_symbolic_object/iteration.get_average_num_child()/local_size, mid_step_function);
+					max_truncated_num_symbolic_object /= local_size;
+
+					/* truncate num child */
+					int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);
+					for (int i = 0; i < max_truncate; ++i) {
+						size_t num_symbolic_object = iteration.get_truncated_num_child();
+						size_t max_num_object = (float)iteration.truncated_num_object*(float)max_truncated_num_symbolic_object/(float)num_symbolic_object;
+
+						if (num_symbolic_object > max_truncated_num_symbolic_object*(1 + truncation_tolerance) ||
+							num_symbolic_object < max_truncated_num_symbolic_object*(1 - truncation_tolerance)) {
+								iteration.truncate(max_num_object, mid_step_function);
+							} else
+								break;
+					}
 				}
 		} else
 			iteration.truncate(max_num_object/local_size, mid_step_function);
