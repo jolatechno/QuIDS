@@ -27,7 +27,7 @@
 	#define TOLERANCE 1e-30;
 #endif
 #ifndef SAFETY_MARGIN
-	#define SAFETY_MARGIN 0.2
+	#define SAFETY_MARGIN 0.4
 #endif
 #ifndef SIZE_AVERAGE_PROPORTION
 	#define SIZE_AVERAGE_PROPORTION 0.1
@@ -274,7 +274,6 @@ namespace iqs {
 		bool random_selector_computed = false;
 		size_t next_iteration_num_object = 0;
 
-		std::vector<robin_hood::unordered_map<size_t, size_t>> elimination_maps;
 		std::vector<char*> placeholder;
 
 		utils::fast_vector<mag_t> magnitude;
@@ -347,17 +346,8 @@ namespace iqs {
 			return (float)hash_map_size + hash_map_size;
 		}
 		size_t get_mem_size() {
-			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
-
-			size_t memory_size = 0;
-			for (auto &map : elimination_maps)
-				memory_size += elimination_maps.capacity();
-			memory_size *= hash_map_size;
-
 			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
-			memory_size += magnitude.size()*symbolic_iteration_memory_size;
-
-			return memory_size;
+			return magnitude.size()*symbolic_iteration_memory_size;
 		}
 		float get_average_child_size() const {
 			size_t total_size = 0;
@@ -389,15 +379,6 @@ namespace iqs {
 		iteration.apply_modifier(rule);
 	}
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
-		auto const get_max_num_object_initial = [&]() {
-			float average_num_child = iteration.get_average_num_child();
-			size_t max_num_object = (float)(utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size()) /
-				(iteration.get_average_object_size() + average_num_child*symbolic_iteration.get_average_object_size()) *
-				average_num_child *
-				(1 - safety_margin)/utils::upsize_policy;
-
-			return std::max(utils::min_vector_size, max_num_object);
-		};
 		auto const get_max_num_object_final = [&]() {
 			size_t max_num_object =  (float)(utils::get_free_mem() + next_iteration.get_mem_size()) /
 				symbolic_iteration.get_average_child_size() *
@@ -420,15 +401,28 @@ namespace iqs {
 		mid_step_function("truncate");
 		iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
-			size_t max_truncated_num_symbolic_object, truncated_num_child;
-			int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);
-			while (((truncated_num_child = iteration.get_truncated_num_child()) > (max_truncated_num_symbolic_object = get_max_num_object_initial())*(1 + truncation_tolerance) || 
-				truncated_num_child < max_truncated_num_symbolic_object*(1 - truncation_tolerance)) &&
-				--max_truncate >= 0) {
-					size_t max_num_object = max_truncated_num_symbolic_object/iteration.get_average_num_child();
-					max_num_object = std::max(iqs::utils::min_vector_size, max_num_object);
-					iteration.truncate(max_num_object, mid_step_function);
+
+			/* available memory */
+			float average_object_size = iteration.get_average_object_size();
+			float average_symbolic_object_size = symbolic_iteration.get_average_object_size();
+			size_t avail_mem = (utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size())*(1 - safety_margin);
+
+			/* actually truncate */
+			for (int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);; --max_truncate) {
+				float avg_num_child = iteration.get_average_num_child();
+				size_t used_memory = iteration.truncated_num_object*(average_object_size + avg_num_child*average_symbolic_object_size)/utils::upsize_policy;
+				
+				/* check for condition */
+				if (used_memory <= avail_mem*(1 + truncation_tolerance)) {
+					if (used_memory >= avail_mem*(1 - truncation_tolerance) || iteration.truncated_num_object == iteration.num_object)
+						break;
+					if (max_truncate <= 0)
+						break;
 				}
+				
+				size_t truncate_num_object = iteration.truncated_num_object*avail_mem/used_memory;
+				iteration.truncate(truncate_num_object, mid_step_function);
+			}
 		} else
 			iteration.truncate(max_num_object, mid_step_function);
 
@@ -450,12 +444,26 @@ namespace iqs {
 		mid_step_function("truncate");
 		symbolic_iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
-			size_t max_truncated_num_object;
-			int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);
-			while ((symbolic_iteration.next_iteration_num_object > (max_truncated_num_object = get_max_num_object_final())*(1 + truncation_tolerance) || 
-				symbolic_iteration.next_iteration_num_object < max_truncated_num_object*(1 - truncation_tolerance)) &&
-				--max_truncate >= 0)
-					symbolic_iteration.truncate(max_truncated_num_object, mid_step_function);
+
+			/* available memory */
+			size_t avail_mem = (utils::get_free_mem() + next_iteration.get_mem_size())*(1 - safety_margin);
+
+			/* actually truncate */
+			for (int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);; --max_truncate) {
+				float average_object_size = symbolic_iteration.get_average_child_size();
+				size_t used_memory = symbolic_iteration.next_iteration_num_object*average_object_size/utils::upsize_policy;
+				
+				/* check for condition */
+				if (used_memory <= avail_mem*(1 + truncation_tolerance)) {
+					if (used_memory >= avail_mem*(1 - truncation_tolerance) || symbolic_iteration.next_iteration_num_object == symbolic_iteration.num_object_after_interferences)
+						break;
+					if (max_truncate <= 0)
+						break;
+				}
+				
+				size_t truncate_num_object = symbolic_iteration.next_iteration_num_object*avail_mem/used_memory;
+				symbolic_iteration.truncate(truncate_num_object, mid_step_function);
+			}
 		} else
 			symbolic_iteration.truncate(max_num_object, mid_step_function);
 
@@ -495,6 +503,11 @@ namespace iqs {
 		/* !!!!!!!!!!!!!!!!
 		pre_truncate
 		 !!!!!!!!!!!!!!!! */
+
+		if (max_num_object >= num_object) {
+			truncated_num_object = num_object;
+			return;
+		}
 
 		if ((truncated_num_object < max_num_object && num_object > max_num_object) ||
 			truncated_num_object > max_num_object) {
@@ -636,8 +649,6 @@ namespace iqs {
 		#pragma omp parallel
 		#pragma omp single
 		num_threads = omp_get_num_threads();
-		
-		elimination_maps.resize(num_threads);
 
 		int const num_bucket = utils::nearest_power_of_two(load_balancing_bucket_per_thread*num_threads);
 		size_t const offset = 8*sizeof(size_t) - utils::log_2_upper_bound(num_bucket);
@@ -682,10 +693,10 @@ namespace iqs {
 		#pragma omp parallel
 		{
 			int thread_id = omp_get_thread_num();
-			auto &elimination_map = elimination_maps[thread_id];
-
 			int load_begin = load_balancing_begin[thread_id], load_end = load_balancing_begin[thread_id + 1];
 			for (int j = load_begin; j < load_end; ++j) {
+				robin_hood::unordered_map<size_t, size_t> elimination_map;
+
 				size_t begin = partition_begin[j], end = partition_begin[j + 1];
 
 				elimination_map.reserve(end - begin);
@@ -700,7 +711,6 @@ namespace iqs {
 					/* keep the object if it is unique */
 					is_unique[oid] = unique;
 				}
-				elimination_map.clear();
 			}
 		}
 		mid_step_function("compute_collisions - finalize");
@@ -732,6 +742,11 @@ namespace iqs {
 		/* !!!!!!!!!!!!!!!!
 		truncate
 		 !!!!!!!!!!!!!!!! */
+
+		if (max_num_object >= num_object_after_interferences) {
+			next_iteration_num_object = num_object_after_interferences;
+			return;
+		}
 
 		if ((next_iteration_num_object < max_num_object && num_object > max_num_object) ||
 			next_iteration_num_object > max_num_object) {
