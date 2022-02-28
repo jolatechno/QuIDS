@@ -145,10 +145,17 @@ namespace iqs::mpi {
 
 			/* send size */
 			MPI_Send(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+			if (num_object_sent == 0)
+				return;
+			size_t begin = num_object - num_object_sent;
+			size_t send_object_size = object_begin[num_object] - object_begin[begin];
+			MPI_Send(&send_object_size, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
 
-			if (num_object_sent != 0) {
-				size_t begin = num_object - num_object_sent;
+			/* verify send */
+			bool send;
+			MPI_Recv(&send, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
+			if (send) {
 				/* prepare send */
 				size_t send_object_begin = object_begin[begin];
 				#pragma omp parallel for 
@@ -178,28 +185,33 @@ namespace iqs::mpi {
 				pop(num_object_sent, false);
 			}
 		}
-		void receive_objects(int node, MPI_Comm communicator, bool receive_num_child=false) {
+		void receive_objects(int node, MPI_Comm communicator, bool receive_num_child=false, size_t max_mem=-1) {
 			const static size_t max_int = 1 << 31 - 1;
 
 			/* receive size */
-			size_t num_object_sent;
+			size_t num_object_sent, send_object_size;
 			MPI_Recv(&num_object_sent, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+			if (num_object_sent == 0)
+				return;
+			MPI_Recv(&send_object_size, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
-			if (num_object_sent != 0) {
+			/* verify memory limit */
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t)  + sizeof(float);
+			bool recv = num_object_sent*iteration_memory_size + send_object_size < max_mem;
+			MPI_Send(&recv, 1, MPI_CHAR, node, 0 /* tag*/, communicator);
+
+			if (recv) {
 				/* prepare state */
+				size_t send_object_begin = object_begin[num_object];
 				resize(num_object + num_object_sent);
+				allocate(send_object_begin + send_object_size);
 
 				/* receive properties */
 				MPI_Recv(&magnitude[num_object], num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 				MPI_Recv(&object_begin[num_object + 1], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
-				/* prepare receive objects */
-				size_t send_object_begin = object_begin[num_object];
-				size_t object_offset = send_object_begin;
-				size_t send_object_size = object_begin[num_object + num_object_sent];
-				allocate(send_object_begin + send_object_size);
-
 				/* receive objects */
+				size_t object_offset = send_object_begin;
 				while (send_object_size > max_int) {
 					MPI_Recv(&objects[send_object_begin], max_int, MPI_CHAR, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
@@ -377,10 +389,12 @@ namespace iqs::mpi {
 
 		/* equalize symbolic objects */
 		mid_step_function("equalize_child");
-		for (int max_equalize = iqs::utils::log_2_upper_bound(size); max_equalize > 0; --max_equalize) {
+		for (int max_equalize = std::log2(size/equalize_inbalance); max_equalize >= 0; --max_equalize) {
 			/* check for condition */
-			size_t max_n_object = iteration.get_max_num_symbolic_object_per_task(communicator);
-			float inbalance = ((float)max_n_object - iteration.get_avg_num_symbolic_object_per_task(communicator))/(float)max_n_object;
+			size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
+			size_t max_n_child = iteration.get_max_num_symbolic_object_per_task(communicator);
+			float inbalance = ((float)max_n_child - iteration.get_avg_num_symbolic_object_per_task(communicator))/(float)max_n_child;
+
 			if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
 				break;
 
@@ -412,7 +426,7 @@ namespace iqs::mpi {
 				if (used_memory <= avail_mem*(1 + iqs::truncation_tolerance)) {
 					if (used_memory >= avail_mem*(1 - iqs::truncation_tolerance) || total_truncated_num_object == iteration.get_total_num_object(localComm))
 						break;
-					if (max_truncate <= 0)
+					if (max_truncate < 0)
 						break;
 				}
 
@@ -424,7 +438,7 @@ namespace iqs::mpi {
 					truncate_symbolic_num_object = truncated_num_child*min_truncate_step;
 
 				/* smart truncate */
-				for (int max_smart_truncate = -std::log(total_num_child/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step); max_smart_truncate > 0; --max_smart_truncate) {
+				for (int max_smart_truncate = -std::log(total_num_child/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step); max_smart_truncate >= 0; --max_smart_truncate) {
 					size_t truncated_num_child = iteration.get_truncated_num_child();
 					float average_num_child = (total_num_child + local_size*truncated_num_child)/(total_truncated_num_object + local_size*iteration.truncated_num_object);
 
@@ -480,7 +494,7 @@ namespace iqs::mpi {
 				if (used_memory <= avail_mem*(1 + iqs::truncation_tolerance)) {
 					if (used_memory >= avail_mem*(1 - iqs::truncation_tolerance) || total_num_child == symbolic_iteration.get_total_num_object_after_interferences(localComm))
 						break;
-					if (max_truncate <= 0)
+					if (max_truncate < 0)
 						break;
 				}
 
@@ -502,7 +516,7 @@ namespace iqs::mpi {
 
 		/* equalize and/or normalize */
 		mid_step_function("equalize");
-		for (int max_equalize = iqs::utils::log_2_upper_bound(size); max_equalize > 0; --max_equalize) {
+		for (int max_equalize = std::log2(size/equalize_inbalance); max_equalize >= 0; --max_equalize) {
 			/* check for condition */
 			size_t max_n_object = next_iteration.get_max_num_object_per_task(communicator);
 			float inbalance = ((float)max_n_object - next_iteration.get_total_num_object(communicator))/(float)max_n_object;
@@ -552,7 +566,7 @@ namespace iqs::mpi {
 		std::vector<int> receive_disp(size + 1);
 		std::vector<int> receive_count(size);
 
-		mid_step_function("compute_collisions - prepare (resize)");
+		mid_step_function("compute_collisions - prepare");
 		mpi_resize(num_object);
 
 
@@ -562,7 +576,6 @@ namespace iqs::mpi {
 		/* !!!!!!!!!!!!!!!!
 		partition
 		!!!!!!!!!!!!!!!! */
-		mid_step_function("compute_collisions - prepare (partition)");
 		iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[0] + num_object, 0,
 			partition_begin.begin(), partition_begin.end(),
 			[&](size_t const oid) {
@@ -570,7 +583,6 @@ namespace iqs::mpi {
 			});
 
 		/* generate partitioned hash */
-		mid_step_function("compute_collisions - prepare (un-partition)");
 		#pragma omp parallel for
 		for (size_t id = 0; id < num_object; ++id) {
 			size_t oid = next_oid[id];
@@ -802,10 +814,12 @@ namespace iqs::mpi {
 	void mpi_iteration::equalize(MPI_Comm communicator) {
 		MPI_Request request = MPI_REQUEST_NULL;
 
-		int size, rank;
+		MPI_Comm localComm;
+		int rank, size, local_size;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
-
+		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
+		MPI_Comm_size(localComm, &local_size);
 
 		int this_pair_id;
 		if (rank == 0) {
@@ -827,6 +841,10 @@ namespace iqs::mpi {
 			MPI_Scatter(NULL, 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
 		}
 
+		/* get available memory */
+		size_t avail_mem = iqs::utils::get_free_mem()/local_size*(1 - iqs::safety_margin);
+		MPI_Barrier(localComm);
+
 		/* skip if this node is alone */
 		if (this_pair_id == rank)
 			return;
@@ -842,9 +860,9 @@ namespace iqs::mpi {
 		/* equalize amoung pairs */
 		if (num_object > other_num_object) {
 			size_t num_object_sent = (num_object -  other_num_object) / 2;
-			send_objects(num_object_sent, this_pair_id, communicator);
+			send_objects(num_object_sent, this_pair_id, communicator, false);
 		} else if (num_object < other_num_object)
-			receive_objects(this_pair_id, communicator);
+			receive_objects(this_pair_id, communicator, false, avail_mem);
 	}
 
 	/*
@@ -853,13 +871,16 @@ namespace iqs::mpi {
 	void mpi_iteration::equalize_symbolic(MPI_Comm communicator) {
 		MPI_Request request = MPI_REQUEST_NULL;
 
-		int size, rank;
+		MPI_Comm localComm;
+		int rank, size, local_size;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
+		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
+		MPI_Comm_size(localComm, &local_size);
 
 		/* compute the number of symbolic objects */
-		__gnu_parallel::partial_sum(num_childs.begin(), num_childs.begin() + num_object, child_begin.begin());
-		size_t num_symbolic_object = child_begin[num_object - 1];
+		__gnu_parallel::partial_sum(num_childs.begin(), num_childs.begin() + num_object, child_begin.begin() + 1);
+		size_t num_symbolic_object = child_begin[num_object];
 
 		int this_pair_id;
 		if (rank == 0) {
@@ -880,6 +901,10 @@ namespace iqs::mpi {
 			/* scatter pair_id */
 			MPI_Scatter(NULL, 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
 		}
+		
+		/* get available memory */
+		size_t avail_mem = iqs::utils::get_free_mem()/local_size*(1 - iqs::safety_margin);
+		MPI_Barrier(localComm);
 
 		/* skip if this node is alone */
 		if (this_pair_id == rank)
@@ -907,7 +932,7 @@ namespace iqs::mpi {
 
 			send_objects(num_object_sent, this_pair_id, communicator, true);
 		} else if (num_symbolic_object < other_num_object)
-			receive_objects(this_pair_id, communicator, true);
+			receive_objects(this_pair_id, communicator, true, avail_mem);
 	}
 
 	/*

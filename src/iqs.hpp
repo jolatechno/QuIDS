@@ -27,7 +27,7 @@
 	#define TOLERANCE 1e-30;
 #endif
 #ifndef SAFETY_MARGIN
-	#define SAFETY_MARGIN 0.4
+	#define SAFETY_MARGIN 0.35
 #endif
 #ifndef SIZE_AVERAGE_PROPORTION
 	#define SIZE_AVERAGE_PROPORTION 0.1
@@ -424,7 +424,7 @@ namespace iqs {
 				if (used_memory <= avail_mem*(1 + truncation_tolerance)) {
 					if (used_memory >= avail_mem*(1 - truncation_tolerance) || iteration.truncated_num_object == iteration.num_object)
 						break;
-					if (max_truncate <= 0)
+					if (max_truncate < 0)
 						break;
 				}
 				
@@ -472,7 +472,7 @@ namespace iqs {
 				if (used_memory <= avail_mem*(1 + truncation_tolerance)) {
 					if (used_memory >= avail_mem*(1 - truncation_tolerance) || symbolic_iteration.next_iteration_num_object == symbolic_iteration.num_object_after_interferences)
 						break;
-					if (max_truncate <= 0)
+					if (max_truncate < 0)
 						break;
 				}
 
@@ -825,11 +825,7 @@ namespace iqs {
 	void symbolic_iteration::finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function) {
 		if (next_iteration_num_object == 0) {
 			next_iteration.num_object = 0;
-			mid_step_function("prepare_final (sort)");
-			mid_step_function("prepare_final (resize)");
-			mid_step_function("prepare_final (partition)");
-			mid_step_function("prepare_final (partial_sum)");
-			mid_step_function("prepare_final (resize)");
+			mid_step_function("prepare_final");
 			mid_step_function("final");
 			return;
 		}
@@ -844,18 +840,16 @@ namespace iqs {
 		/* !!!!!!!!!!!!!!!!
 		prepare_final
 		 !!!!!!!!!!!!!!!! */
-		mid_step_function("prepare_final (sort)");
+		mid_step_function("prepare_final");
 		next_iteration.num_object = next_iteration_num_object;
 
 		/* sort to make memory access more continuous */
 		__gnu_parallel::sort(&next_oid[0], &next_oid[0] + next_iteration.num_object);
 
 		/* resize new step variables */
-		mid_step_function("prepare_final (resize)");
 		next_iteration.resize(next_iteration.num_object);
 				
 		/* prepare for partial sum */
-		mid_step_function("prepare_final (partition)");
 		#pragma omp parallel for 
 		for (size_t oid = 0; oid < next_iteration.num_object; ++oid) {
 			auto id = next_oid[oid];
@@ -865,12 +859,10 @@ namespace iqs {
 			next_iteration.magnitude[oid] = magnitude[id];
 		}
 
-		mid_step_function("prepare_final (partial_sum)");
 		__gnu_parallel::partial_sum(&next_iteration.object_begin[1],
 			&next_iteration.object_begin[1] + next_iteration.num_object,
 			&next_iteration.object_begin[1]);
 
-		mid_step_function("prepare_final (resize)");
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
 		
