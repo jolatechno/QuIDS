@@ -27,7 +27,7 @@
 	#define TOLERANCE 1e-30;
 #endif
 #ifndef SAFETY_MARGIN
-	#define SAFETY_MARGIN 0.35
+	#define SAFETY_MARGIN 0.4
 #endif
 #ifndef SIZE_AVERAGE_PROPORTION
 	#define SIZE_AVERAGE_PROPORTION 0.1
@@ -182,7 +182,7 @@ namespace iqs {
 		}
 		float get_average_object_size() const {
 			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t)  + sizeof(float);
-			return (float)iteration_memory_size + (float)get_object_length()/(float)num_object;
+			return (float)iteration_memory_size + (float)get_object_length()/num_object;
 		}
 
 

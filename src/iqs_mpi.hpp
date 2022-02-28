@@ -61,7 +61,7 @@ namespace iqs::mpi {
 
 			size_t total_object_size;
 			MPI_Allreduce(&object_begin[num_object], &total_object_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			return (float)iteration_memory_size + (float)total_object_size/(float)get_total_num_object(communicator);
+			return (float)iteration_memory_size + (float)total_object_size/get_total_num_object(communicator);
 		}
 		size_t inline get_total_truncated_num_object(MPI_Comm communicator) const {
 			size_t total_truncated_num_object;
@@ -93,7 +93,7 @@ namespace iqs::mpi {
 			int size;
 			MPI_Comm_size(communicator, &size);
 
-			return (float)total_num_object_per_node/(float)size;
+			return (float)total_num_object_per_node/size;
 		}
 		size_t get_max_num_symbolic_object_per_task(MPI_Comm communicator) {
 			size_t max_num_object_per_node = get_num_symbolic_object();
@@ -393,7 +393,7 @@ namespace iqs::mpi {
 			/* check for condition */
 			size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
 			size_t max_n_child = iteration.get_max_num_symbolic_object_per_task(communicator);
-			float inbalance = ((float)max_n_child - iteration.get_avg_num_symbolic_object_per_task(communicator))/(float)max_n_child;
+			float inbalance = ((float)max_n_child - iteration.get_avg_num_symbolic_object_per_task(communicator))/max_n_child;
 
 			if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
 				break;
@@ -424,10 +424,19 @@ namespace iqs::mpi {
 				if (total_truncated_num_object == 0)
 					break;
 				if (used_memory <= avail_mem*(1 + iqs::truncation_tolerance)) {
-					if (used_memory >= avail_mem*(1 - iqs::truncation_tolerance) || total_truncated_num_object == iteration.get_total_num_object(localComm))
-						break;
 					if (max_truncate < 0)
 						break;
+					if (total_truncated_num_object == iteration.get_total_num_object(localComm))
+						break;
+					if (used_memory >= avail_mem*(1 - iqs::truncation_tolerance)) {
+						size_t max_n_child, max_n_object = iteration.get_max_num_object_per_task(communicator);
+						MPI_Allreduce(&truncated_num_child, &max_n_child, 1, Proba_MPI_Datatype, MPI_MAX, localComm);
+						float inbalance = ((float)max_n_child - (float)total_num_child/local_size)/max_n_child;
+
+						/* check inbalance */
+						if (max_n_object < min_equalize_size || inbalance < equalize_inbalance || inbalance < iqs::truncation_tolerance)
+							break;
+					}
 				}
 
 				/* compute the number of child to keep within limits */
@@ -475,6 +484,9 @@ namespace iqs::mpi {
 		symbolic_iteration.compute_collisions(communicator, mid_step_function);
 		symbolic_iteration.next_iteration_num_object = symbolic_iteration.num_object_after_interferences;
 
+		if (symbolic_iteration.num_object != iteration.get_truncated_num_child())
+			std::cerr << "	failure at rank " << rank << "\n";
+
 		/* second max_num_object */
 		mid_step_function("truncate");
 		symbolic_iteration.random_selector_computed = false;
@@ -492,10 +504,19 @@ namespace iqs::mpi {
 				if (total_num_child == 0)
 					break;
 				if (used_memory <= avail_mem*(1 + iqs::truncation_tolerance)) {
-					if (used_memory >= avail_mem*(1 - iqs::truncation_tolerance) || total_num_child == symbolic_iteration.get_total_num_object_after_interferences(localComm))
-						break;
 					if (max_truncate < 0)
 						break;
+					if (used_memory >= avail_mem*(1 - iqs::truncation_tolerance) || total_num_child == symbolic_iteration.get_total_num_object_after_interferences(localComm)) {
+						size_t max_n_child;
+						MPI_Allreduce(&symbolic_iteration.next_iteration_num_object, &max_n_child, 1, Proba_MPI_Datatype, MPI_MAX, localComm);
+						float inbalance = ((float)max_n_child - (float)total_num_child/local_size)/max_n_child;
+
+						/* check inbalance */
+						if (max_n_child < min_equalize_size || inbalance < equalize_inbalance || inbalance < iqs::truncation_tolerance)
+							break;
+
+						break;
+					}
 				}
 
 				/* compute truncate_num_object within limits */
@@ -517,9 +538,10 @@ namespace iqs::mpi {
 		/* equalize and/or normalize */
 		mid_step_function("equalize");
 		for (int max_equalize = std::log2(size/equalize_inbalance); max_equalize >= 0; --max_equalize) {
-			/* check for condition */
 			size_t max_n_object = next_iteration.get_max_num_object_per_task(communicator);
-			float inbalance = ((float)max_n_object - next_iteration.get_total_num_object(communicator))/(float)max_n_object;
+			float inbalance = ((float)max_n_object - next_iteration.get_total_num_object(communicator)/size)/max_n_object;
+
+			/* check for condition */
 			if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
 				break;
 
@@ -842,7 +864,10 @@ namespace iqs::mpi {
 		}
 
 		/* get available memory */
-		size_t avail_mem = iqs::utils::get_free_mem()/local_size*(1 - iqs::safety_margin);
+		MPI_Barrier(localComm);
+		size_t total_iteration_size, iteration_size = iqs::iteration::get_mem_size();
+		MPI_Allreduce(&iteration_size, &total_iteration_size, 1, Proba_MPI_Datatype, MPI_SUM, localComm);
+		size_t avail_mem = ((iqs::utils::get_free_mem() + total_iteration_size)/local_size - iteration_size)*(1 - iqs::safety_margin);
 		MPI_Barrier(localComm);
 
 		/* skip if this node is alone */
@@ -903,7 +928,10 @@ namespace iqs::mpi {
 		}
 		
 		/* get available memory */
-		size_t avail_mem = iqs::utils::get_free_mem()/local_size*(1 - iqs::safety_margin);
+		MPI_Barrier(localComm);
+		size_t total_iteration_size, iteration_size = iqs::iteration::get_mem_size();
+		MPI_Allreduce(&iteration_size, &total_iteration_size, 1, Proba_MPI_Datatype, MPI_SUM, localComm);
+		size_t avail_mem = ((iqs::utils::get_free_mem() + total_iteration_size)/local_size - iteration_size)*(1 - iqs::safety_margin);
 		MPI_Barrier(localComm);
 
 		/* skip if this node is alone */
