@@ -400,8 +400,9 @@ namespace iqs::mpi {
 			size_t avail_mem = (iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm))*(1 - iqs::safety_margin);
 
 			/* actually truncate */
-			for (int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);; --max_truncate) {
-				size_t total_num_child = iteration.get_total_truncated_num_child(localComm);
+			for (int max_truncate = -std::log(iteration.get_total_num_object(localComm)/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step);; --max_truncate) {
+				size_t total_num_child, truncated_num_child = iteration.get_truncated_num_child();
+				MPI_Allreduce(&truncated_num_child, &total_num_child, 1, Proba_MPI_Datatype, MPI_SUM, localComm);
 				size_t total_truncated_num_object = iteration.get_total_truncated_num_object(localComm);
 				size_t used_memory = (total_truncated_num_object*average_object_size + total_num_child*average_symbolic_object_size)/iqs::utils::upsize_policy;
 				
@@ -415,17 +416,29 @@ namespace iqs::mpi {
 						break;
 				}
 
-				/* smart truncate */
+				/* compute the number of child to keep within limits */
 				size_t truncate_symbolic_num_object = total_num_child*avail_mem/used_memory/local_size;
-				for (int max_smart_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance); max_smart_truncate > 0; --max_smart_truncate) {
+				if (truncate_symbolic_num_object > truncated_num_child*max_truncate_step) {
+					truncate_symbolic_num_object = truncated_num_child*max_truncate_step;
+				} else if (truncate_symbolic_num_object < truncated_num_child*min_truncate_step)
+					truncate_symbolic_num_object = truncated_num_child*min_truncate_step;
+
+				/* smart truncate */
+				for (int max_smart_truncate = -std::log(total_num_child/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step); max_smart_truncate > 0; --max_smart_truncate) {
 					size_t truncated_num_child = iteration.get_truncated_num_child();
 					float average_num_child = (total_num_child + local_size*truncated_num_child)/(total_truncated_num_object + local_size*iteration.truncated_num_object);
-					size_t truncate_num_object = truncate_symbolic_num_object/average_num_child;
 
 					/* check for condition */
 					if (truncated_num_child <= truncate_symbolic_num_object*(1 + iqs::truncation_tolerance) &&
 						(truncated_num_child >= truncate_symbolic_num_object*(1 - iqs::truncation_tolerance) || truncated_num_child == iteration.num_object))
 							break;
+
+					/* compute truncate_num_object within limits */
+					size_t truncate_num_object = truncate_symbolic_num_object/average_num_child;
+					if (truncate_num_object > iteration.truncated_num_object*max_truncate_step) {
+						truncate_num_object = iteration.truncated_num_object*max_truncate_step;
+					} else if (truncate_num_object < iteration.truncated_num_object*min_truncate_step)
+						truncate_num_object = iteration.truncated_num_object*min_truncate_step;
 
 					/* actually truncate */
 					iteration.truncate(truncate_num_object, mid_step_function);
@@ -457,7 +470,7 @@ namespace iqs::mpi {
 			size_t avail_mem = (iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm))*(1 - iqs::safety_margin);
 
 			/* actually truncate */
-			for (int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);; --max_truncate) {
+			for (int max_truncate = -std::log(symbolic_iteration.get_total_num_object_after_interferences(localComm)/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step);; --max_truncate) {
 				size_t total_num_child = symbolic_iteration.get_total_next_iteration_num_object(localComm);
 				size_t used_memory = symbolic_iteration.get_average_child_size(localComm)*total_num_child/iqs::utils::upsize_policy;
 				
@@ -471,8 +484,14 @@ namespace iqs::mpi {
 						break;
 				}
 
-				/* smart truncate */
+				/* compute truncate_num_object within limits */
 				size_t truncate_num_object = total_num_child*avail_mem/used_memory/local_size;
+				if (truncate_num_object > symbolic_iteration.next_iteration_num_object*max_truncate_step) {
+					truncate_num_object = symbolic_iteration.next_iteration_num_object*max_truncate_step;
+				} else if (truncate_num_object < symbolic_iteration.next_iteration_num_object*min_truncate_step)
+					truncate_num_object = symbolic_iteration.next_iteration_num_object*min_truncate_step;
+
+				/* truncate */
 				symbolic_iteration.truncate(truncate_num_object, mid_step_function);
 			}
 		} else

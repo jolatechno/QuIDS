@@ -38,6 +38,12 @@
 #ifndef TRUNCATION_TOLERANCE
 	#define TRUNCATION_TOLERANCE 0.05;
 #endif
+#ifndef MAX_TRUNCATE_STEP
+	#define MAX_TRUNCATE_STEP 2;
+#endif
+#ifndef MIN_TRUNCATE_STEP
+	#define MIN_TRUNCATE_STEP 0.2;
+#endif
 
 /*
 defining openmp function's return values if openmp isn't installed or loaded
@@ -66,12 +72,14 @@ namespace iqs {
 	float safety_margin = SAFETY_MARGIN;
 	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
-	float truncation_tolerance = TRUNCATION_TOLERANCE;
 	#ifdef SIMPLE_TRUNCATION
 		bool simple_truncation = true;
 	#else
 		bool simple_truncation = false;
 	#endif
+	float truncation_tolerance = TRUNCATION_TOLERANCE;
+	float max_truncate_step = MAX_TRUNCATE_STEP;
+	float min_truncate_step = MIN_TRUNCATE_STEP;
 
 	/* forward typedef */
 	typedef std::complex<PROBA_TYPE> mag_t;
@@ -408,7 +416,7 @@ namespace iqs {
 			size_t avail_mem = (utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size())*(1 - safety_margin);
 
 			/* actually truncate */
-			for (int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);; --max_truncate) {
+			for (int max_truncate = -std::log(truncation_tolerance/iteration.num_object)/std::log(min_truncate_step);; --max_truncate) {
 				float avg_num_child = iteration.get_average_num_child();
 				size_t used_memory = iteration.truncated_num_object*(average_object_size + avg_num_child*average_symbolic_object_size)/utils::upsize_policy;
 				
@@ -420,7 +428,14 @@ namespace iqs {
 						break;
 				}
 				
+				/* compute truncate_num_object within limits */
 				size_t truncate_num_object = iteration.truncated_num_object*avail_mem/used_memory;
+				if (truncate_num_object > iteration.truncated_num_object*max_truncate_step) {
+					truncate_num_object = iteration.truncated_num_object*max_truncate_step;
+				} else if (truncate_num_object < iteration.truncated_num_object*min_truncate_step)
+					truncate_num_object = iteration.truncated_num_object*min_truncate_step;
+
+				/* truncate */
 				iteration.truncate(truncate_num_object, mid_step_function);
 			}
 		} else
@@ -460,8 +475,15 @@ namespace iqs {
 					if (max_truncate <= 0)
 						break;
 				}
-				
+
+				/* compute truncate_num_object within limits */
 				size_t truncate_num_object = symbolic_iteration.next_iteration_num_object*avail_mem/used_memory;
+				if (truncate_num_object > symbolic_iteration.next_iteration_num_object*max_truncate_step) {
+					truncate_num_object = symbolic_iteration.next_iteration_num_object*max_truncate_step;
+				} else if (truncate_num_object < symbolic_iteration.next_iteration_num_object*min_truncate_step)
+					truncate_num_object = symbolic_iteration.next_iteration_num_object*min_truncate_step;
+				
+				/* truncate */
 				symbolic_iteration.truncate(truncate_num_object, mid_step_function);
 			}
 		} else
