@@ -429,7 +429,7 @@ namespace iqs::mpi {
 					if (total_truncated_num_object == iteration.get_total_num_object(localComm))
 						break;
 					if (used_memory >= avail_mem*(1 - iqs::truncation_tolerance)) {
-						size_t max_n_child, max_n_object = iteration.get_max_num_object_per_task(communicator);
+						size_t max_n_child, max_n_object = iteration.get_max_num_object_per_task(localComm);
 						MPI_Allreduce(&truncated_num_child, &max_n_child, 1, Proba_MPI_Datatype, MPI_MAX, localComm);
 						float inbalance = ((float)max_n_child - (float)total_num_child/local_size)/max_n_child;
 
@@ -449,7 +449,8 @@ namespace iqs::mpi {
 					truncate_symbolic_num_object = truncated_num_child;
 
 				/* smart truncate */
-				for (int max_smart_truncate = -std::log(total_num_child/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step); max_smart_truncate >= 0; --max_smart_truncate) {
+				int max_smart_truncate = -std::log(total_num_child/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step);
+				for (int i = 0; i < max_smart_truncate; ++i) {
 					size_t truncated_num_child = iteration.get_truncated_num_child();
 					float average_num_child = (total_num_child + local_size*truncated_num_child)/(total_truncated_num_object + local_size*iteration.truncated_num_object);
 
@@ -464,7 +465,7 @@ namespace iqs::mpi {
 						truncate_num_object = iteration.truncated_num_object*max_truncate_step;
 					} else if (truncate_num_object < iteration.truncated_num_object*min_truncate_step)
 						truncate_num_object = iteration.truncated_num_object*min_truncate_step;
-					if (max_truncate < -1 && truncate_num_object > iteration.truncated_num_object)
+					if (max_truncate < -max_smart_truncate && truncate_num_object > iteration.truncated_num_object)
 						truncate_num_object = iteration.truncated_num_object;
 
 					/* actually truncate */
@@ -487,9 +488,6 @@ namespace iqs::mpi {
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(communicator, mid_step_function);
 		symbolic_iteration.next_iteration_num_object = symbolic_iteration.num_object_after_interferences;
-
-		if (symbolic_iteration.num_object != iteration.get_truncated_num_child())
-			std::cerr << "	failure at rank " << rank << "\n";
 
 		/* second max_num_object */
 		mid_step_function("truncate");
@@ -634,8 +632,8 @@ namespace iqs::mpi {
 			mid_step_function("compute_collisions - com");
 			MPI_Reduce(&partition_begin[1], &total_partition_begin[1],
 				num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
-			mid_step_function("compute_collisions - prepare");
 
+			mid_step_function("compute_collisions - prepare");
 			iqs::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
 				load_balancing_begin.begin(), load_balancing_begin.end());
 		} else {
@@ -646,11 +644,10 @@ namespace iqs::mpi {
 		}
 
 		mid_step_function("compute_collisions - com");
-
 		MPI_Bcast(&load_balancing_begin[1], n_segment, MPI_INT, 0, communicator);
-		mid_step_function("compute_collisions - prepare");
 
 		/* recompute local count and disp */
+		mid_step_function("compute_collisions - prepare");
 		local_disp[0] = 0;
 		for (int i = 1; i <= n_segment; ++i) {
 			local_disp[i] = partition_begin[load_balancing_begin[i]];
@@ -667,8 +664,8 @@ namespace iqs::mpi {
 		!!!!!!!!!!!!!!!! */
 		mid_step_function("compute_collisions - com");
 		MPI_Alltoall(&local_count[0], num_threads, MPI_INT, &global_count[0], num_threads, MPI_INT, communicator);
-		mid_step_function("compute_collisions - prepare");
 
+		mid_step_function("compute_collisions - prepare");
 		std::partial_sum(&global_count[0], &global_count[0] + n_segment, &global_disp[1]);
 
 		/* recompute send and receive count and disp */
@@ -690,7 +687,6 @@ namespace iqs::mpi {
 			&hash_buffer[0], &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
 		MPI_Alltoallv(&partitioned_mag[0], &send_count[0], &send_disp[0], mag_MPI_Datatype,
 			&mag_buffer[0], &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
-		mid_step_function("compute_collisions - insert");
 
 
 
@@ -700,6 +696,7 @@ namespace iqs::mpi {
 		/* !!!!!!!!!!!!!!!!
 		compute-collision
 		!!!!!!!!!!!!!!!! */
+		mid_step_function("compute_collisions - prepare");
 		/* prepare node_id buffer */
 		for (int node = 0; node < size; ++node) {
 			size_t begin = receive_disp[node], end = receive_disp[node + 1];
@@ -708,6 +705,7 @@ namespace iqs::mpi {
 				node_id_buffer[i] = node;
 		}
 
+		mid_step_function("compute_collisions - insert");
 		#pragma omp parallel
 		{
 			std::vector<int> global_num_object_after_interferences(size, 0);
@@ -773,9 +771,9 @@ namespace iqs::mpi {
 			&partitioned_mag[0], &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
 		MPI_Alltoallv(&is_unique_buffer[0], &receive_count[0], &receive_disp[0], MPI_CHAR,
 			&partitioned_is_unique[0], &send_count[0], &send_disp[0], MPI_CHAR, communicator);
-		mid_step_function("compute_collisions - finalize");
 
 		/* un-partition magnitude */
+		mid_step_function("compute_collisions - finalize");
 		#pragma omp parallel for
 		for (size_t id = 0; id < num_object; ++id) {
 			size_t oid = next_oid[id];
