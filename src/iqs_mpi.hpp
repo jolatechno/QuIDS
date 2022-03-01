@@ -365,17 +365,6 @@ namespace iqs::mpi {
 		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
 		MPI_Comm_size(localComm, &local_size);
 
-		auto const get_max_num_object_final = [&]() {
-			MPI_Barrier(localComm);
-			size_t max_num_object = (float)(iqs::utils::get_free_mem() + next_iteration.get_mem_size(localComm)) /
-				symbolic_iteration.get_average_child_size(localComm) *
-				(1 - safety_margin)/iqs::utils::upsize_policy;
-
-			return std::max(iqs::utils::min_vector_size, max_num_object);
-		};
-
-
-
 
 
 		
@@ -404,7 +393,7 @@ namespace iqs::mpi {
 		}
 
 		/* max_num_object */
-		mid_step_function("truncate");
+		mid_step_function("truncate_symbolic");
 		iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
 

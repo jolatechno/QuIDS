@@ -387,26 +387,12 @@ namespace iqs {
 		iteration.apply_modifier(rule);
 	}
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
-		auto const get_max_num_object_final = [&]() {
-			size_t max_num_object =  (float)(utils::get_free_mem() + next_iteration.get_mem_size()) /
-				symbolic_iteration.get_average_child_size() *
-				(1 - safety_margin)/utils::upsize_policy;
-
-			return std::max(utils::min_vector_size, max_num_object);
-		};
-
-
-
-
-
-
-
 		/* compute the number of child */
 		iteration.compute_num_child(rule, mid_step_function);
 		iteration.truncated_num_object = iteration.num_object;
 
 		/* max_num_object */
-		mid_step_function("truncate");
+		mid_step_function("truncate_symbolic");
 		iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
 
