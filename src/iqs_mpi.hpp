@@ -394,7 +394,7 @@ namespace iqs::mpi {
 
 		/* equalize symbolic objects */
 		mid_step_function("equalize_child");
-		for (int max_equalize = std::log2(size/equalize_inbalance); max_equalize >= 0; --max_equalize) {
+		for (int max_equalize = std::log2(size); max_equalize >= 0; --max_equalize) {
 			/* check for condition */
 			size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
 			size_t max_n_child = iteration.get_max_num_symbolic_object_per_task(communicator);
@@ -427,7 +427,7 @@ namespace iqs::mpi {
 
 			/* actually truncate */
 			size_t avg_truncate_symbolic_num_object;
-			int max_truncate = iteration.num_object == 0 ? 0 : std::log(size*iteration.num_object/iqs::truncation_tolerance)*log_dimension;
+			int max_truncate = iteration.num_object == 0 ? 0 : std::log2(size) + std::log(iteration.num_object)*log_dimension;
 			MPI_Allreduce(MPI_IN_PLACE, &max_truncate, 1, MPI_INT, MPI_MAX, communicator);
 			for (int i = max_truncate;; --i) {
 				size_t total_num_child, truncated_num_child = iteration.get_truncated_num_child();
@@ -467,7 +467,7 @@ namespace iqs::mpi {
 
 				/* smart truncate */
 				if (total_num_child > 0) {
-					int max_smart_truncate = std::log(total_num_child/iqs::truncation_tolerance)*log_dimension;
+					int max_smart_truncate = std::log(total_num_child)*log_dimension;
 					for (int j = 0; j < max_smart_truncate; ++j) {
 						size_t truncated_num_child = iteration.get_truncated_num_child();
 						float average_num_child = (total_num_child + local_size*truncated_num_child)/(total_truncated_num_object + local_size*iteration.truncated_num_object);
@@ -520,7 +520,7 @@ namespace iqs::mpi {
 
 			/* actually truncate */
 			size_t avg_truncate_num_object;
-			int max_truncate = symbolic_iteration.num_object_after_interferences == 0 ? 0 : std::log(size*symbolic_iteration.num_object_after_interferences/iqs::truncation_tolerance)*log_dimension;
+			int max_truncate = symbolic_iteration.num_object_after_interferences == 0 ? 0 : std::log2(size) + std::log(symbolic_iteration.num_object_after_interferences)*log_dimension;
 			MPI_Allreduce(MPI_IN_PLACE, &max_truncate, 1, MPI_INT, MPI_MAX, communicator);
 			for (int i = max_truncate;; --i) {
 				size_t total_num_child = symbolic_iteration.get_total_next_iteration_num_object(localComm);
@@ -567,7 +567,7 @@ namespace iqs::mpi {
 
 		/* equalize and/or normalize */
 		mid_step_function("equalize");
-		for (int max_equalize = std::log2(size/equalize_inbalance); max_equalize >= 0; --max_equalize) {
+		for (int max_equalize = std::log2(size); max_equalize >= 0; --max_equalize) {
 			size_t max_n_object = next_iteration.get_max_num_object_per_task(communicator);
 			float inbalance = ((float)max_n_object - next_iteration.get_total_num_object(communicator)/size)/max_n_object;
 

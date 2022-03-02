@@ -404,7 +404,7 @@ namespace iqs {
 			size_t avail_mem = (utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size())*(1 - safety_margin);
 
 			/* actually truncate */
-			for (int max_truncate = std::log(truncation_tolerance/iteration.num_object)*log_dimension;; --max_truncate) {
+			for (int max_truncate = -std::log(iteration.num_object)*log_dimension;; --max_truncate) {
 				float avg_num_child = iteration.get_average_num_child();
 				size_t used_memory = iteration.truncated_num_object*(average_object_size + avg_num_child*average_symbolic_object_size)/utils::upsize_policy;
 				
@@ -454,7 +454,7 @@ namespace iqs {
 			size_t avail_mem = (utils::get_free_mem() + next_iteration.get_mem_size())*(1 - safety_margin);
 
 			/* actually truncate */
-			for (int max_truncate = -std::log(truncation_tolerance)*log_dimension;; --max_truncate) {
+			for (int max_truncate = std::log(symbolic_iteration.num_object_after_interferences)*log_dimension;; --max_truncate) {
 				float average_object_size = symbolic_iteration.get_average_child_size();
 				size_t used_memory = symbolic_iteration.next_iteration_num_object*average_object_size/utils::upsize_policy;
 				
