@@ -423,7 +423,7 @@ namespace iqs {
 				} else if (truncate_num_object < iteration.truncated_num_object*min_truncate_step)
 					truncate_num_object = iteration.truncated_num_object*min_truncate_step;
 				if (max_truncate < 0 && truncate_num_object > iteration.truncated_num_object)
-					truncate_num_object = iteration.truncated_num_object;
+					truncate_num_object = (1 - iqs::truncation_tolerance)*iteration.truncated_num_object;
 
 				/* truncate */
 				iteration.truncate(truncate_num_object, mid_step_function);
@@ -473,7 +473,7 @@ namespace iqs {
 				} else if (truncate_num_object < symbolic_iteration.next_iteration_num_object*min_truncate_step)
 					truncate_num_object = symbolic_iteration.next_iteration_num_object*min_truncate_step;
 				if (max_truncate < 0 && truncate_num_object > symbolic_iteration.next_iteration_num_object)
-					truncate_num_object = symbolic_iteration.next_iteration_num_object;
+					truncate_num_object = (1 - iqs::truncation_tolerance)*symbolic_iteration.next_iteration_num_object;
 				
 				/* truncate */
 				symbolic_iteration.truncate(truncate_num_object, mid_step_function);

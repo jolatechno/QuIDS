@@ -436,8 +436,7 @@ namespace iqs::mpi {
 				size_t used_memory = (total_truncated_num_object*average_object_size + total_num_child*average_symbolic_object_size)/iqs::utils::upsize_policy;
 				
 				/* check for condition */
-				if (used_memory <= avail_mem*(1 + iqs::truncation_tolerance) && 
-					i < 0)
+				if (i < 0 && used_memory <= avail_mem*(1 + iqs::truncation_tolerance))
 					break;
 				
 				/* compute the number of child to keep with upword limit */
@@ -452,7 +451,7 @@ namespace iqs::mpi {
 						int count = iteration.num_object != 0;
 						MPI_Allreduce(MPI_IN_PLACE, &count, 1, MPI_INT, MPI_SUM, communicator);
 						if (count == 0)
-							return;
+							break;
 						avg_truncate_symbolic_num_object /= count;
 					}
 					if (truncate_symbolic_num_object > avg_truncate_symbolic_num_object)
@@ -474,7 +473,7 @@ namespace iqs::mpi {
 						/* compute truncate_num_object within limits */
 						size_t truncate_num_object = truncate_symbolic_num_object/average_num_child;
 						if (i < 0 && truncate_num_object > iteration.truncated_num_object)
-							truncate_num_object = iteration.truncated_num_object;
+							truncate_num_object = (1 - iqs::truncation_tolerance)*iteration.truncated_num_object;
 
 						/* actually truncate */
 						iteration.truncate(truncate_num_object, mid_step_function);
@@ -497,6 +496,8 @@ namespace iqs::mpi {
 		symbolic_iteration.compute_collisions(communicator, mid_step_function);
 		symbolic_iteration.next_iteration_num_object = symbolic_iteration.num_object_after_interferences;
 
+
+
 		/* second max_num_object */
 		mid_step_function("truncate");
 		symbolic_iteration.random_selector_computed = false;
@@ -516,9 +517,8 @@ namespace iqs::mpi {
 				size_t used_memory = symbolic_iteration.get_average_child_size(localComm)*total_num_child/iqs::utils::upsize_policy;
 
 				/* check for condition */
-				if (used_memory <= avail_mem*(1 + iqs::truncation_tolerance) && 
-					i < 0)
-						break;
+				if (i < 0 && used_memory <= avail_mem*(1 + iqs::truncation_tolerance))
+					break;
 
 				/* compute the number of child to keep with upword limit */
 				size_t truncate_num_object = used_memory == 0 ? 0 : total_num_child*avail_mem/used_memory/local_size;
@@ -532,7 +532,7 @@ namespace iqs::mpi {
 						int count = symbolic_iteration.num_object_after_interferences != 0;
 						MPI_Allreduce(MPI_IN_PLACE, &count, 1, MPI_INT, MPI_SUM, communicator);
 						if (count == 0)
-							return; 
+							break; 
 						avg_truncate_num_object /= count;
 					}
 					if (truncate_num_object > avg_truncate_num_object)
@@ -543,7 +543,7 @@ namespace iqs::mpi {
 				if (truncate_num_object < symbolic_iteration.next_iteration_num_object*iqs::min_truncate_step)
 					truncate_num_object = symbolic_iteration.next_iteration_num_object*iqs::min_truncate_step;
 				if (i < 0 && truncate_num_object > symbolic_iteration.next_iteration_num_object)
-					truncate_num_object = symbolic_iteration.next_iteration_num_object;
+					truncate_num_object = (1 - iqs::truncation_tolerance)*symbolic_iteration.next_iteration_num_object;
 
 				/* truncate */
 				if (!(symbolic_iteration.next_iteration_num_object <= truncate_num_object*(1 + iqs::truncation_tolerance) &&

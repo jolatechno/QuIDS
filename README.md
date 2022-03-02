@@ -360,11 +360,11 @@ The default value of any of those variable can be altered at compilation, by pas
 
 #### simple truncation
 
-...
+`simple_truncation` is a `bool` variable (default is `false`, but can be set to `true` by compilling with the `SIMPLE_TRUNCATION` flag). Is `simple_truncation` is `true`, then truncation simply consist in selecting the n highest probability objects. Otherwise object are selected with some probabilistic aspect, with the probability of keeping an object being proportional to the probability of each object.
 
 #### truncation max and min step
 
-...
+`max_truncation_step` and `min_truncation_step` represent the maximum and minimum relative truncation allowed at each iteration of the truncation algorithm (default is respectivly `2` and `0.2`). This limit is used for stability.
 
 #### load balancing bucket per thread
 
@@ -384,7 +384,7 @@ If this first condition is met, `equalize(...)` if the maximum relative imbalanc
 
 #### minimize truncation
 
-...
+`minimize_truncation` is a `bool` variable (default is `false`, but can be set to `true` by compilling with the `MINIMIZE_TRUNCATION` flag). If `minimize_truncation` is `true` then each mpi rank will keep the maximum number of object it can within memory limitation, effectively "minimizing truncation". Otherwise each node will maximize the number of graph it keeps.
 
 ### Utils global variables
 
