@@ -987,6 +987,11 @@ namespace iqs::rules::qcgd {
 				return input.substr(begin + key.length(), end - begin);
 			}
 
+			bool parse_bool(std::string const input, std::string const key, std::string const separator) {
+				std::string string_value = parse(input, key, separator);
+				return !(string_value == "");
+			}
+
 			int parse_int_with_default(std::string const input, std::string const key, std::string const separator, int Default) {
 				std::string string_value = parse(input, key, separator);
 				if (string_value == "")
@@ -1021,6 +1026,8 @@ namespace iqs::rules::qcgd {
 
 			iqs::tolerance = parse_float_with_default(string_arg, "tolerance=", ",", iqs::tolerance);
 			iqs::safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", iqs::safety_margin);
+
+			iqs::simple_truncation = iqs::simple_truncation || parse_bool(string_arg, "simple_truncate", ",");
 
 			size_t max_num_object = parse_int_with_default(string_arg, "max_num_object=", ",", 0);
 
