@@ -443,7 +443,8 @@ namespace iqs::mpi {
 						MPI_Allreduce(&truncate_symbolic_num_object, &avg_truncate_symbolic_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 						int count = iteration.num_object != 0;
 						MPI_Allreduce(MPI_IN_PLACE, &count, 1, MPI_INT, MPI_SUM, communicator);
-						avg_truncate_symbolic_num_object /= count;
+						if (count > 0)
+							avg_truncate_symbolic_num_object /= count;
 					}
 					if (truncate_symbolic_num_object > avg_truncate_symbolic_num_object)
 						truncate_symbolic_num_object = avg_truncate_symbolic_num_object;
@@ -530,7 +531,8 @@ namespace iqs::mpi {
 						MPI_Allreduce(&truncate_num_object, &avg_truncate_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 						int count = symbolic_iteration.num_object_after_interferences != 0;
 						MPI_Allreduce(MPI_IN_PLACE, &count, 1, MPI_INT, MPI_SUM, communicator);
-						avg_truncate_num_object /= count;
+						if (count > 0)
+							avg_truncate_num_object /= count;
 					}
 					if (truncate_num_object > avg_truncate_num_object)
 						truncate_num_object = avg_truncate_num_object;
