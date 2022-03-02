@@ -465,31 +465,20 @@ namespace iqs::mpi {
 				if (i < 0 && truncate_symbolic_num_object > truncated_num_child)
 					truncate_symbolic_num_object = truncated_num_child;
 
-				/* smart truncate */
-				if (total_num_child > 0) {
-					int max_smart_truncate = std::log(total_num_child)*log_dimension;
-					for (int j = 0; j < max_smart_truncate; ++j) {
+				if (total_num_child > 0 &&
+					!(truncated_num_child <= truncate_symbolic_num_object*(1 + iqs::truncation_tolerance) &&
+					truncated_num_child >= truncate_symbolic_num_object*(1 - iqs::truncation_tolerance))) {
 						size_t truncated_num_child = iteration.get_truncated_num_child();
 						float average_num_child = (total_num_child + local_size*truncated_num_child)/(total_truncated_num_object + local_size*iteration.truncated_num_object);
 
-						/* check for condition */
-						if (truncated_num_child <= truncate_symbolic_num_object*(1 + iqs::truncation_tolerance) &&
-							(truncated_num_child >= truncate_symbolic_num_object*(1 - iqs::truncation_tolerance) || truncated_num_child == iteration.num_object))
-								break;
-
 						/* compute truncate_num_object within limits */
 						size_t truncate_num_object = truncate_symbolic_num_object/average_num_child;
-						if (truncate_num_object > iteration.truncated_num_object*iqs::max_truncate_step) {
-							truncate_num_object = iteration.truncated_num_object*iqs::max_truncate_step;
-						} else if (truncate_num_object < iteration.truncated_num_object*iqs::min_truncate_step)
-							truncate_num_object = iteration.truncated_num_object*iqs::min_truncate_step;
-						if (max_truncate < -max_smart_truncate && truncate_num_object > iteration.truncated_num_object)
+						if (i < 0 && truncate_num_object > iteration.truncated_num_object)
 							truncate_num_object = iteration.truncated_num_object;
 
 						/* actually truncate */
 						iteration.truncate(truncate_num_object, mid_step_function);
 					}
-				}
 			}
 		} else
 			iteration.truncate(max_num_object/local_size, mid_step_function);
@@ -557,7 +546,9 @@ namespace iqs::mpi {
 					truncate_num_object = symbolic_iteration.next_iteration_num_object;
 
 				/* truncate */
-				symbolic_iteration.truncate(truncate_num_object, mid_step_function);
+				if (!(symbolic_iteration.next_iteration_num_object <= truncate_num_object*(1 + iqs::truncation_tolerance) &&
+					symbolic_iteration.next_iteration_num_object >= truncate_num_object*(1 - iqs::truncation_tolerance)))
+						symbolic_iteration.truncate(truncate_num_object, mid_step_function);
 			}
 		} else
 			symbolic_iteration.truncate(max_num_object/local_size, mid_step_function);
