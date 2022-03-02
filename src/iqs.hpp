@@ -29,9 +29,6 @@
 #ifndef SAFETY_MARGIN
 	#define SAFETY_MARGIN 0.4
 #endif
-#ifndef SIZE_AVERAGE_PROPORTION
-	#define SIZE_AVERAGE_PROPORTION 0.1
-#endif
 #ifndef LOAD_BALANCING_BUCKET_PER_THREAD
 	#define LOAD_BALANCING_BUCKET_PER_THREAD 32
 #endif
@@ -70,7 +67,6 @@ namespace iqs {
 	*/
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
-	float size_average_proportion = SIZE_AVERAGE_PROPORTION;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
 	#ifdef SIMPLE_TRUNCATION
 		bool simple_truncation = true;
@@ -387,6 +383,12 @@ namespace iqs {
 		iteration.apply_modifier(rule);
 	}
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
+		const int log_dimension = max_truncate_step == 0 || min_truncate_step == 0 ? 1/std::log(2) : 1/std::log(iqs::max_truncate_step) - 1/std::log(iqs::min_truncate_step);
+
+
+
+
+
 		/* compute the number of child */
 		iteration.compute_num_child(rule, mid_step_function);
 		iteration.truncated_num_object = iteration.num_object;
@@ -402,7 +404,7 @@ namespace iqs {
 			size_t avail_mem = (utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size())*(1 - safety_margin);
 
 			/* actually truncate */
-			for (int max_truncate = -std::log(truncation_tolerance/iteration.num_object)/std::log(min_truncate_step);; --max_truncate) {
+			for (int max_truncate = std::log(truncation_tolerance/iteration.num_object)*log_dimension;; --max_truncate) {
 				float avg_num_child = iteration.get_average_num_child();
 				size_t used_memory = iteration.truncated_num_object*(average_object_size + avg_num_child*average_symbolic_object_size)/utils::upsize_policy;
 				
@@ -452,7 +454,7 @@ namespace iqs {
 			size_t avail_mem = (utils::get_free_mem() + next_iteration.get_mem_size())*(1 - safety_margin);
 
 			/* actually truncate */
-			for (int max_truncate = iqs::utils::log_2_upper_bound(1/truncation_tolerance);; --max_truncate) {
+			for (int max_truncate = -std::log(truncation_tolerance)*log_dimension;; --max_truncate) {
 				float average_object_size = symbolic_iteration.get_average_child_size();
 				size_t used_memory = symbolic_iteration.next_iteration_num_object*average_object_size/utils::upsize_policy;
 				

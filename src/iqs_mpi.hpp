@@ -371,6 +371,8 @@ namespace iqs::mpi {
 	simulation function
 	*/
 	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](const char*){}) {
+		const int log_dimension = iqs::max_truncate_step == 0 || iqs::min_truncate_step == 0 ? 1/std::log(2) : 1/std::log(iqs::max_truncate_step) - 1/std::log(iqs::min_truncate_step);
+
 		/* get local size */
 		MPI_Comm localComm;
 		int rank, size, local_size;
@@ -425,7 +427,7 @@ namespace iqs::mpi {
 
 			/* actually truncate */
 			size_t avg_truncate_symbolic_num_object;
-			int max_truncate = iteration.num_object == 0 ? 0 : -std::log(iteration.num_object/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step);
+			int max_truncate = iteration.num_object == 0 ? 0 : std::log(size*iteration.num_object/iqs::truncation_tolerance)*log_dimension;
 			MPI_Allreduce(MPI_IN_PLACE, &max_truncate, 1, MPI_INT, MPI_MAX, communicator);
 			for (int i = max_truncate;; --i) {
 				size_t total_num_child, truncated_num_child = iteration.get_truncated_num_child();
@@ -465,7 +467,7 @@ namespace iqs::mpi {
 
 				/* smart truncate */
 				if (total_num_child > 0) {
-					int max_smart_truncate = -std::log(total_num_child/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step);
+					int max_smart_truncate = std::log(total_num_child/iqs::truncation_tolerance)*log_dimension;
 					for (int j = 0; j < max_smart_truncate; ++j) {
 						size_t truncated_num_child = iteration.get_truncated_num_child();
 						float average_num_child = (total_num_child + local_size*truncated_num_child)/(total_truncated_num_object + local_size*iteration.truncated_num_object);
@@ -518,7 +520,7 @@ namespace iqs::mpi {
 
 			/* actually truncate */
 			size_t avg_truncate_num_object;
-			int max_truncate = symbolic_iteration.num_object_after_interferences == 0 ? 0 : -std::log(symbolic_iteration.num_object_after_interferences/iqs::truncation_tolerance)/std::log(iqs::min_truncate_step);
+			int max_truncate = symbolic_iteration.num_object_after_interferences == 0 ? 0 : std::log(size*symbolic_iteration.num_object_after_interferences/iqs::truncation_tolerance)*log_dimension;
 			MPI_Allreduce(MPI_IN_PLACE, &max_truncate, 1, MPI_INT, MPI_MAX, communicator);
 			for (int i = max_truncate;; --i) {
 				size_t total_num_child = symbolic_iteration.get_total_next_iteration_num_object(localComm);

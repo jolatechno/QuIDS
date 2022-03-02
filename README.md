@@ -6,9 +6,7 @@ This library is header-only, so you can simply link files in [src](./src).
 
 ### Requirements
 
-The only requirement is to have at least `c++17`, and `tbb` ([Thread Building Blocks](https://github.com/oneapi-src/oneTBB)). Parallelism is implemented using `OpenMP`.
-
-`onetbb` can be installed using the [tbb-install.sh](./tbb-install.sh), with the flags to pass to make being outputed by [get-tbb-cflags.sh](./get-tbb-cflags.sh).
+The only requirement is to have at least `c++2a`. Parallelism is implemented using `OpenMP`, although the pure `MPI` implementation is more efficient right now.
 
 ## Usage
 
@@ -21,7 +19,7 @@ Objects are represented by a simple begin and end pointer. Their exist two kind 
 
 int main(int argc, char* argv[]) {
 	/* variables*/
-	iqs::it_t buffer, state;
+	iqs::it_t next_state, state;
 	iqs::sy_it_t symbolic_iteration;
 
 	/* initializing the state */
@@ -35,7 +33,9 @@ int main(int argc, char* argv[]) {
 
 	/* applying a rule */
 	iqs::rule_t *rule = new my_rule(/*...*/);
-	iqs::simulate(state, rule, buffer, symbolic_iteration);
+	iqs::simulate(state, rule, next_state, symbolic_iteration);
+
+	/* "next_state" now holds an application of "rule" on "state" */
 }
 ```
 
@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
     }
 
 	/* variables*/
-	iqs::mpi::mpi_it_t buffer, state;
+	iqs::mpi::mpi_it_t next_state, state;
 	iqs::mpi::mpi_sy_it_t symbolic_iteration;
 
 	/* initializing the state */
@@ -70,7 +70,9 @@ int main(int argc, char* argv[]) {
 
 	/* applying a rule */
 	iqs::rule_t *rule = new my_rule(/*...*/);
-	iqs::mpi::simulate(state, rule, buffer, symbolic_iteration, MPI_COMM_WORLD);
+	iqs::mpi::simulate(state, rule, next_state, symbolic_iteration, MPI_COMM_WORLD);
+
+	/* "next_state" now holds an application of "rule" on "state" */
 
 	MPI_Finalize();
 }
@@ -101,6 +103,9 @@ public:
 		char* const child_begin, uint32_t const child_id,
 		size_t &size, std::complex<PROBA_TYPE> &mag) const override;
 
+	inline void populate_child_simple(char const *parent_begin, char const *parent_end,
+		char* const child_begin, uint32_t const child_id) const; // optional
+
 	inline size_t hasher(char const *parent_begin, char const *parent_end) const; // optional
 };
 ```
@@ -129,6 +134,18 @@ inline void populate_child(char const *parent_begin, char const *parent_end,
 	// modify mag...
 	// populate the child, starting at child_begin
 	size = actual_child_size;
+}
+```
+
+The third function is `populate_child_simple(...)` which is simply a copy of `populate_child(...)` that can skip the computation of the magnitude and the size of the child objects. If not provided the default implementation relize on `populate_child(...)`:
+
+```cpp
+inline void populate_child_simple(char const *parent_begin, char const *parent_end,
+	char* const child_begin, uint32_t const child_id) const { //can be overwritten
+		size_t size_placeholder;
+		mag_t mag_placeholder;
+		populate_child(parent_begin, parent_end, child_begin, child_id,
+			size_placeholder, mag_placeholder);
 }
 ```
 
@@ -268,20 +285,41 @@ The additional member functions are:
 
 `node_total_proba` is the only additional member variable, and is the proportion of total probability that is held by a given node.
 
-### Global parameters
+### Global parameters and pre-processor flags
 
 In addition to classes, some global parameters are used to modify the behaviour of the simulation.
 
 ```cpp
+#ifndef PROBA_TYPE
+	#define PROBA_TYPE double
+#endif
+#ifndef HASH_MAP_OVERHEAD
+	#define HASH_MAP_OVERHEAD 1.7
+#endif
+
+/* other default-value flags */
+
 namespace iqs {
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
-	float collision_test_proportion = COLLISION_TEST_PROPORTION;
-	float collision_tolerance = COLLISION_TOLERANCE;
+	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
+	#ifdef SIMPLE_TRUNCATION
+		bool simple_truncation = true;
+	#else
+		bool simple_truncation = false;
+	#endif
+	float truncation_tolerance = TRUNCATION_TOLERANCE;
+	float max_truncate_step = MAX_TRUNCATE_STEP;
+	float min_truncate_step = MIN_TRUNCATE_STEP;
 
 	namespace mpi {
 		size_t min_equalize_size = MIN_EQUALIZE_SIZE;
-		float equalize_imablance = EQUALIZE_IMBALANCE;
+		float equalize_inbalance = EQUALIZE_INBALANCE;
+		#ifdef MINIMIZE_TRUNCATION
+			bool minimize_truncation = true;
+		#else
+			bool minimize_truncation = false;
+		#endif
 
 		/* ... */
 	}
@@ -298,6 +336,18 @@ namespace iqs {
 }
 ```
 
+### Pre-processor flags
+
+#### proba. type
+
+The `PROBA_TYPE` flag is used to change the type used to represent probabilities and magnitude in the program. The default is `double` for a high enough precision, but other float type could be used to either get more precision or less memory/execution time cost.
+
+#### hash map overhead
+
+The `HASH_MAP_OVERHEAD` flag represent the overhead per element of the hashmap (of type `robin_hood::unordered_map`, default is set to `1.7` which has been determined through experiments).
+
+### Global variables
+
 The default value of any of those variable can be altered at compilation, by passing an uppercase flag with the same name as the desired variable.
 
 #### tolerance
@@ -306,19 +356,23 @@ The default value of any of those variable can be altered at compilation, by pas
 
 #### safety margin
 
-`safety_margin` represents the target proportion of memory to keep free (default is `0.2` for 20%).
+`safety_margin` represents the target proportion of memory to keep free (default is `0.4` for 40%).
 
-#### collision test proportion and collision tolerance
+#### simple truncation
 
-`collision_test_proportion` represents the proportion of objects for which with first remove duplicates, we then continue removing duplicates only if the proportion of duplicates is greater than `collision_tolerance`.
+...
 
-`collision_test_proportion` has a default of  `0.1` and `collision_tolerance` has a default of `0.05`.
+#### truncation max and min step
+
+...
 
 #### load balancing bucket per thread
 
 `load_balancing_bucket_per_thread` represent the number of partition par thread (or MPI node), which allows load balancing by then having a variable number of partition per thread according to each partition's size.
 
 `load_balancing_bucket_per_thread` has a default of `8`.
+
+### MPI global variables
 
 #### minimum equalize size and equalize imbalance.
 
@@ -327,6 +381,12 @@ The default value of any of those variable can be altered at compilation, by pas
 If this first condition is met, `equalize(...)` if the maximum relative imbalance in the number of object accross the nodes is greater than `mpi::equalize_imablance`.
 
 `mpi::min_equalize_size` is equal to `1000` by default, and `mpi::equalize_imablance` has a default of `0.2`.
+
+#### minimize truncation
+
+...
+
+### Utils global variables
 
 #### min vector size
 
