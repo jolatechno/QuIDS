@@ -6,17 +6,17 @@ This is the only utilisy that is system dependent !
 
 #include <windows.h>
 
-void inline get_free_mem(size_t &free_ram) {
+size_t inline get_free_mem() {
 	MEMORYSTATUSEX statex;
 	statex.dwLength = sizeof (statex);
 	GlobalMemoryStatusEx (&statex);
 
-    free_ram = statex.AvailPageFile; // free virtual memory instead of free physical memory...
+    return statex.AvailPageFile; // free virtual memory instead of free physical memory...
 }
 
 #elif defined(__linux__) // linux systems
 
-void inline get_free_mem(size_t &free_ram) {
+size_t inline get_free_mem() {
 	char buff[128];
 	char useless[128];
 	unsigned long free_mem = 0;
@@ -27,7 +27,7 @@ void inline get_free_mem(size_t &free_ram) {
 	fgets(buff, sizeof(buff), fd); 
 	sscanf(buff, "%s %lu ", useless, &free_mem); 
 
-	free_ram = free_mem * 1000; 
+	return free_mem * 1000; 
 }
 
 #elif defined(__unix__) // other unix systems

@@ -34,6 +34,14 @@ public:
     explicit fast_vector(size_t n = 0) {
     	resize(n);
 	}
+
+	~fast_vector() {
+		if (ptr != NULL) {
+			free(ptr);
+			ptr = NULL;
+			size_ = 0;
+		}
+	}
  
     // NOT SUPPORTED !!!
     size_t push_back(value_type) {
@@ -52,25 +60,17 @@ public:
     }
 
     value_type& operator[](size_t index) {
-	    if (index >= size_)
-	        throw;
-	 
 	    return *(ptr + index);
 	}
 
 	value_type operator[](size_t index) const {
-	    if (index >= size_)
-	        throw;
-	 
 	    return *(ptr + index);
 	}
 
 	/*
 	"upsize_policy" is a multiplier (>1) that forces any upsize to add a margin to avoid frequent resize.
-
 	"downsize_policy" is a multiplier (<1) that forces a down_size to free memory only if the freed memory exceed the downsize_policy
 		(to allow memory to be freed and given back to another vector).
-
 	"min_state_size" is the minimum size of a vector, to avoid small vectors which are bound to be resized frequently.
 	*/
     void resize(size_t n) const {

@@ -32,7 +32,7 @@ namespace iqs::rules::quantum_computer {
 
 	public:
 		hadamard(size_t bit_) : bit(bit_) {}
-		inline void get_num_child(char const *parent_begin, char const *parent_end, uint32_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const override {
 			num_child = 2;
 			max_child_size = std::distance(parent_begin, parent_end);
 		}

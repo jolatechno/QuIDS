@@ -429,6 +429,27 @@ namespace iqs::rules::qcgd {
 				}
 			}
 		}
+		inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_) const override {
+			operations::copy(parent_begin, parent_end, child_begin);
+
+			uint32_t child_id = child_id_;
+
+			uint16_t num_nodes = graphs::num_nodes(parent_begin);
+			for (int i = 0; i < num_nodes; ++i) {
+				bool &left = graphs::left(child_begin, i);
+				bool &right = graphs::right(child_begin, i);
+
+				uint8_t sum = left + right;
+				if ((sum & 1) == 0) {
+					bool conj = sum / 2;
+					if (child_id & 1) {
+						left = !left;
+						right = !right;
+					}
+					child_id >>= 1;
+				}
+			}
+		}
 	};
 
 	class coin : public iqs::rule {
@@ -478,6 +499,26 @@ namespace iqs::rules::qcgd {
 						right = !right;
 					} else
 						mag *= conj ? -do_not_conj : do_not;
+					child_id >>= 1;
+				}
+			}
+		}
+		inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_) const override {
+			operations::copy(parent_begin, parent_end, child_begin);
+
+			uint32_t child_id = child_id_;
+
+			uint16_t num_nodes = graphs::num_nodes(parent_begin);
+			for (int i = 0; i < num_nodes; ++i) {
+				bool &left = graphs::left(child_begin, i);
+				bool &right = graphs::right(child_begin, i);
+
+				if (left ^ right /* == 1 */) {
+					bool conj = left;
+					if (child_id & 1) {
+						left = !left;
+						right = !right;
+					}
 					child_id >>= 1;
 				}
 			}
@@ -726,6 +767,193 @@ namespace iqs::rules::qcgd {
 
 			size = std::distance(child_begin, (char*)(child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes)));
 		}
+
+		inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_) const override {
+			uint32_t child_id = child_id_;
+			uint16_t num_nodes = graphs::num_nodes(parent_begin);
+
+			/* check for first split or last merge */
+			bool last_merge = false;
+			bool first_split = graphs::left(parent_begin, 0) && graphs::right(parent_begin, 0);
+			if (!first_split && num_nodes > 1)
+				last_merge = graphs::right(parent_begin, 0) && graphs::left(parent_begin, num_nodes - 1) && !graphs::right(parent_begin, num_nodes - 1);
+			bool first_split_overflow = false;
+
+			/* proba for first split or last merge */
+			first_split &= child_id; //forget last split if it shouldn't happend
+			if (first_split)
+				child_id >>= 1;
+			if (last_merge) {
+				if (!(child_id & 1))
+					last_merge = false;
+				child_id >>= 1;
+			}	
+
+			uint16_t &child_num_nodes = graphs::num_nodes(child_begin);
+			child_num_nodes = num_nodes + first_split - last_merge;
+
+			/* first path to get the final size */
+			uint32_t child_id_copy = child_id;
+			for (int i = first_split + last_merge; i < num_nodes - last_merge; ++i) {
+				/* get opeartions */
+				bool split, merge;
+				operations::get_operations(parent_begin, i, split, merge);
+
+				/* check if the operation needs to be done */
+				if (merge || split) {
+					if (child_id_copy & 1)
+						/* increment num nodes */
+						child_num_nodes += split - merge;
+
+					child_id_copy >>= 1;
+				}
+			}
+
+			/* util variable */
+			auto parent_node_name_begin = graphs::node_name(parent_begin);
+			auto child_node_name_begin = graphs::node_name(child_begin);
+			graphs::node_name_begin(child_begin, 0) = 0;
+
+			/* do first split */
+			if (first_split) {
+				bool has_most_left_zero = true;
+				if (parent_node_name_begin->right_or_type >= 0)
+					if ((parent_node_name_begin + 1)->hmlz_and_element > 0)
+						has_most_left_zero = false;
+
+				if (has_most_left_zero) {
+					/* set particules position */
+					graphs::left(child_begin, 0) = true;
+					graphs::right(child_begin, 0) = false;
+					graphs::left(child_begin, 1) = false;
+					graphs::right(child_begin, 1) = true;
+
+					/* split first node */
+					auto node_name_end = operations::left(parent_node_name_begin,
+						parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
+						child_node_name_begin);
+
+					graphs::node_name_begin(child_begin, 1) = std::distance(child_node_name_begin, node_name_end);
+
+					node_name_end = operations::right(parent_node_name_begin,
+						parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
+						node_name_end);
+
+					graphs::node_name_begin(child_begin, 2) = std::distance(child_node_name_begin, node_name_end);
+				} else {
+					first_split_overflow = true;
+
+					/* set particules position */
+					graphs::left(child_begin, child_num_nodes - 1) = true;
+					graphs::right(child_begin, child_num_nodes - 1) = false;
+					graphs::left(child_begin, 0) = false;
+					graphs::right(child_begin, 0) = true;
+
+					/* split first node */
+					auto node_name_end = operations::right(parent_node_name_begin,
+						parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
+						child_node_name_begin);
+
+					graphs::node_name_begin(child_begin, 1) = std::distance(child_node_name_begin, node_name_end);
+				}
+			}
+
+			/* do last merge */
+			if (last_merge) {
+				graphs::left(child_begin, 0) = true;
+				graphs::right(child_begin, 0) = true;
+
+				/* merge nodes */
+				auto node_name_end = operations::merge(parent_node_name_begin + graphs::node_name_begin(parent_begin, num_nodes - 1),
+					parent_node_name_begin + graphs::node_name_begin(parent_begin, num_nodes),
+					parent_node_name_begin,
+					parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
+					child_node_name_begin);
+
+				graphs::node_name_begin(child_begin, 1) = std::distance(child_node_name_begin, node_name_end);
+			}
+
+			/* split merge every other node */
+			int offset = first_split - first_split_overflow;
+			for (int i = first_split + last_merge; i < num_nodes - last_merge; ++i) {
+
+				/* get opeartions */
+				bool split, merge;
+				operations::get_operations(parent_begin, i, split, merge);
+				
+				/* check if the operation needs to be done */
+				bool Do = false;
+				if (merge || split) {
+					Do = child_id & 1;
+					if (Do) {
+						if (split) {
+							/* set particule position */
+							graphs::left(child_begin, i + offset) = true;
+							graphs::right(child_begin, i + offset) = false;
+							graphs::left(child_begin, i + offset + 1) = false;
+							graphs::right(child_begin, i + offset + 1) = true;
+
+							/* split left node */
+							auto node_name_end = operations::left(parent_node_name_begin + graphs::node_name_begin(parent_begin, i),
+								parent_node_name_begin + graphs::node_name_begin(parent_begin, i + 1),
+								child_node_name_begin + graphs::node_name_begin(child_begin, i + offset));
+
+							graphs::node_name_begin(child_begin, i + 1 + offset) = std::distance(child_node_name_begin, node_name_end);
+
+							/* split right node */
+							node_name_end = operations::right(parent_node_name_begin + graphs::node_name_begin(parent_begin, i),
+								parent_node_name_begin + graphs::node_name_begin(parent_begin, i + 1),
+								child_node_name_begin + graphs::node_name_begin(child_begin, i + offset + 1));
+
+							graphs::node_name_begin(child_begin, i + 1 + offset + 1) = std::distance(child_node_name_begin, node_name_end);
+						} else {
+							/* set particule position */
+							graphs::left(child_begin, i + offset) = true;
+							graphs::right(child_begin, i + offset) = true;
+
+							/* merge nodes */
+							auto node_name_end = operations::merge(parent_node_name_begin + graphs::node_name_begin(parent_begin, i),
+								parent_node_name_begin + graphs::node_name_begin(parent_begin, i + 1),
+								parent_node_name_begin + graphs::node_name_begin(parent_begin, i + 1),
+								parent_node_name_begin + graphs::node_name_begin(parent_begin, i + 2),
+								child_node_name_begin + graphs::node_name_begin(child_begin, i + offset));
+
+							graphs::node_name_begin(child_begin, i + 1 + offset) = std::distance(child_node_name_begin, node_name_end);
+						}
+
+						/* increment num nodes */
+						offset += split - merge;
+						i += merge;
+					}
+
+					/* roll child id */
+					child_id >>= 1;
+				}
+
+				if (!Do) {
+					/* set particule position */
+					graphs::left(child_begin, i + offset) = graphs::left(parent_begin, i);
+					graphs::right(child_begin, i + offset) = graphs::right(parent_begin, i);
+					
+					/* copy node */
+					auto node_name_end = operations::copy(parent_node_name_begin + graphs::node_name_begin(parent_begin, i),
+						parent_node_name_begin + graphs::node_name_begin(parent_begin, i + 1),
+						child_node_name_begin + graphs::node_name_begin(child_begin, i + offset));
+
+					graphs::node_name_begin(child_begin, i + 1 + offset) = std::distance(child_node_name_begin, node_name_end);
+				}
+			}
+
+			/* finish first split */
+			if (first_split_overflow) {
+				/* split first node */
+				auto node_name_end = operations::left(parent_node_name_begin,
+					parent_node_name_begin + graphs::node_name_begin(parent_begin, 1),
+					child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes - 1));
+
+				graphs::node_name_begin(child_begin, child_num_nodes) = std::distance(child_node_name_begin, node_name_end);
+			}
+		}
 	};
 
 	namespace flags {
@@ -757,6 +985,11 @@ namespace iqs::rules::qcgd {
 				end = end == std::string::npos ? input.size() : end;
 
 				return input.substr(begin + key.length(), end - begin);
+			}
+
+			bool parse_bool(std::string const input, std::string const key, std::string const separator) {
+				std::string string_value = parse(input, key, separator);
+				return !(string_value == "");
 			}
 
 			int parse_int_with_default(std::string const input, std::string const key, std::string const separator, int Default) {
@@ -793,18 +1026,16 @@ namespace iqs::rules::qcgd {
 
 			iqs::tolerance = parse_float_with_default(string_arg, "tolerance=", ",", iqs::tolerance);
 			iqs::safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", iqs::safety_margin);
-			iqs::collision_test_proportion = parse_float_with_default(string_arg, "collision_test_proportion=", ",", iqs::collision_test_proportion);
-			iqs::collision_tolerance = parse_float_with_default(string_arg, "collision_tolerance=", ",", iqs::collision_tolerance);
+
+			iqs::simple_truncation = iqs::simple_truncation || parse_bool(string_arg, "simple_truncate", ",");
 
 			size_t max_num_object = parse_int_with_default(string_arg, "max_num_object=", ",", 0);
 
 			return {n_iters, reversed_n_iters, max_num_object};
 		}
 
-		iqs::it_t read_state(const char* argv) {
+		void read_state(const char* argv, iqs::it_t &state) {
 			std::string string_args = argv;
-
-			iqs::it_t state;
 
 			std::string string_arg;
 			while ((string_arg = strip(string_args, ";")) != "") {
@@ -821,11 +1052,9 @@ namespace iqs::rules::qcgd {
 			}
 
 			utils::randomize(state);
-
-			return state;
 		}
 
-		simulator_t read_rule(const char* argv, debug_t mid_step_function=[](int){}) {
+		simulator_t read_rule(const char* argv, debug_t mid_step_function=[](const char*){}) {
 			std::string string_args = argv;
 
 			simulator_t simulator;
@@ -854,14 +1083,14 @@ namespace iqs::rules::qcgd {
 			return simulator;
 		}
 
-		std::tuple<uint, uint, it_t, simulator_t, size_t> parse_simulation(const char* argv, debug_t mid_step_function=[](int){}) {
+		std::tuple<uint, uint, simulator_t, size_t> parse_simulation(const char* argv, it_t &state, debug_t mid_step_function=[](const char*){}) {
 			std::string string_args = argv;
 
 			auto [n_iter, reversed_n_iters, max_num_object] = read_n_iter(strip(string_args, "|").c_str());
-			it_t state = read_state(strip(string_args, "|").c_str());
+			read_state(strip(string_args, "|").c_str(), state);
 			auto simulator = read_rule(string_args.c_str(), mid_step_function);
 
-			return {n_iter, reversed_n_iters, state, simulator, max_num_object};
+			return {n_iter, reversed_n_iters, simulator, max_num_object};
 		}
 	}
 }

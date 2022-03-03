@@ -21,9 +21,9 @@ int main(int argc, char* argv[]) {
 	std::cout << "initial state:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, H1, buffer, sy_it);
-	std::cout << "\nhadamard on second qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
+	std::cout << "\nhadamard on second qubit:\n"; iqs::rules::quantum_computer::utils::print(buffer);
 
-	iqs::simulate(state, H2, buffer, sy_it);
+	iqs::simulate(buffer, H2, state, sy_it);
 	std::cout << "\nhadamard on third qubit:\n"; iqs::rules::quantum_computer::utils::print(state);
 
 	iqs::simulate(state, CNOT);
@@ -43,6 +43,6 @@ int main(int argc, char* argv[]) {
 	iqs::simulate(state, X2);
 	iqs::simulate(state, CNOT);
 	iqs::simulate(state, H2, buffer, sy_it);
-	iqs::simulate(state, H1, buffer, sy_it);
+	iqs::simulate(buffer, H1, state, sy_it);
 	std::cout << "\napplied all previous gates in reverse order:\n";  iqs::rules::quantum_computer::utils::print(state);
 }
