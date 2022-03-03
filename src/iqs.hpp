@@ -373,7 +373,7 @@ namespace iqs {
 		iteration.apply_modifier(rule);
 	}
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
-		const int log_dimension = max_truncate_step == 0 || min_truncate_step == 0 ? 1/std::log(2) : 1/std::log(iqs::max_truncate_step) - 1/std::log(iqs::min_truncate_step);
+		const int log_dimension = max_truncate_step == 0 && min_truncate_step == 0 ? 1/std::log(2) : 1/std::log(iqs::max_truncate_step) - 1/std::log(iqs::min_truncate_step);
 
 
 

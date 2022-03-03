@@ -8,7 +8,7 @@
 	#define MIN_EQUALIZE_SIZE 100
 #endif
 #ifndef EQUALIZE_INBALANCE
-	#define EQUALIZE_INBALANCE 0.01
+	#define EQUALIZE_INBALANCE 0.05
 #endif
 
 namespace iqs::mpi {
@@ -371,7 +371,7 @@ namespace iqs::mpi {
 	simulation function
 	*/
 	void simulate(mpi_it_t &iteration, iqs::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqs::debug_t mid_step_function=[](const char*){}) {
-		const int log_dimension = iqs::max_truncate_step == 0 || iqs::min_truncate_step == 0 ? 1/std::log(2) : 1/std::log(iqs::max_truncate_step) - 1/std::log(iqs::min_truncate_step);
+		const int log_dimension = iqs::max_truncate_step == 0 && iqs::min_truncate_step == 0 ? 1/std::log(2) : 1/std::log(iqs::max_truncate_step) - 1/std::log(iqs::min_truncate_step);
 
 		/* get local size */
 		MPI_Comm localComm;
@@ -384,6 +384,7 @@ namespace iqs::mpi {
 
 
 		
+
 
 		if (size == 1)
 			return iqs::simulate(iteration, rule, next_iteration, symbolic_iteration, max_num_object, mid_step_function);
@@ -550,22 +551,6 @@ namespace iqs::mpi {
 
 		/* finalize simulation */
 		symbolic_iteration.finalize(rule, iteration, next_iteration, mid_step_function);
-
-		/* equalize and/or normalize */
-		mid_step_function("equalize");
-		for (int max_equalize = std::log2(size); max_equalize >= 0; --max_equalize) {
-			size_t max_n_object = next_iteration.get_max_num_object_per_task(communicator);
-			float inbalance = ((float)max_n_object - next_iteration.get_total_num_object(communicator)/size)/max_n_object;
-
-			/* check for condition */
-			if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
-				break;
-
-			/* actually equalize */
-			next_iteration.equalize(communicator); 
-		}
-
-		/* finish by normalizing */
 		next_iteration.normalize(communicator, mid_step_function);
 
 		MPI_Comm_free(&localComm);
