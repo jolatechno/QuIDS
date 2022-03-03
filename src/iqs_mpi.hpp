@@ -249,6 +249,7 @@ namespace iqs::mpi {
 			}
 		}
 
+		void equalize(MPI_Comm communicator);
 		void distribute_objects(MPI_Comm communicator, int node_id);
 		void gather_objects(MPI_Comm communicator, int node_id);
 
@@ -836,6 +837,65 @@ namespace iqs::mpi {
 	/*
 	"utility" functions from here on:
 	*/
+	/*
+	equalize the number of objects across nodes
+	*/
+	void mpi_iteration::equalize(MPI_Comm communicator) {
+		MPI_Request request = MPI_REQUEST_NULL;
+
+		MPI_Comm localComm;
+		int rank, size, local_size;
+		MPI_Comm_size(communicator, &size);
+		MPI_Comm_rank(communicator, &rank);
+		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
+		MPI_Comm_size(localComm, &local_size);
+
+		int this_pair_id;
+		if (rank == 0) {
+			/* gather sizes */
+			std::vector<size_t> sizes(size, 0);
+			MPI_Gather(&num_object, 1, MPI_UNSIGNED_LONG_LONG, &sizes[0], 1, MPI_UNSIGNED_LONG_LONG, 0, communicator);
+
+			/* compute pair_id*/
+			std::vector<int> pair_id(size, 0);
+			utils::make_equal_pairs(&sizes[0], &sizes[0] + size, &pair_id[0]);
+
+			/* scatter pair_id */
+			MPI_Scatter(&pair_id[0], 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
+		} else {
+			/* gather sizes */
+			MPI_Gather(&num_object, 1, MPI_UNSIGNED_LONG_LONG, NULL, 1, MPI_UNSIGNED_LONG_LONG, 0, communicator);
+
+			/* scatter pair_id */
+			MPI_Scatter(NULL, 1, MPI_INT, &this_pair_id, 1, MPI_INT, 0, communicator);
+		}
+
+		/* get available memory */
+		MPI_Barrier(localComm);
+		size_t total_iteration_size, iteration_size = iqs::iteration::get_mem_size();
+		MPI_Allreduce(&iteration_size, &total_iteration_size, 1, Proba_MPI_Datatype, MPI_SUM, localComm);
+		size_t avail_mem = ((iqs::utils::get_free_mem() + total_iteration_size)/local_size - iteration_size)*(1 - iqs::safety_margin);
+		MPI_Barrier(localComm);
+
+		/* skip if this node is alone */
+		if (this_pair_id == rank)
+			return;
+
+		/* get the number of objects of the respective pairs */
+		size_t other_num_object;
+		MPI_Isend(&num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
+		MPI_Isend(&num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
+		
+		MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+		MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+
+		/* equalize amoung pairs */
+		if (num_object > other_num_object) {
+			size_t num_object_sent = (num_object -  other_num_object) / 2;
+			send_objects(num_object_sent, this_pair_id, communicator, false);
+		} else if (num_object < other_num_object)
+			receive_objects(this_pair_id, communicator, false, avail_mem);
+	}
 
 	/*
 	equalize symbolic object across nodes
