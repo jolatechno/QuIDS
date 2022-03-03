@@ -4,13 +4,6 @@
 #include <parallel/numeric>
 #include <limits>
 
-
-
-#include <iostream>
-
-
-
-
 #include <complex>
 #include <cstddef>
 #include <vector>
@@ -33,13 +26,13 @@
 	#define LOAD_BALANCING_BUCKET_PER_THREAD 32
 #endif
 #ifndef TRUNCATION_TOLERANCE
-	#define TRUNCATION_TOLERANCE 0.05;
+	#define TRUNCATION_TOLERANCE 0.125;
 #endif
 #ifndef MAX_TRUNCATE_STEP
 	#define MAX_TRUNCATE_STEP 2;
 #endif
 #ifndef MIN_TRUNCATE_STEP
-	#define MIN_TRUNCATE_STEP 0.2;
+	#define MIN_TRUNCATE_STEP 0.05;
 #endif
 
 /*
@@ -773,7 +766,6 @@ namespace iqs {
 				#pragma omp for
 				for (size_t i = 0; i < num_object_after_interferences; ++i) {
 					size_t oid = next_oid[i];
-
 					random_selector[oid] = std::log( -std::log(1 - rng()) / std::norm(magnitude[oid]));
 				}
 			}
