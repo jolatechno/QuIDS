@@ -505,6 +505,8 @@ namespace iqs {
 				num_childs[oid], size);
 			max_symbolic_object_size = std::max(max_symbolic_object_size, size);
 		}
+
+		__gnu_parallel::partial_sum(num_childs.begin(), num_childs.begin() + num_object, child_begin.begin() + 1);
 	}
 
 	/*
