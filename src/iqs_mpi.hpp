@@ -408,9 +408,12 @@ namespace iqs::mpi {
 			iteration.truncated_num_object = iteration.num_object;
 		}
 
+		/* prepare truncate */
+		mid_step_function("truncate_symbolic - prepare");
+		iteration.prepare_truncate(mid_step_function);
+
 		/* max_num_object */
 		mid_step_function("truncate_symbolic");
-		iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
 
 			/* average object size with weighted average */
@@ -426,11 +429,11 @@ namespace iqs::mpi {
 			avail_mem *= 1 - iqs::safety_margin;
 
 			/* actually truncate */
-			size_t avg_truncate_symbolic_num_object;
-			int max_truncate = iteration.num_object == 0 ? 0 : std::log2(size) + std::log(iteration.num_object)*log_dimension;
+			size_t avg_truncate_symbolic_num_object, truncated_num_child = iteration.get_truncated_num_child();
+			int max_truncate = iteration.num_object == 0 ? 0 : std::log2(size) + std::log(truncated_num_child)*log_dimension;
 			MPI_Allreduce(MPI_IN_PLACE, &max_truncate, 1, MPI_INT, MPI_MAX, communicator);
 			for (int i = max_truncate;; --i) {
-				size_t total_num_child, truncated_num_child = iteration.get_truncated_num_child();
+				size_t total_num_child;
 				MPI_Allreduce(&truncated_num_child, &total_num_child, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 				size_t total_truncated_num_object = iteration.get_total_truncated_num_object(localComm);
 				size_t used_memory = (total_truncated_num_object*average_object_size + total_num_child*average_symbolic_object_size)/iqs::utils::upsize_policy;
@@ -464,20 +467,9 @@ namespace iqs::mpi {
 				if (i < 0 && truncate_symbolic_num_object > truncated_num_child)
 					truncate_symbolic_num_object = truncated_num_child;
 
-				if (total_num_child > 0 &&
-					!(truncated_num_child <= truncate_symbolic_num_object*(1 + iqs::truncation_tolerance) &&
-					truncated_num_child >= truncate_symbolic_num_object*(1 - iqs::truncation_tolerance))) {
-						size_t truncated_num_child = iteration.get_truncated_num_child();
-						float average_num_child = (total_num_child + local_size*truncated_num_child)/(total_truncated_num_object + local_size*iteration.truncated_num_object);
-
-						/* compute truncate_num_object within limits */
-						size_t truncate_num_object = truncate_symbolic_num_object/average_num_child;
-						if (i < 0 && truncate_num_object > iteration.truncated_num_object)
-							truncate_num_object = (1 - iqs::truncation_tolerance)*iteration.truncated_num_object;
-
-						/* actually truncate */
-						iteration.truncate(truncate_num_object, mid_step_function);
-					}
+				/* actually truncate */
+				iteration.truncate_symbolic(truncate_symbolic_num_object, mid_step_function);
+				truncated_num_child = truncate_symbolic_num_object;
 			}
 		} else
 			iteration.truncate(max_num_object/local_size, mid_step_function);
@@ -498,9 +490,12 @@ namespace iqs::mpi {
 
 
 
+		/* prepare truncate */
+		mid_step_function("truncate - prepare");
+		symbolic_iteration.prepare_truncate(mid_step_function);
+
 		/* second max_num_object */
 		mid_step_function("truncate");
-		symbolic_iteration.random_selector_computed = false;
 		if (max_num_object == 0) {
 
 			/* available memory */
