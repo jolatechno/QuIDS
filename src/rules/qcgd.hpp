@@ -436,8 +436,8 @@ namespace iqs::rules::qcgd {
 				print_indentation(); std::cout << "}";
 			}
 		}
-	}
 #endif
+	}
 
 	void step(char *parent_begin, char *parent_end, mag_t &mag) {
 		uint16_t num_nodes = graphs::num_nodes(parent_begin);
