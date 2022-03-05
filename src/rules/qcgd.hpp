@@ -341,8 +341,11 @@ namespace iqs::rules::qcgd {
 				return density*density;
 			});
 
-			PROBA_TYPE std_dev_size = std::sqrt(avg_squared_size - avg_size*avg_size);
-			PROBA_TYPE std_dev_density = std::sqrt(avg_squared_density - avg_density*avg_density);
+			PROBA_TYPE std_dev_size = avg_squared_size - avg_size*avg_size;
+			std_dev_size = std_dev_size < iqs::tolerance ? 0 : std::sqrt(avg_squared_size);
+
+			PROBA_TYPE std_dev_density = avg_squared_density - avg_density*avg_density;
+			std_dev_density = std_dev_density < iqs::tolerance ? 0 : std::sqrt(std_dev_density);
 
 			auto const print_indentation = [=]() {
 				for (auto i = 0; i < indentation; ++i)
@@ -409,8 +412,11 @@ namespace iqs::rules::qcgd {
 				return density*density;
 			}, communicator);
 
-			PROBA_TYPE std_dev_size = std::sqrt(avg_squared_size - avg_size*avg_size);
-			PROBA_TYPE std_dev_density = std::sqrt(avg_squared_density - avg_density*avg_density);
+			PROBA_TYPE std_dev_size = avg_squared_size - avg_size*avg_size;
+			std_dev_size = std_dev_size < iqs::tolerance ? 0 : std::sqrt(avg_squared_size);
+
+			PROBA_TYPE std_dev_density = avg_squared_density - avg_density*avg_density;
+			std_dev_density = std_dev_density < iqs::tolerance ? 0 : std::sqrt(std_dev_density);
 
 			auto const print_indentation = [=]() {
 				for (auto i = 0; i < indentation; ++i)
