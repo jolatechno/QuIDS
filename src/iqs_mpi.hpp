@@ -129,24 +129,15 @@ namespace iqs::mpi {
 
 			return total_num_object;
 		}
-		template<class T>
-		T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const {
-			return iqs::iteration::average_value(observable) / node_total_proba;
+		PROBA_TYPE average_value(std::function<PROBA_TYPE(char const *object_begin, char const *object_end)> const observable) const {
+			return node_total_proba == 0 ? 0 : iqs::iteration::average_value(observable) / node_total_proba * total_proba;
 		}
-		template<class T>
-		T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable, MPI_Comm communicator) const {
-			int size, rank;
-			MPI_Comm_size(communicator, &size);
-			MPI_Comm_rank(communicator, &rank);
-
+		PROBA_TYPE average_value(std::function<PROBA_TYPE(char const *object_begin, char const *object_end)> const observable, MPI_Comm communicator) const {
 			/* compute local average */
-			T local_avg = iqs::iteration::average_value(observable);
+			PROBA_TYPE avg = iqs::iteration::average_value(observable);
 
 			/* accumulate average value */
-			T avg;
-			MPI_Datatype avg_datatype = utils::get_mpi_datatype(avg);
-			MPI_Allreduce(&local_avg, &avg, 1, avg_datatype, MPI_SUM, communicator);
-
+			MPI_Allreduce(MPI_IN_PLACE, &avg, 1, Proba_MPI_Datatype, MPI_SUM, communicator);
 			return avg;
 		}
 		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator, bool send_num_child=false) {

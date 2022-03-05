@@ -10,6 +10,8 @@ The only requirement is to have at least `c++2a`. Parallelism is implemented usi
 
 ## Usage
 
+Some rules that can be used directly, or understood as examples are implemented in [src/rules](./src/rules).
+
 Objects are represented by a simple begin and end pointer. Their exist two kind of interfaces for implementing a unitary transformation.
 
 `modifiers` and `rules` are applied using the `iqs::simulate(...)` function:

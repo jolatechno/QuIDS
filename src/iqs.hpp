@@ -216,14 +216,15 @@ namespace iqs {
 
 			if (normalize_) normalize();
 		}
-		template<class T>
-		T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const {
-			T avg = 0;
+		PROBA_TYPE average_value(std::function<PROBA_TYPE(char const *object_begin, char const *object_end)> const observable) const {
+			PROBA_TYPE avg = 0;
+			if (num_object == 0)
+				return avg;
 
 			#pragma omp parallel
 			{	
 				/* compute average per thread */
-				T local_avg = 0;
+				PROBA_TYPE local_avg = 0;
 				#pragma omp for 
 				for (size_t oid = 0; oid < num_object; ++oid) {
 					size_t size;

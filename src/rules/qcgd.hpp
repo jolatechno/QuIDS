@@ -306,42 +306,43 @@ namespace iqs::rules::qcgd {
 		}
 
 		void serialize(iqs::it_t const &iter, iqs::sy_it_t const &sy_it, uint indentation=0) {
-			double interference_ratio = 1;
-			double deletion_ratio = 1; 
+			PROBA_TYPE interference_ratio = 1;
+			PROBA_TYPE deletion_ratio = 1; 
 			if (sy_it.num_object > 0) {
-				interference_ratio = ((double)sy_it.num_object_after_interferences) / ((double)sy_it.num_object);
-				deletion_ratio = ((double)iter.num_object) / ((double)sy_it.num_object_after_interferences);
+				interference_ratio = ((PROBA_TYPE)sy_it.num_object_after_interferences) / ((PROBA_TYPE)sy_it.num_object);
+				deletion_ratio = ((PROBA_TYPE)iter.num_object) / ((PROBA_TYPE)sy_it.num_object_after_interferences);
 			}
 
-			double avg_size = 0;
-			double avg_squared_size = 0;
-			double avg_density = 0;
-			double avg_squared_density = 0;
+			PROBA_TYPE avg_size = iter.average_value([](char const *object_begin, char const *object_end) {
+				return (PROBA_TYPE)graphs::num_nodes(object_begin);
+			});
+			PROBA_TYPE avg_squared_size = iter.average_value([](char const *object_begin, char const *object_end) {
+				PROBA_TYPE num_nodes = graphs::num_nodes(object_begin);
+				return num_nodes*num_nodes;
+			});
+			PROBA_TYPE avg_density = iter.average_value([](char const *object_begin, char const *object_end) {
+				PROBA_TYPE num_nodes = graphs::num_nodes(object_begin);
 
-			for (auto gid = 0; gid < iter.num_object; ++gid) {
-				size_t size;
-				mag_t mag;
-				char const *begin;
-				iter.get_object(gid, begin, size, mag);
-
-				double proba = std::norm(mag);
-
-				uint16_t const num_nodes = graphs::num_nodes(begin);
-				double double_num_nodes = num_nodes;
-
-				double density = 0;
+				PROBA_TYPE density = 0;
 				for (auto i = 0; i < num_nodes; ++i)
-					density += graphs::left(begin, i) + graphs::right(begin, i);
-				density /= 2*double_num_nodes;
+					density += graphs::left(object_begin, i) + graphs::right(object_begin, i);
+				density /= 2*num_nodes;
 
-				avg_size += proba*double_num_nodes;
-				avg_squared_size += proba*double_num_nodes*double_num_nodes;
-				avg_density += proba*density;
-				avg_squared_density += proba*density*density;
-			}
+				return density;
+			});
+			PROBA_TYPE avg_squared_density = iter.average_value([](char const *object_begin, char const *object_end) {
+				PROBA_TYPE num_nodes = graphs::num_nodes(object_begin);
 
-			double std_dev_size = std::sqrt(avg_squared_size - avg_size*avg_size);
-			double std_dev_density = std::sqrt(avg_squared_density - avg_density*avg_density);
+				PROBA_TYPE density = 0;
+				for (auto i = 0; i < num_nodes; ++i)
+					density += graphs::left(object_begin, i) + graphs::right(object_begin, i);
+				density /= 2*num_nodes;
+				
+				return density*density;
+			});
+
+			PROBA_TYPE std_dev_size = std::sqrt(avg_squared_size - avg_size*avg_size);
+			PROBA_TYPE std_dev_density = std::sqrt(avg_squared_density - avg_density*avg_density);
 
 			auto const print_indentation = [=]() {
 				for (auto i = 0; i < indentation; ++i)
@@ -359,7 +360,78 @@ namespace iqs::rules::qcgd {
 			print_indentation(); std::cout << "\t\"deletion_ratio\" : " << deletion_ratio << "\n";
 			print_indentation(); std::cout << "}";
 		}
+
+#ifdef MPI_VERSION
+		void serialize(iqs::mpi::mpi_it_t const &iter, iqs::mpi::mpi_sy_it_t const &sy_it, MPI_Comm communicator, uint indentation=0) {
+			int rank;
+			MPI_Comm_rank(communicator, &rank);
+
+			size_t total_num_object = iter.get_total_num_object(communicator);
+
+			PROBA_TYPE interference_ratio = 1;
+			PROBA_TYPE deletion_ratio = 1; 
+			
+			PROBA_TYPE total_num_object_after_interferences = sy_it.get_total_num_object_after_interferences(communicator);
+
+			if (total_num_object_after_interferences >= 0) {
+				interference_ratio = total_num_object_after_interferences / (PROBA_TYPE)sy_it.get_total_num_object(communicator);
+				deletion_ratio = (PROBA_TYPE)total_num_object / total_num_object_after_interferences;
+			}
+
+			PROBA_TYPE avg_size = iter.average_value([](char const *object_begin, char const *object_end) {
+				return (PROBA_TYPE)graphs::num_nodes(object_begin);
+			}, communicator);
+
+			PROBA_TYPE avg_squared_size = iter.average_value([](char const *object_begin, char const *object_end) {
+				PROBA_TYPE num_nodes = graphs::num_nodes(object_begin);
+				return num_nodes*num_nodes;
+			}, communicator);
+
+			PROBA_TYPE avg_density = iter.average_value([](char const *object_begin, char const *object_end) {
+				PROBA_TYPE num_nodes = graphs::num_nodes(object_begin);
+
+				PROBA_TYPE density = 0;
+				for (auto i = 0; i < num_nodes; ++i)
+					density += graphs::left(object_begin, i) + graphs::right(object_begin, i);
+				density /= 2*num_nodes;
+
+				return density;
+			}, communicator);
+
+			PROBA_TYPE avg_squared_density = iter.average_value([](char const *object_begin, char const *object_end) {
+				PROBA_TYPE num_nodes = graphs::num_nodes(object_begin);
+
+				PROBA_TYPE density = 0;
+				for (auto i = 0; i < num_nodes; ++i)
+					density += graphs::left(object_begin, i) + graphs::right(object_begin, i);
+				density /= 2*num_nodes;
+				
+				return density*density;
+			}, communicator);
+
+			PROBA_TYPE std_dev_size = std::sqrt(avg_squared_size - avg_size*avg_size);
+			PROBA_TYPE std_dev_density = std::sqrt(avg_squared_density - avg_density*avg_density);
+
+			auto const print_indentation = [=]() {
+				for (auto i = 0; i < indentation; ++i)
+					std::cout << "\t";
+			};
+
+			if (rank == 0) {
+				std::cout << "{\n";
+				print_indentation(); std::cout << "\t\"total_proba\" : " << iter.total_proba << ",\n";
+				print_indentation(); std::cout << "\t\"num_graphs\" : " << total_num_object << ",\n";
+				print_indentation(); std::cout << "\t\"avg_size\" : " << avg_size << ",\n";
+				print_indentation(); std::cout << "\t\"std_dev_size\" : " << std_dev_size << ",\n";
+				print_indentation(); std::cout << "\t\"avg_density\" : " << avg_density << ",\n";
+				print_indentation(); std::cout << "\t\"std_dev_density\" : " << std_dev_density << ",\n";
+				print_indentation(); std::cout << "\t\"interference_ratio\" : " << interference_ratio << ",\n";
+				print_indentation(); std::cout << "\t\"deletion_ratio\" : " << deletion_ratio << "\n";
+				print_indentation(); std::cout << "}";
+			}
+		}
 	}
+#endif
 
 	void step(char *parent_begin, char *parent_end, mag_t &mag) {
 		uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -987,11 +1059,6 @@ namespace iqs::rules::qcgd {
 				return input.substr(begin + key.length(), end - begin);
 			}
 
-			bool parse_bool(std::string const input, std::string const key, std::string const separator) {
-				std::string string_value = parse(input, key, separator);
-				return !(string_value == "");
-			}
-
 			int parse_int_with_default(std::string const input, std::string const key, std::string const separator, int Default) {
 				std::string string_value = parse(input, key, separator);
 				if (string_value == "")
@@ -1025,9 +1092,21 @@ namespace iqs::rules::qcgd {
 			utils::max_print_num_graphs = parse_int_with_default(string_arg, "max_print_num_graphs=", ",", utils::max_print_num_graphs);
 
 			iqs::tolerance = parse_float_with_default(string_arg, "tolerance=", ",", iqs::tolerance);
+			iqs::truncation_tolerance = parse_float_with_default(string_arg, "truncation_tolerance=", ",", iqs::truncation_tolerance);
 			iqs::safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", iqs::safety_margin);
 
-			iqs::simple_truncation = iqs::simple_truncation || parse_bool(string_arg, "simple_truncate", ",");
+			iqs::max_truncate_step = parse_float_with_default(string_arg, "max_truncate_step=", ",", iqs::max_truncate_step);
+			iqs::min_truncate_step = parse_float_with_default(string_arg, "min_truncate_step=", ",", iqs::min_truncate_step);
+
+			iqs::simple_truncation = parse_int_with_default(string_arg, "simple_truncate=", ",", iqs::simple_truncation);
+			iqs::load_balancing_bucket_per_thread = parse_int_with_default(string_arg, "load_balancing_bucket_per_thread=", ",", iqs::load_balancing_bucket_per_thread);
+
+			#ifdef MPI_VERSION
+				iqs::mpi::min_equalize_size = parse_int_with_default(string_arg, "min_equalize_size=", ",", iqs::mpi::min_equalize_size);
+				iqs::mpi::equalize_inbalance = parse_float_with_default(string_arg, "equalize_inbalance=", ",", iqs::mpi::equalize_inbalance);
+
+				iqs::mpi::minimize_truncation = parse_int_with_default(string_arg, "minimize_truncation=", ",", iqs::mpi::minimize_truncation);
+			#endif
 
 			size_t max_num_object = parse_int_with_default(string_arg, "max_num_object=", ",", 0);
 
