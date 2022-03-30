@@ -310,9 +310,6 @@ namespace iqs {
 	#else
 		bool simple_truncation = false;
 	#endif
-	float truncation_tolerance = TRUNCATION_TOLERANCE;
-	float max_truncate_step = MAX_TRUNCATE_STEP;
-	float min_truncate_step = MIN_TRUNCATE_STEP;
 
 	namespace mpi {
 		size_t min_equalize_size = MIN_EQUALIZE_SIZE;
@@ -363,14 +360,6 @@ The default value of any of those variable can be altered at compilation, by pas
 #### simple truncation
 
 `simple_truncation` is a `bool` variable (default is `false`, but can be set to `true` by compilling with the `SIMPLE_TRUNCATION` flag). Is `simple_truncation` is `true`, then truncation simply consist in selecting the n highest probability objects. Otherwise object are selected with some probabilistic aspect, with the probability of keeping an object being proportional to the probability of each object.
-
-#### truncation tolerance
-
-`truncation_tolerance` represent the maximum imbalance between the target and the actual truncated size. It should be significantly smaller then `safety_margin` to insure stabiliy. Its default is `0.125` or for 12.5%.
-
-#### truncation max and min step
-
-`max_truncation_step` and `min_truncation_step` represent the maximum and minimum relative truncation allowed at each iteration of the truncation algorithm (default is respectivly `2` and `0.05`). This limit is used for stability.
 
 #### load balancing bucket per thread
 

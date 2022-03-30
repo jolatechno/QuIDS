@@ -1098,11 +1098,7 @@ namespace iqs::rules::qcgd {
 			utils::max_print_num_graphs = parse_int_with_default(string_arg, "max_print_num_graphs=", ",", utils::max_print_num_graphs);
 
 			iqs::tolerance = parse_float_with_default(string_arg, "tolerance=", ",", iqs::tolerance);
-			iqs::truncation_tolerance = parse_float_with_default(string_arg, "truncation_tolerance=", ",", iqs::truncation_tolerance);
 			iqs::safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", iqs::safety_margin);
-
-			iqs::max_truncate_step = parse_float_with_default(string_arg, "max_truncate_step=", ",", iqs::max_truncate_step);
-			iqs::min_truncate_step = parse_float_with_default(string_arg, "min_truncate_step=", ",", iqs::min_truncate_step);
 
 			iqs::simple_truncation = parse_int_with_default(string_arg, "simple_truncate=", ",", iqs::simple_truncation);
 			iqs::load_balancing_bucket_per_thread = parse_int_with_default(string_arg, "load_balancing_bucket_per_thread=", ",", iqs::load_balancing_bucket_per_thread);
