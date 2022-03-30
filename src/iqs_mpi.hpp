@@ -475,7 +475,7 @@ namespace iqs::mpi {
 						avg_truncate_symbolic_num_object /= count;
 					}
 					if (truncate_symbolic_num_object > avg_truncate_symbolic_num_object)
-						truncate_symbolic_num_object = (truncate_symbolic_num_object + avg_truncate_symbolic_num_object)/2;
+						truncate_symbolic_num_object = truncate_symbolic_num_object*(1 - iqs::truncation_tolerance) + avg_truncate_symbolic_num_object*iqs::truncation_tolerance;
 				}
 
 				/* set limits on the number of childs */
@@ -568,7 +568,7 @@ namespace iqs::mpi {
 						avg_truncate_num_object /= count;
 					}
 					if (truncate_num_object > avg_truncate_num_object)
-						truncate_num_object = (truncate_num_object + avg_truncate_num_object) / 2;
+						truncate_num_object = truncate_num_object*(1 - iqs::truncation_tolerance) + avg_truncate_num_object*iqs::truncation_tolerance;
 				}
 
 				/* set limits on the number of childs */
