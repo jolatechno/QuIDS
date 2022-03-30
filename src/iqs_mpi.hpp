@@ -435,7 +435,17 @@ namespace iqs::mpi {
 				MPI_Allreduce(&truncated_num_child, &total_num_child, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, localComm);
 				size_t total_truncated_num_object = iteration.get_total_truncated_num_object(localComm);
 				size_t used_memory = (total_truncated_num_object*average_object_size + total_num_child*average_symbolic_object_size)/iqs::utils::upsize_policy;
+
+
+
+				/* !!!!!!
+				!!!!!!!!!
+				debuging */
+				if (rank == 0)
+					std::cerr << "\t" << (float)used_memory/1e9 << "GB =? " << (float)avail_mem/(1 - iqs::safety_margin)/1e9 << "GB * " << (1 - iqs::safety_margin) << "  (symbolic truncation)\n";
 				
+
+
 				/* check for condition */
 				if (i < 0 && used_memory <= avail_mem*(1 + iqs::truncation_tolerance))
 					break;
@@ -508,6 +518,15 @@ namespace iqs::mpi {
 			for (int i = max_truncate;; --i) {
 				size_t total_num_child = symbolic_iteration.get_total_next_iteration_num_object(localComm);
 				size_t used_memory = symbolic_iteration.get_average_child_size(localComm)*total_num_child/iqs::utils::upsize_policy;
+
+
+				/* !!!!!!
+				!!!!!!!!!
+				debuging */
+				if (rank == 0)
+					std::cerr << "\t" << (float)used_memory/1e9 << "GB =? " << (float)avail_mem/(1 - iqs::safety_margin)/1e9 << "GB * " << (1 - iqs::safety_margin) << "  (truncation)\n";
+				
+
 
 				/* check for condition */
 				if (i < 0 && used_memory <= avail_mem*(1 + iqs::truncation_tolerance))
