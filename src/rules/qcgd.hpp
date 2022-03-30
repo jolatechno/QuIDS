@@ -1106,8 +1106,6 @@ namespace iqs::rules::qcgd {
 			#ifdef MPI_VERSION
 				iqs::mpi::min_equalize_size = parse_int_with_default(string_arg, "min_equalize_size=", ",", iqs::mpi::min_equalize_size);
 				iqs::mpi::equalize_inbalance = parse_float_with_default(string_arg, "equalize_inbalance=", ",", iqs::mpi::equalize_inbalance);
-
-				iqs::mpi::minimize_truncation = parse_int_with_default(string_arg, "minimize_truncation=", ",", iqs::mpi::minimize_truncation);
 			#endif
 
 			size_t max_num_object = parse_int_with_default(string_arg, "max_num_object=", ",", 0);

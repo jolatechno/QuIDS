@@ -25,11 +25,6 @@ namespace iqs::mpi {
 	*/
 	size_t min_equalize_size = MIN_EQUALIZE_SIZE;
 	float equalize_inbalance = EQUALIZE_INBALANCE;
-	#ifdef MINIMIZE_TRUNCATION
-		bool minimize_truncation = true;
-	#else
-		bool minimize_truncation = false;
-	#endif
 
 	/* forward typedef */
 	typedef class mpi_iteration mpi_it_t;
@@ -372,8 +367,21 @@ namespace iqs::mpi {
 			size_t avail_memory = next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm) + iqs::utils::get_free_mem();
 			size_t target_memory = avail_memory/local_size*(1 - iqs::safety_margin);
 
-			/* actually truncate */
-			/* TODO */
+			/* actually truncate by binary search */
+			if (iteration.get_truncated_mem_size() > target_memory) {
+				size_t begin = 0, end = iteration.num_object;
+				while (end > begin + 1) {
+					size_t middle = (end + begin) / 2;
+					iteration.truncate(begin, middle, mid_step_function);
+
+					size_t used_memory = iteration.get_truncated_mem_size(begin);
+					if (used_memory < target_memory) {
+						target_memory -= used_memory;
+						begin = middle;
+					} else
+						end = middle;
+				}
+			}
 		} else
 			iteration.truncate(0, max_num_object/local_size, mid_step_function);
 
@@ -405,8 +413,21 @@ namespace iqs::mpi {
 			size_t avail_memory = next_iteration.get_mem_size(localComm) + iqs::utils::get_free_mem();
 			size_t target_memory = avail_memory/local_size*(1 - iqs::safety_margin);
 
-			/* actually truncate */
-			/* TODO */
+			/* actually truncate by binary search */
+			if (symbolic_iteration.get_truncated_mem_size() > target_memory) {
+				size_t begin = 0, end = symbolic_iteration.num_object_after_interferences;
+				while (end > begin + 1) {
+					size_t middle = (end + begin) / 2;
+					symbolic_iteration.truncate(begin, middle, mid_step_function);
+
+					size_t used_memory = symbolic_iteration.get_truncated_mem_size(begin);
+					if (used_memory < target_memory) {
+						target_memory -= used_memory;
+						begin = middle;
+					} else
+						end = middle;
+				}
+			}
 		} else
 			symbolic_iteration.truncate(0, max_num_object/local_size, mid_step_function);
 

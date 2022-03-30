@@ -349,10 +349,24 @@ namespace iqs {
 		if (max_num_object == 0) {
 
 			/* available memory */
-			size_t avail_memory = (utils::get_free_mem() + next_iteration.get_mem_size() + symbolic_iteration.get_mem_size());
+			size_t avail_memory =  next_iteration.get_mem_size() + symbolic_iteration.get_mem_size() + utils::get_free_mem();
 			size_t target_memory = avail_memory*(1 - safety_margin);
 
-			/* TODO */
+			/* actually truncate by binary search */
+			if (iteration.get_truncated_mem_size() > target_memory) {
+				size_t begin = 0, end = iteration.num_object;
+				while (end > begin + 1) {
+					size_t middle = (end + begin) / 2;
+					iteration.truncate(begin, middle, mid_step_function);
+
+					size_t used_memory = iteration.get_truncated_mem_size(begin);
+					if (used_memory < target_memory) {
+						target_memory -= used_memory;
+						begin = middle;
+					} else
+						end = middle;
+				}
+			}
 		} else
 			iteration.truncate(0, max_num_object, mid_step_function);
 
@@ -380,10 +394,24 @@ namespace iqs {
 		if (max_num_object == 0) {
 
 			/* available memory */
-			size_t avail_memory = (utils::get_free_mem() + next_iteration.get_mem_size());
+			size_t avail_memory = next_iteration.get_mem_size() + utils::get_free_mem();
 			size_t target_memory = avail_memory*(1 - safety_margin);
 
-			/* TODO */
+			/* actually truncate by binary search */
+			if (symbolic_iteration.get_truncated_mem_size() > target_memory) {
+				size_t begin = 0, end = symbolic_iteration.num_object_after_interferences;
+				while (end > begin + 1) {
+					size_t middle = (end + begin) / 2;
+					symbolic_iteration.truncate(begin, middle, mid_step_function);
+
+					size_t used_memory = symbolic_iteration.get_truncated_mem_size(begin);
+					if (used_memory < target_memory) {
+						target_memory -= used_memory;
+						begin = middle;
+					} else
+						end = middle;
+				}
+			}
 		} else
 			symbolic_iteration.truncate(0, max_num_object, mid_step_function);
 
@@ -446,13 +474,7 @@ namespace iqs {
 		prepare pre_truncate
 		 !!!!!!!!!!!!!!!! */
 
-		if (simple_truncation) {
-			/* sort objects according to random selectors */
-			__gnu_parallel::sort(truncated_oid.begin(), truncated_oid.begin() + num_object,
-			[&](size_t const &oid1, size_t const &oid2) {
-				return std::norm(magnitude[oid1]) > std::norm(magnitude[oid2]);
-			});
-		} else {
+		if (!simple_truncation) {
 			#pragma omp parallel
 			{
 				utils::random_generator rng;

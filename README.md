@@ -296,7 +296,7 @@ In addition to classes, some global parameters are used to modify the behaviour 
 	#define PROBA_TYPE double
 #endif
 #ifndef HASH_MAP_OVERHEAD
-	#define HASH_MAP_OVERHEAD 1.7
+	#define HASH_MAP_OVERHEAD 1.5
 #endif
 
 /* other default-value flags */
@@ -314,11 +314,6 @@ namespace iqs {
 	namespace mpi {
 		size_t min_equalize_size = MIN_EQUALIZE_SIZE;
 		float equalize_inbalance = EQUALIZE_INBALANCE;
-		#ifdef MINIMIZE_TRUNCATION
-			bool minimize_truncation = true;
-		#else
-			bool minimize_truncation = false;
-		#endif
 
 		/* ... */
 	}
@@ -355,7 +350,7 @@ The default value of any of those variable can be altered at compilation, by pas
 
 #### safety margin
 
-`safety_margin` represents the target proportion of memory to keep free (default is `0.4` for 40%).
+`safety_margin` represents the target proportion of memory to keep free (default is `0.1` for 10%).
 
 #### simple truncation
 
@@ -376,10 +371,6 @@ The default value of any of those variable can be altered at compilation, by pas
 If this first condition is met, `equalize(...)` if the maximum relative imbalance in the number of object accross the nodes is greater than `mpi::equalize_imablance`.
 
 `mpi::min_equalize_size` is equal to `1000` by default, and `mpi::equalize_imablance` has a default of `0.2`.
-
-#### minimize truncation
-
-`minimize_truncation` is a `bool` variable (default is `false`, but can be set to `true` by compilling with the `MINIMIZE_TRUNCATION` flag). If `minimize_truncation` is `true` then each mpi rank will keep the maximum number of object it can within memory limitation, effectively "minimizing truncation". Otherwise each node will maximize the number of graph it keeps.
 
 ### Utils global variables
 
