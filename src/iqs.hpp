@@ -150,6 +150,7 @@ namespace iqs {
 
 		void compute_num_child(rule_t const *rule, debug_t mid_step_function=[](const char*){}) const;
 		void prepare_truncate(debug_t mid_step_function=[](const char*){}) const;
+		size_t get_truncated_mem_size(size_t begin_num_object=0) const;
 		void truncate(size_t begin_num_object, size_t max_num_object, debug_t mid_step_function=[](const char*){}) const;
 		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](const char*){}) const;
 		void apply_modifier(modifier_t const rule);
@@ -310,17 +311,13 @@ namespace iqs {
 		/*
 		utils functions
 		*/
-		float get_average_object_size() {
-			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
-			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
-			return (float)hash_map_size + hash_map_size;
-		}
-		size_t get_mem_size() {
+		size_t get_mem_size() const {
 			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
 			return magnitude.size()*symbolic_iteration_memory_size;
 		}
 
 		void compute_collisions(debug_t mid_step_function=[](const char*){});
+		size_t get_truncated_mem_size(size_t begin_num_object=0) const;
 		void truncate(size_t begin_num_object, size_t max_num_object, debug_t mid_step_function=[](const char*){});
 		void prepare_truncate(debug_t mid_step_function=[](const char*){});
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](const char*){});
@@ -338,7 +335,7 @@ namespace iqs {
 	void inline simulate(it_t &iteration, modifier_t const rule) {
 		iteration.apply_modifier(rule);
 	}
-	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {
+	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {	
 		/* compute the number of child */
 		iteration.compute_num_child(rule, mid_step_function);
 		iteration.truncated_num_object = iteration.num_object;
@@ -419,6 +416,26 @@ namespace iqs {
 		}
 
 		__gnu_parallel::partial_sum(num_childs.begin(), num_childs.begin() + num_object, child_begin.begin() + 1);
+	}
+
+	/*
+	get the truncated memory size
+	*/
+	size_t iteration::get_truncated_mem_size(size_t begin_num_object) const {
+		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
+
+		static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
+		static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
+
+		size_t mem_size = iteration_memory_size*(truncated_num_object - begin_num_object);
+		for (size_t i = begin_num_object; i < truncated_num_object; ++i) {
+			size_t oid = truncated_oid[i];
+
+			mem_size += object_begin[oid + 1] - object_begin[oid];
+			mem_size += num_childs[oid]*(symbolic_iteration_memory_size + hash_map_size);
+		}
+
+		return mem_size;
 	}
 
 	/*
@@ -678,6 +695,19 @@ namespace iqs {
 					random_selector[oid] = std::log( -std::log(1 - rng()) / std::norm(magnitude[oid]));
 				}
 			}
+	}
+
+	/*
+	get the truncated memory size
+	*/
+	size_t symbolic_iteration::get_truncated_mem_size(size_t begin_num_object) const {
+		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
+
+		size_t mem_size = iteration_memory_size*(next_iteration_num_object - begin_num_object);
+		for (size_t i = begin_num_object; i < next_iteration_num_object; ++i)
+			mem_size += size[next_oid[i]];
+
+		return mem_size;
 	}
 
 	/*

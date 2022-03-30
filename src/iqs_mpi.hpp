@@ -52,7 +52,7 @@ namespace iqs::mpi {
 		utils functions
 		*/
 		size_t inline get_mem_size(MPI_Comm communicator) const {
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t)  + sizeof(float);
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
 
 			size_t total_size, local_size = iteration_memory_size*magnitude.size() + objects.size();
 			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
@@ -67,7 +67,7 @@ namespace iqs::mpi {
 		/*
 		function to compute the maximum and minimum per node size
 		*/
-		float get_avg_num_symbolic_object_per_task(MPI_Comm communicator) {
+		float get_avg_num_symbolic_object_per_task(MPI_Comm communicator) const {
 			size_t total_num_object_per_node = get_num_symbolic_object();
 			MPI_Allreduce(MPI_IN_PLACE, &total_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 
@@ -76,18 +76,19 @@ namespace iqs::mpi {
 
 			return (float)total_num_object_per_node/size;
 		}
-		size_t get_max_num_symbolic_object_per_task(MPI_Comm communicator) {
+		size_t get_max_num_symbolic_object_per_task(MPI_Comm communicator) const {
 			size_t max_num_object_per_node = get_num_symbolic_object();
 			MPI_Allreduce(MPI_IN_PLACE, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
 			return max_num_object_per_node;
 		}
-		size_t get_max_num_object_per_task(MPI_Comm communicator) {
+		size_t get_max_num_object_per_task(MPI_Comm communicator) const {
 			size_t max_num_object_per_node;
 			MPI_Allreduce(&num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
 			return max_num_object_per_node;
 		}
 
 
+		size_t get_truncated_mem_size(size_t begin_num_object=0) const;
 	public:
 		PROBA_TYPE node_total_proba = 0;
 
@@ -414,6 +415,27 @@ namespace iqs::mpi {
 		next_iteration.normalize(communicator, mid_step_function);
 
 		MPI_Comm_free(&localComm);
+	}
+
+	/*
+	get the truncated memory size
+	*/
+	size_t mpi_iteration::get_truncated_mem_size(size_t begin_num_object) const {
+		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
+
+		static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
+		static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
+		static const size_t mpi_symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 1*sizeof(size_t) + sizeof(int);
+
+		size_t mem_size = iteration_memory_size*(truncated_num_object - begin_num_object);
+		for (size_t i = begin_num_object; i < truncated_num_object; ++i) {
+			size_t oid = truncated_oid[i];
+
+			mem_size += object_begin[oid + 1] - object_begin[oid];
+			mem_size += num_childs[oid]*(symbolic_iteration_memory_size + mpi_symbolic_iteration_memory_size + hash_map_size);
+		}
+
+		return mem_size;
 	}
 
 	/*
