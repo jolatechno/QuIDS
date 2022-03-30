@@ -463,8 +463,6 @@ namespace iqs::mpi {
 
 
 
-				if (truncate_symbolic_num_object > truncated_num_child*iqs::max_truncate_step)
-					truncate_symbolic_num_object = truncated_num_child*iqs::max_truncate_step;
 
 				/* check for inbalance */
 				if (!minimize_truncation) {
@@ -481,6 +479,8 @@ namespace iqs::mpi {
 				}
 
 				/* set limits on the number of childs */
+				if (truncate_symbolic_num_object > truncated_num_child*iqs::max_truncate_step)
+					truncate_symbolic_num_object = truncated_num_child*iqs::max_truncate_step;
 				if (truncate_symbolic_num_object < truncated_num_child*iqs::min_truncate_step)
 					truncate_symbolic_num_object = truncated_num_child*iqs::min_truncate_step;
 				if (i < 0 && truncate_symbolic_num_object > truncated_num_child)
@@ -557,9 +557,6 @@ namespace iqs::mpi {
 
 
 
-				if (truncate_num_object > symbolic_iteration.next_iteration_num_object*iqs::max_truncate_step)
-					truncate_num_object = symbolic_iteration.next_iteration_num_object*iqs::max_truncate_step;
-
 				/* check for inbalance */
 				if (!minimize_truncation) {
 					if (i >= 0) {
@@ -575,6 +572,8 @@ namespace iqs::mpi {
 				}
 
 				/* set limits on the number of childs */
+				if (truncate_num_object > symbolic_iteration.next_iteration_num_object*iqs::max_truncate_step)
+					truncate_num_object = symbolic_iteration.next_iteration_num_object*iqs::max_truncate_step;
 				if (truncate_num_object < symbolic_iteration.next_iteration_num_object*iqs::min_truncate_step)
 					truncate_num_object = symbolic_iteration.next_iteration_num_object*iqs::min_truncate_step;
 				if (i < 0 && truncate_num_object > symbolic_iteration.next_iteration_num_object)
