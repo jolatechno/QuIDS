@@ -442,7 +442,7 @@ namespace iqs::mpi {
 				!!!!!!!!!
 				debuging */
 				if (rank == 0)
-					std::cerr << "\t" << (float)used_memory/1e9 << "GB =? " << (float)avail_mem/(1 - iqs::safety_margin)/1e9 << "GB * " << (1 - iqs::safety_margin) << ", " << i << "th iteration (symbolic truncation)\n";
+					std::cerr << "\t" << (float)used_memory/1e9 << "GB =? " << (float)avail_mem/(1 - iqs::safety_margin)/1e9 << "GB * " << (1 - iqs::safety_margin) << ", " << i << "th iteration (symbolic truncation " << local_size << ", " << (float)avail_mem/(float)used_memory << ", " << iqs::min_truncate_step << ", " << iqs::max_truncate_step << ")\n";
 				
 
 
@@ -524,7 +524,7 @@ namespace iqs::mpi {
 				!!!!!!!!!
 				debuging */
 				if (rank == 0)
-					std::cerr << "\t" << (float)used_memory/1e9 << "GB =? " << (float)avail_mem/(1 - iqs::safety_margin)/1e9 << "GB * " << (1 - iqs::safety_margin) << ", " << i << "th iteration (truncation)\n";
+					std::cerr << "\t" << (float)used_memory/1e9 << "GB =? " << (float)avail_mem/(1 - iqs::safety_margin)/1e9 << "GB * " << (1 - iqs::safety_margin) << ", " << i << "th iteration (truncation " << local_size << ", " << (float)avail_mem/(float)used_memory << ", " << iqs::min_truncate_step << ", " << iqs::max_truncate_step << ")\n";
 				
 
 
@@ -534,8 +534,8 @@ namespace iqs::mpi {
 
 				/* compute the number of child to keep with upword limit */
 				size_t truncate_num_object = used_memory == 0 ? 0 : total_num_child*avail_mem/used_memory/local_size;
-				if (truncate_num_object > total_num_child*iqs::max_truncate_step)
-					truncate_num_object = total_num_child*iqs::max_truncate_step;
+				if (truncate_num_object > symbolic_iteration.next_iteration_num_object*iqs::max_truncate_step)
+					truncate_num_object = symbolic_iteration.next_iteration_num_object*iqs::max_truncate_step;
 
 				/* check for inbalance */
 				if (!minimize_truncation) {

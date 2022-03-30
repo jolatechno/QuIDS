@@ -29,7 +29,7 @@
 	#define TRUNCATION_TOLERANCE 0.125;
 #endif
 #ifndef MAX_TRUNCATE_STEP
-	#define MAX_TRUNCATE_STEP 2;
+	#define MAX_TRUNCATE_STEP 4;
 #endif
 #ifndef MIN_TRUNCATE_STEP
 	#define MIN_TRUNCATE_STEP 0.05;
