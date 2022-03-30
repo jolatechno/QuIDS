@@ -452,6 +452,17 @@ namespace iqs::mpi {
 				
 				/* compute the number of child to keep with upword limit */
 				size_t truncate_symbolic_num_object = used_memory == 0 ? 0 : total_num_child*avail_mem/used_memory/local_size;
+
+
+
+				/* !!!!!!
+				!!!!!!!!!
+				debuging */
+				if (rank == 0)
+				std::cerr << "\t\t" << truncated_num_child << " -> " << truncate_symbolic_num_object << "\n";
+
+
+
 				if (truncate_symbolic_num_object > truncated_num_child*iqs::max_truncate_step)
 					truncate_symbolic_num_object = truncated_num_child*iqs::max_truncate_step;
 
@@ -534,6 +545,18 @@ namespace iqs::mpi {
 
 				/* compute the number of child to keep with upword limit */
 				size_t truncate_num_object = used_memory == 0 ? 0 : total_num_child*avail_mem/used_memory/local_size;
+
+
+
+				/* !!!!!!
+				!!!!!!!!!
+				debuging */
+				if (rank == 0)
+				std::cerr << "\t\t" << symbolic_iteration.next_iteration_num_object << " -> " << truncate_num_object << "\n";
+
+
+
+
 				if (truncate_num_object > symbolic_iteration.next_iteration_num_object*iqs::max_truncate_step)
 					truncate_num_object = symbolic_iteration.next_iteration_num_object*iqs::max_truncate_step;
 
