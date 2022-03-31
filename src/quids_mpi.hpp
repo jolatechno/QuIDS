@@ -1,6 +1,6 @@
 #pragma once
 
-#include "iqds.hpp"
+#include "quids.hpp"
 
 #include <mpi.h>
 
@@ -11,7 +11,7 @@
 	#define EQUALIZE_INBALANCE 0.05
 #endif
 
-namespace iqds::mpi {
+namespace quids::mpi {
 	namespace utils {        
 		#include "utils/mpi_utils.hpp"
 	}
@@ -33,13 +33,13 @@ namespace iqds::mpi {
 	/*
 	mpi iteration class
 	*/
-	class mpi_iteration : public iqds::iteration {
+	class mpi_iteration : public quids::iteration {
 	private:
 		friend mpi_symbolic_iteration;
-		friend void inline simulate(mpi_it_t &iteration, iqds::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqds::debug_t mid_step_function);
+		friend void inline simulate(mpi_it_t &iteration, quids::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, quids::debug_t mid_step_function);
 
 		void equalize_symbolic(MPI_Comm communicator);
-		void normalize(MPI_Comm communicator, iqds::debug_t mid_step_function=[](const char*){});
+		void normalize(MPI_Comm communicator, quids::debug_t mid_step_function=[](const char*){});
 
 
 
@@ -88,7 +88,7 @@ namespace iqds::mpi {
 		PROBA_TYPE node_total_proba = 0;
 
 		mpi_iteration() {}
-		mpi_iteration(char* object_begin_, char* object_end_) : iqds::iteration(object_begin_, object_end_) {}
+		mpi_iteration(char* object_begin_, char* object_end_) : quids::iteration(object_begin_, object_end_) {}
 
 		size_t get_total_num_object(MPI_Comm communicator) const {
 			/* accumulate number of node */
@@ -98,11 +98,11 @@ namespace iqds::mpi {
 			return total_num_object;
 		}
 		PROBA_TYPE average_value(std::function<PROBA_TYPE(char const *object_begin, char const *object_end)> const observable) const {
-			return node_total_proba == 0 ? 0 : iqds::iteration::average_value(observable) / node_total_proba * total_proba;
+			return node_total_proba == 0 ? 0 : quids::iteration::average_value(observable) / node_total_proba * total_proba;
 		}
 		PROBA_TYPE average_value(std::function<PROBA_TYPE(char const *object_begin, char const *object_end)> const observable, MPI_Comm communicator) const {
 			/* compute local average */
-			PROBA_TYPE avg = iqds::iteration::average_value(observable);
+			PROBA_TYPE avg = quids::iteration::average_value(observable);
 
 			/* accumulate average value */
 			MPI_Allreduce(MPI_IN_PLACE, &avg, 1, Proba_MPI_Datatype, MPI_SUM, communicator);
@@ -219,21 +219,21 @@ namespace iqds::mpi {
 		}
 	};
 
-	class mpi_symbolic_iteration : public iqds::symbolic_iteration {
+	class mpi_symbolic_iteration : public quids::symbolic_iteration {
 	private:
 		friend mpi_iteration;
-		friend void inline simulate(mpi_it_t &iteration, iqds::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, iqds::debug_t mid_step_function); 
+		friend void inline simulate(mpi_it_t &iteration, quids::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, quids::debug_t mid_step_function); 
 
-		iqds::utils::fast_vector<mag_t> partitioned_mag;
-		iqds::utils::fast_vector<size_t> partitioned_hash;
-		iqds::utils::fast_vector<char /*bool*/> partitioned_is_unique;
+		quids::utils::fast_vector<mag_t> partitioned_mag;
+		quids::utils::fast_vector<size_t> partitioned_hash;
+		quids::utils::fast_vector<char /*bool*/> partitioned_is_unique;
 
-		iqds::utils::fast_vector<mag_t> mag_buffer;
-		iqds::utils::fast_vector<size_t> hash_buffer;
-		iqds::utils::fast_vector<int> node_id_buffer;
-		iqds::utils::fast_vector<char /*bool*/> is_unique_buffer;
+		quids::utils::fast_vector<mag_t> mag_buffer;
+		quids::utils::fast_vector<size_t> hash_buffer;
+		quids::utils::fast_vector<int> node_id_buffer;
+		quids::utils::fast_vector<char /*bool*/> is_unique_buffer;
 
-		void compute_collisions(MPI_Comm communicator, iqds::debug_t mid_step_function=[](const char*){});
+		void compute_collisions(MPI_Comm communicator, quids::debug_t mid_step_function=[](const char*){});
 		void mpi_resize(size_t size) {
 			#pragma omp parallel sections
 			{
@@ -319,7 +319,7 @@ namespace iqds::mpi {
 	/*
 	simulation function
 	*/
-	void simulate(mpi_it_t &iteration, iqds::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, iqds::debug_t mid_step_function=[](const char*){}) {
+	void simulate(mpi_it_t &iteration, quids::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, quids::debug_t mid_step_function=[](const char*){}) {
 		/* get local size */
 		MPI_Comm localComm;
 		int rank, size, local_size;
@@ -334,7 +334,7 @@ namespace iqds::mpi {
 
 
 		if (size == 1)
-			return iqds::simulate(iteration, rule, next_iteration, symbolic_iteration, max_num_object, mid_step_function);
+			return quids::simulate(iteration, rule, next_iteration, symbolic_iteration, max_num_object, mid_step_function);
 
 		/* start actual simulation */
 		iteration.compute_num_child(rule, mid_step_function);
@@ -364,8 +364,8 @@ namespace iqds::mpi {
 		mid_step_function("truncate_symbolic");
 		if (max_num_object == 0) {
 			/* available memory */
-			size_t avail_memory = next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm) + iqds::utils::get_free_mem();
-			size_t target_memory = avail_memory/local_size*(1 - iqds::safety_margin);
+			size_t avail_memory = next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm) + quids::utils::get_free_mem();
+			size_t target_memory = avail_memory/local_size*(1 - quids::safety_margin);
 
 			/* actually truncate by binary search */
 			if (iteration.get_truncated_mem_size() > target_memory) {
@@ -410,8 +410,8 @@ namespace iqds::mpi {
 		if (max_num_object == 0) {
 
 			/* available memory */
-			size_t avail_memory = next_iteration.get_mem_size(localComm) + iqds::utils::get_free_mem();
-			size_t target_memory = avail_memory/local_size*(1 - iqds::safety_margin);
+			size_t avail_memory = next_iteration.get_mem_size(localComm) + quids::utils::get_free_mem();
+			size_t target_memory = avail_memory/local_size*(1 - quids::safety_margin);
 
 			/* actually truncate by binary search */
 			if (symbolic_iteration.get_truncated_mem_size() > target_memory) {
@@ -462,13 +462,13 @@ namespace iqds::mpi {
 	/*
 	distributed interference function
 	*/
-	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator, iqds::debug_t mid_step_function) {
+	void mpi_symbolic_iteration::compute_collisions(MPI_Comm communicator, quids::debug_t mid_step_function) {
 		int size, rank;
 		MPI_Comm_size(communicator, &size);
 		MPI_Comm_rank(communicator, &rank);
 
 		if (size == 1)
-			return iqds::symbolic_iteration::compute_collisions(mid_step_function);
+			return quids::symbolic_iteration::compute_collisions(mid_step_function);
 
 		int num_threads;
 		#pragma omp parallel
@@ -476,8 +476,8 @@ namespace iqds::mpi {
 		num_threads = omp_get_num_threads();
 
 		int const n_segment = size*num_threads;
-		int const num_bucket = iqds::utils::nearest_power_of_two(load_balancing_bucket_per_thread*n_segment);
-		size_t const offset = 8*sizeof(size_t) - iqds::utils::log_2_upper_bound(num_bucket);
+		int const num_bucket = quids::utils::nearest_power_of_two(load_balancing_bucket_per_thread*n_segment);
+		size_t const offset = 8*sizeof(size_t) - quids::utils::log_2_upper_bound(num_bucket);
 
 		std::vector<int> load_balancing_begin(n_segment + 1, 0);
 		std::vector<size_t> partition_begin(num_bucket + 1, 0);
@@ -502,7 +502,7 @@ namespace iqds::mpi {
 		/* !!!!!!!!!!!!!!!!
 		partition
 		!!!!!!!!!!!!!!!! */
-		iqds::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[0] + num_object, 0,
+		quids::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[0] + num_object, 0,
 			partition_begin.begin(), partition_begin.end(),
 			[&](size_t const oid) {
 				return hash[oid] >> offset;
@@ -534,7 +534,7 @@ namespace iqds::mpi {
 				num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
 
 			mid_step_function("compute_collisions - prepare");
-			iqds::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
+			quids::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
 				load_balancing_begin.begin(), load_balancing_begin.end());
 		} else {
 			mid_step_function("compute_collisions - com");
@@ -704,7 +704,7 @@ namespace iqds::mpi {
 	/*
 	distributed normalization function
 	*/
-	void mpi_iteration::normalize(MPI_Comm communicator, iqds::debug_t mid_step_function) {
+	void mpi_iteration::normalize(MPI_Comm communicator, quids::debug_t mid_step_function) {
 		/* !!!!!!!!!!!!!!!!
 		normalize
 		 !!!!!!!!!!!!!!!! */
@@ -769,9 +769,9 @@ namespace iqds::mpi {
 
 		/* get available memory */
 		MPI_Barrier(localComm);
-		size_t total_iteration_size, iteration_size = iqds::iteration::get_mem_size();
+		size_t total_iteration_size, iteration_size = quids::iteration::get_mem_size();
 		MPI_Allreduce(&iteration_size, &total_iteration_size, 1, Proba_MPI_Datatype, MPI_SUM, localComm);
-		size_t avail_memory = ((iqds::utils::get_free_mem() + total_iteration_size)/local_size - iteration_size)*(1 - iqds::safety_margin);
+		size_t avail_memory = ((quids::utils::get_free_mem() + total_iteration_size)/local_size - iteration_size)*(1 - quids::safety_margin);
 		MPI_Barrier(localComm);
 
 		/* skip if this node is alone */
@@ -832,9 +832,9 @@ namespace iqds::mpi {
 		
 		/* get available memory */
 		MPI_Barrier(localComm);
-		size_t total_iteration_size, iteration_size = iqds::iteration::get_mem_size();
+		size_t total_iteration_size, iteration_size = quids::iteration::get_mem_size();
 		MPI_Allreduce(&iteration_size, &total_iteration_size, 1, Proba_MPI_Datatype, MPI_SUM, localComm);
-		size_t avail_memory = ((iqds::utils::get_free_mem() + total_iteration_size)/local_size - iteration_size)*(1 - iqds::safety_margin);
+		size_t avail_memory = ((quids::utils::get_free_mem() + total_iteration_size)/local_size - iteration_size)*(1 - quids::safety_margin);
 		MPI_Barrier(localComm);
 
 		/* skip if this node is alone */

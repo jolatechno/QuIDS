@@ -3,9 +3,9 @@
 #include <iostream>
 #include <iomanip>      // std::setprecision
 
-#include "../iqds.hpp"
+#include "../quids.hpp"
 
-namespace iqds::rules::qcgd {
+namespace quids::rules::qcgd {
 	namespace utils {
 		inline void hash_combine(std::size_t& seed, size_t const value_64) {
 		    static size_t magic_number = 0xc6a4a7935bd1e995;
@@ -228,7 +228,7 @@ namespace iqds::rules::qcgd {
 			}
 		}
 
-		void randomize(iqds::it_t &iter) {
+		void randomize(quids::it_t &iter) {
 			size_t size;
 			mag_t *mag_;
 			char *begin;
@@ -238,7 +238,7 @@ namespace iqds::rules::qcgd {
 			}
 		}
 
-		void print(iqds::it_t const &iter) {
+		void print(quids::it_t const &iter) {
 			static std::function<void(graphs::sub_node const*)> print_node_name = [](graphs::sub_node const *sub_node) {
 				if (sub_node->right_or_type == graphs::element_t) {
 					std::cout << std::abs(sub_node->hmlz_and_element) - 1;
@@ -286,8 +286,8 @@ namespace iqds::rules::qcgd {
 
 				uint16_t const num_nodes = graphs::num_nodes(begin);
 
-				PROBA_TYPE real = std::abs(mag.real()) < iqds::tolerance ? 0 : mag.real();
-				PROBA_TYPE imag = std::abs(mag.imag()) < iqds::tolerance ? 0 : mag.imag();
+				PROBA_TYPE real = std::abs(mag.real()) < quids::tolerance ? 0 : mag.real();
+				PROBA_TYPE imag = std::abs(mag.imag()) < quids::tolerance ? 0 : mag.imag();
 
 				std::cout <<std::fixed<<std::setprecision(5)<< "\t" << real << (imag <= -1e-5 ? " - " : " + ") << std::abs(imag) << "i  ";
 
@@ -305,7 +305,7 @@ namespace iqds::rules::qcgd {
 				std::cout << "\t...and " << iter.num_object - num_prints << " other graphs\n";
 		}
 
-		void serialize(iqds::it_t const &iter, iqds::sy_it_t const &sy_it, uint indentation=0) {
+		void serialize(quids::it_t const &iter, quids::sy_it_t const &sy_it, uint indentation=0) {
 			PROBA_TYPE interference_ratio = 1;
 			PROBA_TYPE deletion_ratio = 1; 
 			if (sy_it.num_object > 0) {
@@ -342,10 +342,10 @@ namespace iqds::rules::qcgd {
 			});
 
 			PROBA_TYPE std_dev_size = avg_squared_size - avg_size*avg_size;
-			std_dev_size = std_dev_size < iqds::tolerance ? 0 : std::sqrt(avg_squared_size);
+			std_dev_size = std_dev_size < quids::tolerance ? 0 : std::sqrt(avg_squared_size);
 
 			PROBA_TYPE std_dev_density = avg_squared_density - avg_density*avg_density;
-			std_dev_density = std_dev_density < iqds::tolerance ? 0 : std::sqrt(std_dev_density);
+			std_dev_density = std_dev_density < quids::tolerance ? 0 : std::sqrt(std_dev_density);
 
 			auto const print_indentation = [=]() {
 				for (auto i = 0; i < indentation; ++i)
@@ -365,7 +365,7 @@ namespace iqds::rules::qcgd {
 		}
 
 #ifdef MPI_VERSION
-		void serialize(iqds::mpi::mpi_it_t const &iter, iqds::mpi::mpi_sy_it_t const &sy_it, MPI_Comm communicator, uint indentation=0) {
+		void serialize(quids::mpi::mpi_it_t const &iter, quids::mpi::mpi_sy_it_t const &sy_it, MPI_Comm communicator, uint indentation=0) {
 			int rank;
 			MPI_Comm_rank(communicator, &rank);
 
@@ -413,10 +413,10 @@ namespace iqds::rules::qcgd {
 			}, communicator);
 
 			PROBA_TYPE std_dev_size = avg_squared_size - avg_size*avg_size;
-			std_dev_size = std_dev_size < iqds::tolerance ? 0 : std::sqrt(avg_squared_size);
+			std_dev_size = std_dev_size < quids::tolerance ? 0 : std::sqrt(avg_squared_size);
 
 			PROBA_TYPE std_dev_density = avg_squared_density - avg_density*avg_density;
-			std_dev_density = std_dev_density < iqds::tolerance ? 0 : std::sqrt(std_dev_density);
+			std_dev_density = std_dev_density < quids::tolerance ? 0 : std::sqrt(std_dev_density);
 
 			auto const print_indentation = [=]() {
 				for (auto i = 0; i < indentation; ++i)
@@ -455,7 +455,7 @@ namespace iqds::rules::qcgd {
 		std::rotate(left_, left_ + num_nodes - 1, left_ + num_nodes);
 	}
 
-	class erase_create : public iqds::rule {
+	class erase_create : public quids::rule {
 		mag_t do_ = 1;
 		mag_t do_not = 0;
 		mag_t do_conj = 1;
@@ -530,7 +530,7 @@ namespace iqds::rules::qcgd {
 		}
 	};
 
-	class coin : public iqds::rule {
+	class coin : public quids::rule {
 		mag_t do_ = 1;
 		mag_t do_not = 0;
 		mag_t do_conj = 1;
@@ -603,7 +603,7 @@ namespace iqds::rules::qcgd {
 		}
 	};
 
-	class split_merge : public iqds::rule {
+	class split_merge : public quids::rule {
 		mag_t do_ = 1;
 		mag_t do_not = 0;
 		mag_t do_conj = 1;
@@ -1035,7 +1035,7 @@ namespace iqds::rules::qcgd {
 	};
 
 	namespace flags {
-		typedef std::vector<std::tuple<int, bool, iqds::modifier_t, iqds::rule_t*, iqds::modifier_t, iqds::rule_t*>> simulator_t;
+		typedef std::vector<std::tuple<int, bool, quids::modifier_t, quids::rule_t*, quids::modifier_t, quids::rule_t*>> simulator_t;
 
 		namespace {
 			std::string strip(std::string &input, std::string const separator) {
@@ -1097,15 +1097,15 @@ namespace iqds::rules::qcgd {
 
 			utils::max_print_num_graphs = parse_int_with_default(string_arg, "max_print_num_graphs=", ",", utils::max_print_num_graphs);
 
-			iqds::tolerance = parse_float_with_default(string_arg, "tolerance=", ",", iqds::tolerance);
-			iqds::safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", iqds::safety_margin);
+			quids::tolerance = parse_float_with_default(string_arg, "tolerance=", ",", quids::tolerance);
+			quids::safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", quids::safety_margin);
 
-			iqds::simple_truncation = parse_int_with_default(string_arg, "simple_truncate=", ",", iqds::simple_truncation);
-			iqds::load_balancing_bucket_per_thread = parse_int_with_default(string_arg, "load_balancing_bucket_per_thread=", ",", iqds::load_balancing_bucket_per_thread);
+			quids::simple_truncation = parse_int_with_default(string_arg, "simple_truncate=", ",", quids::simple_truncation);
+			quids::load_balancing_bucket_per_thread = parse_int_with_default(string_arg, "load_balancing_bucket_per_thread=", ",", quids::load_balancing_bucket_per_thread);
 
 			#ifdef MPI_VERSION
-				iqds::mpi::min_equalize_size = parse_int_with_default(string_arg, "min_equalize_size=", ",", iqds::mpi::min_equalize_size);
-				iqds::mpi::equalize_inbalance = parse_float_with_default(string_arg, "equalize_inbalance=", ",", iqds::mpi::equalize_inbalance);
+				quids::mpi::min_equalize_size = parse_int_with_default(string_arg, "min_equalize_size=", ",", quids::mpi::min_equalize_size);
+				quids::mpi::equalize_inbalance = parse_float_with_default(string_arg, "equalize_inbalance=", ",", quids::mpi::equalize_inbalance);
 			#endif
 
 			size_t max_num_object = parse_int_with_default(string_arg, "max_num_object=", ",", 0);
@@ -1113,7 +1113,7 @@ namespace iqds::rules::qcgd {
 			return {n_iters, reversed_n_iters, max_num_object};
 		}
 
-		void read_state(const char* argv, iqds::it_t &state) {
+		void read_state(const char* argv, quids::it_t &state) {
 			std::string string_args = argv;
 
 			std::string string_arg;
