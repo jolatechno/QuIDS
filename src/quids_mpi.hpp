@@ -481,6 +481,7 @@ namespace quids::mpi {
 
 		std::vector<int> load_balancing_begin(n_segment + 1, 0);
 		std::vector<size_t> partition_begin(num_bucket + 1, 0);
+		std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
 
 		std::vector<int> local_disp(n_segment + 1);
 		std::vector<int> local_count(n_segment);
@@ -526,28 +527,15 @@ namespace quids::mpi {
 		/* !!!!!!!!!!!!!!!!
 		load-balance
 		!!!!!!!!!!!!!!!! */
-		if (rank == 0) {
-			std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
-
-			mid_step_function("compute_collisions - com");
-			MPI_Reduce(&partition_begin[1], &total_partition_begin[1],
-				num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
-
-			mid_step_function("compute_collisions - prepare");
-			quids::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
-				load_balancing_begin.begin(), load_balancing_begin.end());
-		} else {
-			mid_step_function("compute_collisions - com");
-			MPI_Reduce(&partition_begin[1], NULL,
-				num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, 0, communicator);
-			mid_step_function("compute_collisions - prepare");
-		}
-
 		mid_step_function("compute_collisions - com");
-		MPI_Bcast(&load_balancing_begin[1], n_segment, MPI_INT, 0, communicator);
+		MPI_Allreduce(&partition_begin[1], &total_partition_begin[1],
+			num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+
+		mid_step_function("compute_collisions - prepare");
+		quids::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
+			load_balancing_begin.begin(), load_balancing_begin.end());
 
 		/* recompute local count and disp */
-		mid_step_function("compute_collisions - prepare");
 		local_disp[0] = 0;
 		for (int i = 1; i <= n_segment; ++i) {
 			local_disp[i] = partition_begin[load_balancing_begin[i]];
