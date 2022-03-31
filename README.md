@@ -1,4 +1,4 @@
-# Irregular Quantum Simulator 
+# Irregular Quantum Dynamic Simulator 
 
 ## Installation
 
@@ -14,28 +14,28 @@ Some rules that can be used directly, or understood as examples are implemented 
 
 Objects are represented by a simple begin and end pointer. Their exist two kind of interfaces for implementing a unitary transformation.
 
-`modifiers` and `rules` are applied using the `iqs::simulate(...)` function:
+`modifiers` and `rules` are applied using the `iqds::simulate(...)` function:
 
 ```cpp
-#include "src/iqs.hpp"
+#include "src/iqds.hpp"
 
 int main(int argc, char* argv[]) {
 	/* variables*/
-	iqs::it_t next_state, state;
-	iqs::sy_it_t symbolic_iteration;
+	iqds::it_t next_state, state;
+	iqds::sy_it_t symbolic_iteration;
 
 	/* initializing the state */
 	state.append(object_begin, object_end);
 
 	/* applying a modifier */
-	iqs::simulate(state, my_modifier);
-	iqs::simulate(state, [](char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
+	iqds::simulate(state, my_modifier);
+	iqds::simulate(state, [](char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
 			/* using lambda-expressions */
 		});
 
 	/* applying a rule */
-	iqs::rule_t *rule = new my_rule(/*...*/);
-	iqs::simulate(state, rule, next_state, symbolic_iteration);
+	iqds::rule_t *rule = new my_rule(/*...*/);
+	iqds::simulate(state, rule, next_state, symbolic_iteration);
 
 	/* "next_state" now holds an application of "rule" on "state" */
 }
@@ -43,10 +43,10 @@ int main(int argc, char* argv[]) {
 
 ### MPI support
 
-Simulations can also be done across nodes. For that, you'll need to replace `iqs::sy_it` and `iqs::it_t` respectivly by `iqs::mpi::mpi_sy_it` and `iqs::mpi::mpi_it_t`. 
+Simulations can also be done across nodes. For that, you'll need to replace `iqds::sy_it` and `iqds::it_t` respectivly by `iqds::mpi::mpi_sy_it` and `iqds::mpi::mpi_it_t`. 
 
 ```cpp
-#include "src/iqs_mpi.hpp"
+#include "src/iqds_mpi.hpp"
 
 int main(int argc, char* argv[]) {
 	/* MPI initialization */
@@ -58,21 +58,21 @@ int main(int argc, char* argv[]) {
     }
 
 	/* variables*/
-	iqs::mpi::mpi_it_t next_state, state;
-	iqs::mpi::mpi_sy_it_t symbolic_iteration;
+	iqds::mpi::mpi_it_t next_state, state;
+	iqds::mpi::mpi_sy_it_t symbolic_iteration;
 
 	/* initializing the state */
 	state.append(object_begin, object_end);
 
 	/* applying a modifier */
-	iqs::simulate(state, my_modifier);
-	iqs::simulate(state, [](char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
+	iqds::simulate(state, my_modifier);
+	iqds::simulate(state, [](char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> &mag) {
 			/* using lambda-expressions */
 		});
 
 	/* applying a rule */
-	iqs::rule_t *rule = new my_rule(/*...*/);
-	iqs::mpi::simulate(state, rule, next_state, symbolic_iteration, MPI_COMM_WORLD);
+	iqds::rule_t *rule = new my_rule(/*...*/);
+	iqds::mpi::simulate(state, rule, next_state, symbolic_iteration, MPI_COMM_WORLD);
 
 	/* "next_state" now holds an application of "rule" on "state" */
 
@@ -95,7 +95,7 @@ void my_modifier(char *parent_begin, char *parent_end, std::complex<PROBA_TYPE> 
 A `rule` is a simple class, implementing 2 functions (with a third being optional).
 
 ```cpp
-class my_rule : public iqs::rule_t {
+class my_rule : public iqds::rule_t {
 public:
 	my_rule() {};
 	inline void get_num_child(char const *parent_begin, char const *parent_end, 
@@ -162,7 +162,7 @@ inline size_t my_rule::hasher(char const *parent_begin, char const *parent_end) 
 
 ### Interaction with the different classes
 
-We can see that a quantum state is represented by a specific `iteration` class, and a `symbolic_iteration` is generated when applying a unitary transformation on a state. We interact with those classes (modify or read a state, ect...) through public member functions and variables, which will be shortly documented bellow, as they are vital to building a __usefull__ program using `IQS`.
+We can see that a quantum state is represented by a specific `iteration` class, and a `symbolic_iteration` is generated when applying a unitary transformation on a state. We interact with those classes (modify or read a state, ect...) through public member functions and variables, which will be shortly documented bellow, as they are vital to building a __usefull__ program using `IQDS`.
 
 #### Symbolic iteration
 
@@ -230,7 +230,7 @@ Member variables are:
 ```cpp
 typedef class mpi_symbolic_iteration mpi_sy_it_t;
 
-class mpi_symbolic_iteration : public iqs::symbolic_iteration {
+class mpi_symbolic_iteration : public iqds::symbolic_iteration {
 public:
 	size_t get_total_num_object(MPI_Comm communicator) const;
 	size_t get_total_num_object_after_interferences(MPI_Comm communicator) const;
@@ -252,12 +252,12 @@ The two added member functions are:
 ```cpp
 typedef class mpi_iteration mpi_it_t;
 
-class mpi_iteration : public iqs::iteration {
+class mpi_iteration : public iqds::iteration {
 public:
 	PROBA_TYPE node_total_proba = 0;
 
 	mpi_iteration() {}
-	mpi_iteration(char* object_begin_, char* object_end_) : iqs::iteration(object_begin_, object_end_) {}
+	mpi_iteration(char* object_begin_, char* object_end_) : iqds::iteration(object_begin_, object_end_) {}
 
 	void equalize(MPI_Comm communicator);
 	size_t get_total_num_object(MPI_Comm communicator) const;
@@ -301,7 +301,7 @@ In addition to classes, some global parameters are used to modify the behaviour 
 
 /* other default-value flags */
 
-namespace iqs {
+namespace iqds {
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
@@ -366,7 +366,7 @@ The default value of any of those variable can be altered at compilation, by pas
 
 #### minimum equalize size and equalize imbalance.
 
-`mpi::min_equalize_size` represents the minimum per node average size required to automaticly call `equalize(...)` after a call to `iqs::mpi::simulate(...)`.
+`mpi::min_equalize_size` represents the minimum per node average size required to automaticly call `equalize(...)` after a call to `iqds::mpi::simulate(...)`.
 
 If this first condition is met, `equalize(...)` if the maximum relative imbalance in the number of object accross the nodes is greater than `mpi::equalize_imablance`.
 

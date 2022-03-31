@@ -37,7 +37,7 @@ defining openmp function's return values if openmp isn't installed or loaded
 	#include <omp.h>
 #endif
 
-namespace iqs {
+namespace iqds {
 	namespace utils {
 		#include "utils/vector.hpp"
 		#include "utils/load_balancing.hpp"
@@ -631,7 +631,7 @@ namespace iqs {
 		partition
 		!!!!!!!!!!!!!!!! */
 		mid_step_function("compute_collisions - prepare");
-		iqs::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[0] + num_object, 0,
+		iqds::utils::parallel_generalized_partition_from_iota(&next_oid[0], &next_oid[0] + num_object, 0,
 			&partition_begin[0], &partition_begin[num_bucket + 1],
 			[&](size_t const oid) {
 				return hash[oid] >> offset;

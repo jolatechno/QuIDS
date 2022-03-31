@@ -1,12 +1,12 @@
 #include <iostream>
 
-#include "../iqs.hpp"
+#include "../iqds.hpp"
 
-namespace iqs::rules::quantum_computer {
+namespace iqds::rules::quantum_computer {
 	using namespace std::complex_literals;
 
 	namespace utils {
-		void print(iqs::it_t const &iter) {
+		void print(iqds::it_t const &iter) {
 			for (auto oid = 0; oid < iter.num_object; ++oid) {
 				size_t size;
 				mag_t mag;
@@ -27,7 +27,7 @@ namespace iqs::rules::quantum_computer {
 		};
 	}
 
-	class hadamard : public iqs::rule {
+	class hadamard : public iqds::rule {
 		size_t bit;
 
 	public:
