@@ -52,10 +52,10 @@ namespace quids {
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
-	#ifdef NOT_SIMPLE_TRUNCATION
-		bool simple_truncation = false;
-	#else
+	#ifdef SIMPLE_TRUNCATION
 		bool simple_truncation = true;
+	#else
+		bool simple_truncation = false;
 	#endif
 
 	/* forward typedef */

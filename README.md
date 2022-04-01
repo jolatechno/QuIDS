@@ -305,10 +305,10 @@ namespace quids {
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
-	#ifdef NOT_SIMPLE_TRUNCATION
-		bool simple_truncation = false;
-	#else
+	#ifdef SIMPLE_TRUNCATION
 		bool simple_truncation = true;
+	#else
+		bool simple_truncation = false;
 	#endif
 
 	namespace mpi {
@@ -354,7 +354,9 @@ The default value of any of those variable can be altered at compilation, by pas
 
 #### simple truncation
 
-`simple_truncation` is a `bool` variable (default is `false`, but can be set to `true` by compilling with the `SIMPLE_TRUNCATION` flag). Is `simple_truncation` is `true`, then truncation simply consist in selecting the n highest probability objects. Otherwise object are selected with some probabilistic aspect, with the probability of keeping an object being proportional to the probability of each object.
+`simple_truncation` is a `bool` variable (default is `false`, but can be set to `true` by compilling with the `SIMPLE_TRUNCATION` flag). If `simple_truncation` is `true`, then truncation simply consist in selecting the n highest probability objects. Otherwise object are selected with some probabilistic aspect, with the probability of keeping an object being proportional to the probability of each object.
+
+Probabilistic selctions cost a bit of time and of accuracy, with some gain in representation through an analog sampling process to a quantum Monte-Carlo algorithm.
 
 #### load balancing bucket per thread
 
