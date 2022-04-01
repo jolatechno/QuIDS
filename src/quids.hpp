@@ -481,7 +481,7 @@ namespace quids {
 
 				#pragma omp for
 				for (size_t oid = 0; oid < num_object; ++oid)
-					random_selector[oid] = -std::log(1 - rng()) / std::norm(magnitude[oid]);
+					random_selector[oid] = rng() / std::norm(magnitude[oid]); //-std::log(1 - rng()) / std::norm(magnitude[oid]);
 			}
 	}
 
@@ -713,7 +713,7 @@ namespace quids {
 				#pragma omp for
 				for (size_t i = 0; i < num_object_after_interferences; ++i) {
 					size_t oid = next_oid[i];
-					random_selector[oid] = -std::log(1 - rng()) / std::norm(magnitude[oid]);
+					random_selector[oid] = rng() / std::norm(magnitude[oid]); //-std::log(1 - rng()) / std::norm(magnitude[oid]);
 				}
 			}
 	}
