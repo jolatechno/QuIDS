@@ -305,10 +305,10 @@ namespace quids {
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
-	#ifdef SIMPLE_TRUNCATION
-		bool simple_truncation = true;
-	#else
+	#ifdef NOT_SIMPLE_TRUNCATION
 		bool simple_truncation = false;
+	#else
+		bool simple_truncation = true;
 	#endif
 
 	namespace mpi {

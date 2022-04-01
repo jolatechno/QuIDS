@@ -52,10 +52,10 @@ namespace quids {
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
-	#ifdef SIMPLE_TRUNCATION
-		bool simple_truncation = true;
-	#else
+	#ifdef NOT_SIMPLE_TRUNCATION
 		bool simple_truncation = false;
+	#else
+		bool simple_truncation = true;
 	#endif
 
 	/* forward typedef */
@@ -474,16 +474,15 @@ namespace quids {
 		prepare pre_truncate
 		 !!!!!!!!!!!!!!!! */
 
-		if (!simple_truncation) {
+		if (!simple_truncation)
 			#pragma omp parallel
 			{
 				utils::random_generator rng;
 
 				#pragma omp for
 				for (size_t oid = 0; oid < num_object; ++oid)
-					random_selector[oid] = std::log( -std::log(1 - rng()) / std::norm(magnitude[oid]));
+					random_selector[oid] = -std::log(1 - rng()) / std::norm(magnitude[oid]);
 			}
-		}
 	}
 
 	/*
@@ -508,7 +507,7 @@ namespace quids {
 			/* truncation */
 			__gnu_parallel::nth_element(begin, middle, end,
 			[&](size_t const &oid1, size_t const &oid2) {
-				return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
+				return std::norm(magnitude[oid1]) > std::norm(magnitude[oid2]);
 			});
 		} else
 			/* select graphs according to random selectors */
@@ -714,7 +713,7 @@ namespace quids {
 				#pragma omp for
 				for (size_t i = 0; i < num_object_after_interferences; ++i) {
 					size_t oid = next_oid[i];
-					random_selector[oid] = std::log( -std::log(1 - rng()) / std::norm(magnitude[oid]));
+					random_selector[oid] = -std::log(1 - rng()) / std::norm(magnitude[oid]);
 				}
 			}
 	}
@@ -757,7 +756,7 @@ namespace quids {
 			/* truncation */
 			__gnu_parallel::nth_element(begin, middle, end,
 			[&](size_t const &oid1, size_t const &oid2) {
-				return std::norm(magnitude[oid1]) < std::norm(magnitude[oid2]);
+				return std::norm(magnitude[oid1]) > std::norm(magnitude[oid2]);
 			});
 		} else {
 			/* select graphs according to random selectors */
