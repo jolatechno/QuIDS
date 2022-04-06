@@ -1,4 +1,4 @@
-# Quantum Irregular Dynamic Simulator 
+# [QuIDS](https://github.com/jolatechno/QuIDS): Quantum Irregular Dynamic Simulator 
 
 ## Installation
 
