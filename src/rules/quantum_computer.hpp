@@ -1,3 +1,4 @@
+//! @cond
 #include <iostream>
 
 #include "../quids.hpp"

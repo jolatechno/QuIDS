@@ -1,3 +1,4 @@
+//! @cond
 #include "../src/quids.hpp"
 #include "../src/rules/quantum_computer.hpp"
 

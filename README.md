@@ -17,17 +17,17 @@ The code is documented using `doxygen`. Documentation is present (html format) i
 ### file examples
 
 #### dynamics
-Some rules that can be used directly, or understood as examples are implemented in [src/rules](./src/rules).
+Some rules that can be used directly, or understood as examples are implemented in [src/rules](./src/rules) (see [Files](./files.html)/src/rules if you are using docs).
 
-[src/rules/qcgd.hpp](./src/rules/qcgd.hpp) is the implementation of Quantum Causal Graph Dynamics (QCGDs) used in [jolatechno/Quantum-graph-simulation](https://github.com/jolatechno/Quantum-graph-simulation). It _is not meant to be readable_, and is only used as a repeatable, complex performance demonstrator and research tool for the field of QCGDs.
+[src/rules/qcgd.hpp](./src/rules/qcgd.hpp) (see [Files](./files.html)/src/rules/qcgd.hpp if you are using docs) is the implementation of Quantum Causal Graph Dynamics (QCGDs) used in [jolatechno/Quantum-graph-simulation](https://github.com/jolatechno/Quantum-graph-simulation). It _is not meant to be readable_, and is only used as a repeatable, complex performance demonstrator and research tool for the field of QCGDs.
 
-At the contrary, [src/rules/quantum_computer.hpp](./src/rules/quantum_computer.hpp) is a simpler _understandable_ example of multiple modifier, and of a dynamic (the hadamard gate).
+At the contrary, [src/rules/quantum_computer.hpp](./src/rules/quantum_computer.hpp) (see [Files](./files.html)/src/rules/quantum_computer.hpp if you are using docs) is a simpler _understandable_ example of multiple modifier, and of a dynamic (the hadamard gate).
 
 #### usage example
 
-[examples/quantum_computer_test.cpp](examples/quantum_computer_test.cpp) is a simple `OPENMP`-only example.
+[examples/quantum_computer_test.cpp](./examples/quantum_computer_test.cpp) (see [Files](./files.html)/examples/quantum_computer_test.cpp if you are using docs) is a simple `OPENMP`-only example.
 
-Similarly, [examples/mpi_test.cpp](examples/mpi_test.cpp) is a simple `MPI`/`OPENMP` hybrid example, demonstrating how to port a `OPENMP`-only implementation to `MPI`, and demonstrating some `MPI`-specific functions.
+Similarly, [examples/mpi_test.cpp](./examples/mpi_test.cpp) (see [Files](./files.html)/examples/mpi_test.cpp if you are using docs) is a simple `MPI`/`OPENMP` hybrid example, demonstrating how to port a `OPENMP`-only implementation to `MPI`, and demonstrating some `MPI`-specific functions.
 
 ### description
 

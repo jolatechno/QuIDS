@@ -1,3 +1,4 @@
+//! @cond
 #include <string>
 #include <ctime>
 #include <iostream>
