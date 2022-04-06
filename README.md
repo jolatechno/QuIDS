@@ -10,10 +10,26 @@ The only requirement is to have at least `c++2a`. Parallelism is implemented usi
 
 ## Documentation
 
-The code is documented using `doxygen`. Documentation is present in [docs/](./docs/) and is also hosted at [jolatechno.github.io/QuIDS/](https://jolatechno.github.io/QuIDS/).
+The code is documented using `doxygen`. Documentation is present (html format) in [docs/](./docs/) and is also hosted at [jolatechno.github.io/QuIDS/](https://jolatechno.github.io/QuIDS/).
 
 ## Usage
+
+### file examples
+
+#### dynamics
 Some rules that can be used directly, or understood as examples are implemented in [src/rules](./src/rules).
+
+[src/rules/qcgd.hpp](./src/rules/qcgd.hpp) is the implementation of Quantum Causal Graph Dynamics (QCGDs) used in [jolatechno/Quantum-graph-simulation](https://github.com/jolatechno/Quantum-graph-simulation). It _is not meant to be readable_, and is only used as a repeatable, complex performance demonstrator and research tool for the field of QCGDs.
+
+At the contrary, [src/rules/quantum_computer.hpp](./src/rules/quantum_computer.hpp) is a simpler _understandable_ example of multiple modifier, and of a dynamic (the hadamard gate).
+
+#### usage example
+
+[examples/quantum_computer_test.cpp](examples/quantum_computer_test.cpp) is a simple `OPENMP`-only example.
+
+Similarly, [examples/mpi_test.cpp](examples/mpi_test.cpp) is a simple `MPI`/`OPENMP` hybrid example, demonstrating how to port a `OPENMP`-only implementation to `MPI`, and demonstrating some `MPI`-specific functions.
+
+### description
 
 Objects are represented by a simple begin and end pointer. Their exist two kind of interfaces for implementing a unitary transformation.
 

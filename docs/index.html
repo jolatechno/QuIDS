@@ -74,10 +74,22 @@ Requirements</h2>
 <p >The only requirement is to have at least <code>c++2a</code>. Parallelism is implemented using <code>OpenMP</code>, although the pure <code>MPI</code> implementation is more efficient right now.</p>
 <h1><a class="anchor" id="autotoc_md3"></a>
 Documentation</h1>
-<p >The code is documented using <code>doxygen</code>. Documentation is present in <a href="./docs/">docs/</a> and is also hosted at <a href="https://jolatechno.github.io/QuIDS/">jolatechno.github.io/QuIDS/</a>.</p>
+<p >The code is documented using <code>doxygen</code>. Documentation is present (html format) in <a href="./docs/">docs/</a> and is also hosted at <a href="https://jolatechno.github.io/QuIDS/">jolatechno.github.io/QuIDS/</a>.</p>
 <h1><a class="anchor" id="autotoc_md4"></a>
 Usage</h1>
+<h2><a class="anchor" id="autotoc_md5"></a>
+file examples</h2>
+<h3><a class="anchor" id="autotoc_md6"></a>
+dynamics</h3>
 <p >Some rules that can be used directly, or understood as examples are implemented in <a href="./src/rules">src/rules</a>.</p>
+<p ><a href="./src/rules/qcgd.hpp">src/rules/qcgd.hpp</a> is the implementation of Quantum Causal Graph Dynamics (QCGDs) used in <a href="https://github.com/jolatechno/Quantum-graph-simulation">jolatechno/Quantum-graph-simulation</a>. It <em>is not meant to be readable</em>, and is only used as a repeatable, complex performance demonstrator and research tool for the field of QCGDs.</p>
+<p >At the contrary, <a href="./src/rules/quantum_computer.hpp">src/rules/quantum_computer.hpp</a> is a simpler <em>understandable</em> example of multiple modifier, and of a dynamic (the hadamard gate).</p>
+<h3><a class="anchor" id="autotoc_md7"></a>
+usage example</h3>
+<p ><a href="examples/quantum_computer_test.cpp">examples/quantum_computer_test.cpp</a> is a simple <code>OPENMP</code>-only example.</p>
+<p >Similarly, <a href="examples/mpi_test.cpp">examples/mpi_test.cpp</a> is a simple <code>MPI</code>/<code>OPENMP</code> hybrid example, demonstrating how to port a <code>OPENMP</code>-only implementation to <code>MPI</code>, and demonstrating some <code>MPI</code>-specific functions.</p>
+<h2><a class="anchor" id="autotoc_md8"></a>
+description</h2>
 <p >Objects are represented by a simple begin and end pointer. Their exist two kind of interfaces for implementing a unitary transformation.</p>
 <p ><code>modifiers</code> and <code>rules</code> are applied using the <code>quids::simulate(...)</code> function:</p>
 <div class="fragment"><div class="line"><span class="preprocessor">#include &quot;src/quids.hpp&quot;</span></div>
@@ -106,7 +118,7 @@ Usage</h1>
 <div class="ttc" id="anamespacequids_html_a2f3cfcb2f4d55d58993493426aafb2fe"><div class="ttname"><a href="namespacequids.html#a2f3cfcb2f4d55d58993493426aafb2fe">quids::sy_it_t</a></div><div class="ttdeci">class symbolic_iteration sy_it_t</div><div class="ttdoc">symbolic iteration type</div><div class="ttdef"><b>Definition:</b> quids.hpp:67</div></div>
 <div class="ttc" id="anamespacequids_html_a60a676728450b703f98f219a0ee7e5f2"><div class="ttname"><a href="namespacequids.html#a60a676728450b703f98f219a0ee7e5f2">quids::it_t</a></div><div class="ttdeci">class iteration it_t</div><div class="ttdoc">iteration class type</div><div class="ttdef"><b>Definition:</b> quids.hpp:65</div></div>
 <div class="ttc" id="anamespacequids_html_a62455c8f5240a575676aace3a25dfae3"><div class="ttname"><a href="namespacequids.html#a62455c8f5240a575676aace3a25dfae3">quids::rule_t</a></div><div class="ttdeci">class rule rule_t</div><div class="ttdoc">dynamic (or rule) type</div><div class="ttdef"><b>Definition:</b> quids.hpp:69</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md5"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md9"></a>
 MPI support</h2>
 <p >Simulations can also be done across nodes. For that, you'll need to replace <code>quids::sy_it</code> and <code><a class="el" href="namespacequids.html#a60a676728450b703f98f219a0ee7e5f2" title="iteration class type">quids::it_t</a></code> respectivly by <code>quids::mpi::mpi_sy_it</code> and <code><a class="el" href="namespacequids_1_1mpi.html#a35f6cb8275fdb46ab6042a3e4bd799ba" title="mpi iteration type">quids::mpi::mpi_it_t</a></code>.</p>
 <div class="fragment"><div class="line"><span class="preprocessor">#include &quot;src/quids_mpi.hpp&quot;</span></div>
@@ -144,13 +156,13 @@ MPI support</h2>
 <div class="ttc" id="anamespacequids_1_1mpi_html_a35f6cb8275fdb46ab6042a3e4bd799ba"><div class="ttname"><a href="namespacequids_1_1mpi.html#a35f6cb8275fdb46ab6042a3e4bd799ba">quids::mpi::mpi_it_t</a></div><div class="ttdeci">class mpi_iteration mpi_it_t</div><div class="ttdoc">mpi iteration type</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:29</div></div>
 <div class="ttc" id="anamespacequids_1_1mpi_html_a3e3b2dbb59ff2b0f9b997fb9bf196cc8"><div class="ttname"><a href="namespacequids_1_1mpi.html#a3e3b2dbb59ff2b0f9b997fb9bf196cc8">quids::mpi::mpi_sy_it_t</a></div><div class="ttdeci">class mpi_symbolic_iteration mpi_sy_it_t</div><div class="ttdoc">mpi symbolic iteration type</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:31</div></div>
 <div class="ttc" id="anamespacequids_1_1mpi_html_ab589d2622e28bfe6e3522a103c841450"><div class="ttname"><a href="namespacequids_1_1mpi.html#ab589d2622e28bfe6e3522a103c841450">quids::mpi::simulate</a></div><div class="ttdeci">void simulate(mpi_it_t &amp;iteration, quids::rule_t const *rule, mpi_it_t &amp;next_iteration, mpi_sy_it_t &amp;symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, quids::debug_t mid_step_function=[](const char *){})</div><div class="ttdoc">function to apply a dynamic to a wave function distributed accross multiple nodes</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:389</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md6"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md10"></a>
 Modifiers</h2>
 <p >A <code>modifier</code> is a simple functions that takes a objects, and modify it in place, while keep its size unchanged.</p>
 <div class="fragment"><div class="line"><span class="keywordtype">void</span> my_modifier(<span class="keywordtype">char</span> *parent_begin, <span class="keywordtype">char</span> *parent_end, std::complex&lt;PROBA_TYPE&gt; &amp;mag) {</div>
 <div class="line">    <span class="comment">// modify the object...</span></div>
 <div class="line">}</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md7"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md11"></a>
 Rules</h2>
 <p >A <code>rule</code> is a simple class, implementing 2 functions (with a third being optional).</p>
 <div class="fragment"><div class="line"><span class="keyword">class </span>my_rule : <span class="keyword">public</span> <a class="code hl_typedef" href="namespacequids.html#a62455c8f5240a575676aace3a25dfae3">quids::rule_t</a> {</div>
@@ -200,10 +212,10 @@ Rules</h2>
 <div class="line">    <span class="keywordflow">return</span> std::hash&lt;std::string_view&gt;()(</div>
 <div class="line">        std::string_view(parent_begin, std::distance(parent_begin, parent_end)));</div>
 <div class="line">}</div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md8"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md12"></a>
 Interaction with the different classes</h2>
 <p >We can see that a quantum state is represented by a specific <code>iteration</code> class, and a <code>symbolic_iteration</code> is generated when applying a unitary transformation on a state. We interact with those classes (modify or read a state, ect...) through public member functions and variables, which will be shortly documented bellow, as they are vital to building a <b>usefull</b> program using <code>QuIDS</code>.</p>
-<h3><a class="anchor" id="autotoc_md9"></a>
+<h3><a class="anchor" id="autotoc_md13"></a>
 Symbolic iteration</h3>
 <div class="fragment"><div class="line"><span class="keyword">typedef</span> <span class="keyword">class </span>symbolic_iteration <a class="code hl_typedef" href="namespacequids.html#a2f3cfcb2f4d55d58993493426aafb2fe">sy_it_t</a>;</div>
 <div class="line"> </div>
@@ -222,7 +234,7 @@ Symbolic iteration</h3>
 <li><code>num_object</code> : Number of objects generated at symbolic iteration (before interferences and truncation).</li>
 <li><code>num_object_after_interferences</code> : Number of objects after eliminating duplicates (so called "interferences"), but before truncation.</li>
 </ul>
-<h3><a class="anchor" id="autotoc_md10"></a>
+<h3><a class="anchor" id="autotoc_md14"></a>
 Iteration</h3>
 <div class="fragment"><div class="line"><span class="keyword">typedef</span> <span class="keyword">class </span>iteration <a class="code hl_typedef" href="namespacequids.html#a60a676728450b703f98f219a0ee7e5f2">it_t</a>;</div>
 <div class="line"> </div>
@@ -256,7 +268,7 @@ Iteration</h3>
 <li><code>num_object</code> : Number of object describing this state currently in superposition.</li>
 <li><code>total_proba</code> : total probability held by this state before normalizing it (so after truncation).</li>
 </ul>
-<h3><a class="anchor" id="autotoc_md11"></a>
+<h3><a class="anchor" id="autotoc_md15"></a>
 MPI symbolic iteration</h3>
 <div class="fragment"><div class="line"><span class="keyword">typedef</span> <span class="keyword">class </span>mpi_symbolic_iteration <a class="code hl_typedef" href="namespacequids_1_1mpi.html#a3e3b2dbb59ff2b0f9b997fb9bf196cc8">mpi_sy_it_t</a>;</div>
 <div class="line"> </div>
@@ -275,7 +287,7 @@ MPI symbolic iteration</h3>
 <li><code>get_total_num_object(...)</code> : Get the total number of object at symbolic iteration accross all nodes.</li>
 <li><code>get_total_num_object_after_interferences(...)</code> : Get the total number of object at symbolic iteration, after interferences but before truncation, accross all nodes.</li>
 </ul>
-<h3><a class="anchor" id="autotoc_md12"></a>
+<h3><a class="anchor" id="autotoc_md16"></a>
 MPI iteration</h3>
 <div class="fragment"><div class="line"><span class="keyword">typedef</span> <span class="keyword">class </span>mpi_iteration <a class="code hl_typedef" href="namespacequids_1_1mpi.html#a35f6cb8275fdb46ab6042a3e4bd799ba">mpi_it_t</a>;</div>
 <div class="line"> </div>
@@ -313,7 +325,7 @@ MPI iteration</h3>
 <li><code>average_value(...)</code> : equiavlent to the normal <code>iteration</code> member function, but for the whole distributed wave function (<b>note that calling</b> <code>average_value(...)</code> <b>without an</b> <code>MPI_Comm</code> <b>will return a local average value for retrocompatibility with the basic</b> <code>iteration</code> <b>class</b>).</li>
 </ul>
 <p ><code>node_total_proba</code> is the only additional member variable, and is the proportion of total probability that is held by a given node.</p>
-<h2><a class="anchor" id="autotoc_md13"></a>
+<h2><a class="anchor" id="autotoc_md17"></a>
 Global parameters and pre-processor flags</h2>
 <p >In addition to classes, some global parameters are used to modify the behaviour of the simulation.</p>
 <div class="fragment"><div class="line"><span class="preprocessor">#ifndef PROBA_TYPE</span></div>
@@ -361,47 +373,47 @@ Global parameters and pre-processor flags</h2>
 <div class="ttc" id="anamespacequids_html_acf286be928cefbb5ad9e672e1999de1b"><div class="ttname"><a href="namespacequids.html#acf286be928cefbb5ad9e672e1999de1b">quids::safety_margin</a></div><div class="ttdeci">float safety_margin</div><div class="ttdoc">memory safety margin (0.2 = 80% memory usage target)</div><div class="ttdef"><b>Definition:</b> quids.hpp:51</div></div>
 <div class="ttc" id="anamespacequids_html_ae6148553f287fa7c670cc8d0a729fe8d"><div class="ttname"><a href="namespacequids.html#ae6148553f287fa7c670cc8d0a729fe8d">quids::tolerance</a></div><div class="ttdeci">PROBA_TYPE tolerance</div><div class="ttdoc">tolerance for objects (remove objects with a smaller probability)</div><div class="ttdef"><b>Definition:</b> quids.hpp:49</div></div>
 <div class="ttc" id="anamespacequids_html_af08ec7fda63cfb6d458ad3bb10b31e4d"><div class="ttname"><a href="namespacequids.html#af08ec7fda63cfb6d458ad3bb10b31e4d">quids::simple_truncation</a></div><div class="ttdeci">bool simple_truncation</div><div class="ttdoc">simple truncation toggle - disable probabilistic truncation, increasing &quot;accuracy&quot; but reducing the r...</div><div class="ttdef"><b>Definition:</b> quids.hpp:59</div></div>
-</div><!-- fragment --><h2><a class="anchor" id="autotoc_md14"></a>
+</div><!-- fragment --><h2><a class="anchor" id="autotoc_md18"></a>
 Pre-processor flags</h2>
-<h3><a class="anchor" id="autotoc_md15"></a>
+<h3><a class="anchor" id="autotoc_md19"></a>
 proba. type</h3>
 <p >The <code>PROBA_TYPE</code> flag is used to change the type used to represent probabilities and magnitude in the program. The default is <code>double</code> for a high enough precision, but other float type could be used to either get more precision or less memory/execution time cost.</p>
-<h3><a class="anchor" id="autotoc_md16"></a>
+<h3><a class="anchor" id="autotoc_md20"></a>
 hash map overhead</h3>
 <p >The <code>HASH_MAP_OVERHEAD</code> flag represent the overhead per element of the hashmap (of type <code>robin_hood::unordered_map</code>, default is set to <code>1.7</code> which has been determined through experiments).</p>
-<h2><a class="anchor" id="autotoc_md17"></a>
+<h2><a class="anchor" id="autotoc_md21"></a>
 Global variables</h2>
 <p >The default value of any of those variable can be altered at compilation, by passing an uppercase flag with the same name as the desired variable.</p>
-<h3><a class="anchor" id="autotoc_md18"></a>
+<h3><a class="anchor" id="autotoc_md22"></a>
 tolerance</h3>
 <p ><code>tolerance</code> represents the minimum probability considered non-zero (default is <code>1e-30</code>, to compensate for numerical errors).</p>
-<h3><a class="anchor" id="autotoc_md19"></a>
+<h3><a class="anchor" id="autotoc_md23"></a>
 safety margin</h3>
 <p ><code>safety_margin</code> represents the target proportion of memory to keep free (default is <code>0.1</code> for 10%).</p>
-<h3><a class="anchor" id="autotoc_md20"></a>
+<h3><a class="anchor" id="autotoc_md24"></a>
 simple truncation</h3>
 <p ><code>simple_truncation</code> is a <code>bool</code> variable (default is <code>false</code>, but can be set to <code>true</code> by compilling with the <code>SIMPLE_TRUNCATION</code> flag). If <code>simple_truncation</code> is <code>true</code>, then truncation simply consist in selecting the n highest probability objects. Otherwise object are selected with some probabilistic aspect, with the probability of keeping an object being proportional to the probability of each object.</p>
 <p >Probabilistic selctions cost a bit of time and of accuracy, with some gain in representation through an analog sampling process to a quantum Monte-Carlo algorithm.</p>
-<h3><a class="anchor" id="autotoc_md21"></a>
+<h3><a class="anchor" id="autotoc_md25"></a>
 load balancing bucket per thread</h3>
 <p ><code>load_balancing_bucket_per_thread</code> represent the number of partition par thread (or MPI node), which allows load balancing by then having a variable number of partition per thread according to each partition's size.</p>
 <p ><code>load_balancing_bucket_per_thread</code> has a default of <code>8</code>.</p>
-<h2><a class="anchor" id="autotoc_md22"></a>
+<h2><a class="anchor" id="autotoc_md26"></a>
 MPI global variables</h2>
-<h3><a class="anchor" id="autotoc_md23"></a>
+<h3><a class="anchor" id="autotoc_md27"></a>
 minimum equalize size and equalize imbalance.</h3>
 <p ><code>mpi::min_equalize_size</code> represents the minimum per node average size required to automaticly call <code>equalize(...)</code> after a call to <code>quids::mpi::simulate(...)</code>.</p>
 <p >If this first condition is met, <code>equalize(...)</code> if the maximum relative imbalance in the number of object accross the nodes is greater than <code>mpi::equalize_imablance</code>.</p>
 <p ><code>mpi::min_equalize_size</code> is equal to <code>1000</code> by default, and <code>mpi::equalize_imablance</code> has a default of <code>0.2</code>.</p>
-<h2><a class="anchor" id="autotoc_md24"></a>
+<h2><a class="anchor" id="autotoc_md28"></a>
 Utils global variables</h2>
-<h3><a class="anchor" id="autotoc_md25"></a>
+<h3><a class="anchor" id="autotoc_md29"></a>
 min vector size</h3>
 <p ><code>utils::min_vector_size</code> represent the minimum size of any vector (the default is <code>100000</code>).</p>
-<h3><a class="anchor" id="autotoc_md26"></a>
+<h3><a class="anchor" id="autotoc_md30"></a>
 upsize policy</h3>
 <p ><code>utils::upsize_policy</code> represent the multiplier applied when upsizing a vector (the default is <code>1.1</code>). It avoid frequent upsizing by giving a small margin.</p>
-<h3><a class="anchor" id="autotoc_md27"></a>
+<h3><a class="anchor" id="autotoc_md31"></a>
 downsize policy</h3>
 <p ><code>utils::downsize_policy</code> reprensent the threshold multiplier to downsize a vector (the default is <code>0.85</code>). A vector won't be downsized until the requested size is smaller than this ultiplier times the capacity of the given vector.</p>
 <p ><b>!! this multiplier should always be smaller than the inverse of upsize_policy to avoid upsizing-downsizing loop !!</b> </p>
