@@ -14,4 +14,4 @@
 # paths will be considered relative to the root of the repository, not the
 # location of the DOXYFILE.
 
-DOXYFILE = doc/doxygen.conf
+DOXYFILE = doxygen.conf

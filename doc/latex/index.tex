@@ -1,8 +1,9 @@
-\label{index_md__home_joseph_Documents_projets_programing_cpp_Quantum_graph_simulation_src_QuIDS_README}%
-\Hypertarget{index_md__home_joseph_Documents_projets_programing_cpp_Quantum_graph_simulation_src_QuIDS_README}%
+\label{index_md_README}%
+\Hypertarget{index_md_README}%
  \hypertarget{index_autotoc_md1}{}\doxysection{Installation}\label{index_autotoc_md1}
 This library is header-\/only, so you can simply link files in \href{./src}{\texttt{ src}}.\hypertarget{index_autotoc_md2}{}\doxysubsection{Requirements}\label{index_autotoc_md2}
-The only requirement is to have at least {\ttfamily c++2a}. Parallelism is implemented using {\ttfamily Open\+MP}, although the pure {\ttfamily MPI} implementation is more efficient right now.\hypertarget{index_autotoc_md3}{}\doxysection{Usage}\label{index_autotoc_md3}
+The only requirement is to have at least {\ttfamily c++2a}. Parallelism is implemented using {\ttfamily Open\+MP}, although the pure {\ttfamily MPI} implementation is more efficient right now.\hypertarget{index_autotoc_md3}{}\doxysection{Documentation}\label{index_autotoc_md3}
+The code is documented using {\ttfamily doxygen}. Documentation is present at \href{./doc/}{\texttt{ doc/}} and is also hosted at \href{https://codedocs.xyz/jolatechno/QuIDS}{\texttt{ codedocs.\+xyz/jolatechno/\+Qu\+IDS}}.\hypertarget{index_autotoc_md4}{}\doxysection{Usage}\label{index_autotoc_md4}
 Some rules that can be used directly, or understood as examples are implemented in \href{./src/rules}{\texttt{ src/rules}}.
 
 Objects are represented by a simple begin and end pointer. Their exist two kind of interfaces for implementing a unitary transformation.
@@ -35,7 +36,7 @@ Objects are represented by a simple begin and end pointer. Their exist two kind 
 \DoxyCodeLine{\}}
 
 \end{DoxyCode}
-\hypertarget{index_autotoc_md4}{}\doxysubsection{MPI support}\label{index_autotoc_md4}
+\hypertarget{index_autotoc_md5}{}\doxysubsection{MPI support}\label{index_autotoc_md5}
 Simulations can also be done across nodes. For that, you\textquotesingle{}ll need to replace {\ttfamily quids\+::sy\+\_\+it} and {\ttfamily \mbox{\hyperlink{namespacequids_a60a676728450b703f98f219a0ee7e5f2}{quids\+::it\+\_\+t}}} respectivly by {\ttfamily quids\+::mpi\+::mpi\+\_\+sy\+\_\+it} and {\ttfamily \mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{quids\+::mpi\+::mpi\+\_\+it\+\_\+t}}}.
 
 
@@ -45,8 +46,8 @@ Simulations can also be done across nodes. For that, you\textquotesingle{}ll nee
 \DoxyCodeLine{\textcolor{keywordtype}{int} main(\textcolor{keywordtype}{int} argc, \textcolor{keywordtype}{char}* argv[]) \{}
 \DoxyCodeLine{    \textcolor{comment}{/* MPI initialization */}}
 \DoxyCodeLine{    \textcolor{keywordtype}{int} size, rank, provided;}
-\DoxyCodeLine{    MPI\_Init\_thread(\&argc, \&argv, MPI\_THREAD\_MULTIPLE, \&provided);}
-\DoxyCodeLine{    \textcolor{keywordflow}{if}(provided < MPI\_THREAD\_MULTIPLE) \{}
+\DoxyCodeLine{    MPI\_Init\_thread(\&argc, \&argv, MPI\_THREAD\_SERIALIZED, \&provided);}
+\DoxyCodeLine{    \textcolor{keywordflow}{if}(provided < MPI\_THREAD\_SERIALIZED) \{}
 \DoxyCodeLine{        printf(\textcolor{stringliteral}{"{}The threading support level is lesser than that demanded.\(\backslash\)n"{}});}
 \DoxyCodeLine{        MPI\_Abort(MPI\_COMM\_WORLD, EXIT\_FAILURE);}
 \DoxyCodeLine{    \}}
@@ -74,7 +75,7 @@ Simulations can also be done across nodes. For that, you\textquotesingle{}ll nee
 \DoxyCodeLine{\}}
 
 \end{DoxyCode}
-\hypertarget{index_autotoc_md5}{}\doxysubsection{Modifiers}\label{index_autotoc_md5}
+\hypertarget{index_autotoc_md6}{}\doxysubsection{Modifiers}\label{index_autotoc_md6}
 A {\ttfamily modifier} is a simple functions that takes a objects, and modify it in place, while keep its size unchanged.
 
 
@@ -84,7 +85,7 @@ A {\ttfamily modifier} is a simple functions that takes a objects, and modify it
 \DoxyCodeLine{\}}
 
 \end{DoxyCode}
-\hypertarget{index_autotoc_md6}{}\doxysubsection{Rules}\label{index_autotoc_md6}
+\hypertarget{index_autotoc_md7}{}\doxysubsection{Rules}\label{index_autotoc_md7}
 A {\ttfamily rule} is a simple class, implementing 2 functions (with a third being optional).
 
 
@@ -166,8 +167,8 @@ The last function is a hasher for objects. If not specified, the whole memory bu
 \DoxyCodeLine{\}}
 
 \end{DoxyCode}
-\hypertarget{index_autotoc_md7}{}\doxysubsection{Interaction with the different classes}\label{index_autotoc_md7}
-We can see that a quantum state is represented by a specific {\ttfamily iteration} class, and a {\ttfamily symbolic\+\_\+iteration} is generated when applying a unitary transformation on a state. We interact with those classes (modify or read a state, ect...) through public member functions and variables, which will be shortly documented bellow, as they are vital to building a {\bfseries{usefull}} program using {\ttfamily Qu\+IDS}.\hypertarget{index_autotoc_md8}{}\doxysubsubsection{Symbolic iteration}\label{index_autotoc_md8}
+\hypertarget{index_autotoc_md8}{}\doxysubsection{Interaction with the different classes}\label{index_autotoc_md8}
+We can see that a quantum state is represented by a specific {\ttfamily iteration} class, and a {\ttfamily symbolic\+\_\+iteration} is generated when applying a unitary transformation on a state. We interact with those classes (modify or read a state, ect...) through public member functions and variables, which will be shortly documented bellow, as they are vital to building a {\bfseries{usefull}} program using {\ttfamily Qu\+IDS}.\hypertarget{index_autotoc_md9}{}\doxysubsubsection{Symbolic iteration}\label{index_autotoc_md9}
 
 \begin{DoxyCode}{0}
 \DoxyCodeLine{\textcolor{keyword}{typedef} \textcolor{keyword}{class }symbolic\_iteration \mbox{\hyperlink{namespacequids_a2f3cfcb2f4d55d58993493426aafb2fe}{sy\_it\_t}};}
@@ -192,7 +193,7 @@ Member variables are\+:
 \begin{DoxyItemize}
 \item {\ttfamily num\+\_\+object} \+: Number of objects generated at symbolic iteration (before interferences and truncation).
 \item {\ttfamily num\+\_\+object\+\_\+after\+\_\+interferences} \+: Number of objects after eliminating duplicates (so called \char`\"{}interferences\char`\"{}), but before truncation.
-\end{DoxyItemize}\hypertarget{index_autotoc_md9}{}\doxysubsubsection{Iteration}\label{index_autotoc_md9}
+\end{DoxyItemize}\hypertarget{index_autotoc_md10}{}\doxysubsubsection{Iteration}\label{index_autotoc_md10}
 
 \begin{DoxyCode}{0}
 \DoxyCodeLine{\textcolor{keyword}{typedef} \textcolor{keyword}{class }iteration \mbox{\hyperlink{namespacequids_a60a676728450b703f98f219a0ee7e5f2}{it\_t}};}
@@ -234,7 +235,7 @@ Member variables are\+:
 \begin{DoxyItemize}
 \item {\ttfamily num\+\_\+object} \+: Number of object describing this state currently in superposition.
 \item {\ttfamily total\+\_\+proba} \+: total probability held by this state before normalizing it (so after truncation).
-\end{DoxyItemize}\hypertarget{index_autotoc_md10}{}\doxysubsubsection{MPI symbolic iteration}\label{index_autotoc_md10}
+\end{DoxyItemize}\hypertarget{index_autotoc_md11}{}\doxysubsubsection{MPI symbolic iteration}\label{index_autotoc_md11}
 
 \begin{DoxyCode}{0}
 \DoxyCodeLine{\textcolor{keyword}{typedef} \textcolor{keyword}{class }mpi\_symbolic\_iteration \mbox{\hyperlink{namespacequids_1_1mpi_a3e3b2dbb59ff2b0f9b997fb9bf196cc8}{mpi\_sy\_it\_t}};}
@@ -258,7 +259,7 @@ The two added member functions are\+:
 \begin{DoxyItemize}
 \item {\ttfamily get\+\_\+total\+\_\+num\+\_\+object(...)} \+: Get the total number of object at symbolic iteration accross all nodes.
 \item {\ttfamily get\+\_\+total\+\_\+num\+\_\+object\+\_\+after\+\_\+interferences(...)} \+: Get the total number of object at symbolic iteration, after interferences but before truncation, accross all nodes.
-\end{DoxyItemize}\hypertarget{index_autotoc_md11}{}\doxysubsubsection{MPI iteration}\label{index_autotoc_md11}
+\end{DoxyItemize}\hypertarget{index_autotoc_md12}{}\doxysubsubsection{MPI iteration}\label{index_autotoc_md12}
 
 \begin{DoxyCode}{0}
 \DoxyCodeLine{\textcolor{keyword}{typedef} \textcolor{keyword}{class }mpi\_iteration \mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\_it\_t}};}
@@ -300,7 +301,7 @@ The additional member functions are\+:
 \item {\ttfamily average\+\_\+value(...)} \+: equiavlent to the normal {\ttfamily iteration} member function, but for the whole distributed wave function ({\bfseries{note that calling}} {\ttfamily average\+\_\+value(...)} {\bfseries{without an}} {\ttfamily MPI\+\_\+\+Comm} {\bfseries{will return a local average value for retrocompatibility with the basic}} {\ttfamily iteration} {\bfseries{class}}).
 \end{DoxyItemize}
 
-{\ttfamily node\+\_\+total\+\_\+proba} is the only additional member variable, and is the proportion of total probability that is held by a given node.\hypertarget{index_autotoc_md12}{}\doxysubsection{Global parameters and pre-\/processor flags}\label{index_autotoc_md12}
+{\ttfamily node\+\_\+total\+\_\+proba} is the only additional member variable, and is the proportion of total probability that is held by a given node.\hypertarget{index_autotoc_md13}{}\doxysubsection{Global parameters and pre-\/processor flags}\label{index_autotoc_md13}
 In addition to classes, some global parameters are used to modify the behaviour of the simulation.
 
 
@@ -343,28 +344,28 @@ In addition to classes, some global parameters are used to modify the behaviour 
 \DoxyCodeLine{\}}
 
 \end{DoxyCode}
-\hypertarget{index_autotoc_md13}{}\doxysubsection{Pre-\/processor flags}\label{index_autotoc_md13}
-\hypertarget{index_autotoc_md14}{}\doxysubsubsection{proba. type}\label{index_autotoc_md14}
-The {\ttfamily PROBA\+\_\+\+TYPE} flag is used to change the type used to represent probabilities and magnitude in the program. The default is {\ttfamily double} for a high enough precision, but other float type could be used to either get more precision or less memory/execution time cost.\hypertarget{index_autotoc_md15}{}\doxysubsubsection{hash map overhead}\label{index_autotoc_md15}
-The {\ttfamily HASH\+\_\+\+MAP\+\_\+\+OVERHEAD} flag represent the overhead per element of the hashmap (of type {\ttfamily robin\+\_\+hood\+::unordered\+\_\+map}, default is set to {\ttfamily 1.\+7} which has been determined through experiments).\hypertarget{index_autotoc_md16}{}\doxysubsection{Global variables}\label{index_autotoc_md16}
-The default value of any of those variable can be altered at compilation, by passing an uppercase flag with the same name as the desired variable.\hypertarget{index_autotoc_md17}{}\doxysubsubsection{tolerance}\label{index_autotoc_md17}
-{\ttfamily tolerance} represents the minimum probability considered non-\/zero (default is {\ttfamily 1e-\/30}, to compensate for numerical errors).\hypertarget{index_autotoc_md18}{}\doxysubsubsection{safety margin}\label{index_autotoc_md18}
-{\ttfamily safety\+\_\+margin} represents the target proportion of memory to keep free (default is {\ttfamily 0.\+1} for 10\%).\hypertarget{index_autotoc_md19}{}\doxysubsubsection{simple truncation}\label{index_autotoc_md19}
+\hypertarget{index_autotoc_md14}{}\doxysubsection{Pre-\/processor flags}\label{index_autotoc_md14}
+\hypertarget{index_autotoc_md15}{}\doxysubsubsection{proba. type}\label{index_autotoc_md15}
+The {\ttfamily PROBA\+\_\+\+TYPE} flag is used to change the type used to represent probabilities and magnitude in the program. The default is {\ttfamily double} for a high enough precision, but other float type could be used to either get more precision or less memory/execution time cost.\hypertarget{index_autotoc_md16}{}\doxysubsubsection{hash map overhead}\label{index_autotoc_md16}
+The {\ttfamily HASH\+\_\+\+MAP\+\_\+\+OVERHEAD} flag represent the overhead per element of the hashmap (of type {\ttfamily robin\+\_\+hood\+::unordered\+\_\+map}, default is set to {\ttfamily 1.\+7} which has been determined through experiments).\hypertarget{index_autotoc_md17}{}\doxysubsection{Global variables}\label{index_autotoc_md17}
+The default value of any of those variable can be altered at compilation, by passing an uppercase flag with the same name as the desired variable.\hypertarget{index_autotoc_md18}{}\doxysubsubsection{tolerance}\label{index_autotoc_md18}
+{\ttfamily tolerance} represents the minimum probability considered non-\/zero (default is {\ttfamily 1e-\/30}, to compensate for numerical errors).\hypertarget{index_autotoc_md19}{}\doxysubsubsection{safety margin}\label{index_autotoc_md19}
+{\ttfamily safety\+\_\+margin} represents the target proportion of memory to keep free (default is {\ttfamily 0.\+1} for 10\%).\hypertarget{index_autotoc_md20}{}\doxysubsubsection{simple truncation}\label{index_autotoc_md20}
 {\ttfamily simple\+\_\+truncation} is a {\ttfamily bool} variable (default is {\ttfamily false}, but can be set to {\ttfamily true} by compilling with the {\ttfamily SIMPLE\+\_\+\+TRUNCATION} flag). If {\ttfamily simple\+\_\+truncation} is {\ttfamily true}, then truncation simply consist in selecting the n highest probability objects. Otherwise object are selected with some probabilistic aspect, with the probability of keeping an object being proportional to the probability of each object.
 
-Probabilistic selctions cost a bit of time and of accuracy, with some gain in representation through an analog sampling process to a quantum Monte-\/\+Carlo algorithm.\hypertarget{index_autotoc_md20}{}\doxysubsubsection{load balancing bucket per thread}\label{index_autotoc_md20}
+Probabilistic selctions cost a bit of time and of accuracy, with some gain in representation through an analog sampling process to a quantum Monte-\/\+Carlo algorithm.\hypertarget{index_autotoc_md21}{}\doxysubsubsection{load balancing bucket per thread}\label{index_autotoc_md21}
 {\ttfamily load\+\_\+balancing\+\_\+bucket\+\_\+per\+\_\+thread} represent the number of partition par thread (or MPI node), which allows load balancing by then having a variable number of partition per thread according to each partition\textquotesingle{}s size.
 
-{\ttfamily load\+\_\+balancing\+\_\+bucket\+\_\+per\+\_\+thread} has a default of {\ttfamily 8}.\hypertarget{index_autotoc_md21}{}\doxysubsection{MPI global variables}\label{index_autotoc_md21}
-\hypertarget{index_autotoc_md22}{}\doxysubsubsection{minimum equalize size and equalize imbalance.}\label{index_autotoc_md22}
+{\ttfamily load\+\_\+balancing\+\_\+bucket\+\_\+per\+\_\+thread} has a default of {\ttfamily 8}.\hypertarget{index_autotoc_md22}{}\doxysubsection{MPI global variables}\label{index_autotoc_md22}
+\hypertarget{index_autotoc_md23}{}\doxysubsubsection{minimum equalize size and equalize imbalance.}\label{index_autotoc_md23}
 {\ttfamily mpi\+::min\+\_\+equalize\+\_\+size} represents the minimum per node average size required to automaticly call {\ttfamily equalize(...)} after a call to {\ttfamily quids\+::mpi\+::simulate(...)}.
 
 If this first condition is met, {\ttfamily equalize(...)} if the maximum relative imbalance in the number of object accross the nodes is greater than {\ttfamily mpi\+::equalize\+\_\+imablance}.
 
-{\ttfamily mpi\+::min\+\_\+equalize\+\_\+size} is equal to {\ttfamily 1000} by default, and {\ttfamily mpi\+::equalize\+\_\+imablance} has a default of {\ttfamily 0.\+2}.\hypertarget{index_autotoc_md23}{}\doxysubsection{Utils global variables}\label{index_autotoc_md23}
-\hypertarget{index_autotoc_md24}{}\doxysubsubsection{min vector size}\label{index_autotoc_md24}
-{\ttfamily utils\+::min\+\_\+vector\+\_\+size} represent the minimum size of any vector (the default is {\ttfamily 100000}).\hypertarget{index_autotoc_md25}{}\doxysubsubsection{upsize policy}\label{index_autotoc_md25}
-{\ttfamily utils\+::upsize\+\_\+policy} represent the multiplier applied when upsizing a vector (the default is {\ttfamily 1.\+1}). It avoid frequent upsizing by giving a small margin.\hypertarget{index_autotoc_md26}{}\doxysubsubsection{downsize policy}\label{index_autotoc_md26}
+{\ttfamily mpi\+::min\+\_\+equalize\+\_\+size} is equal to {\ttfamily 1000} by default, and {\ttfamily mpi\+::equalize\+\_\+imablance} has a default of {\ttfamily 0.\+2}.\hypertarget{index_autotoc_md24}{}\doxysubsection{Utils global variables}\label{index_autotoc_md24}
+\hypertarget{index_autotoc_md25}{}\doxysubsubsection{min vector size}\label{index_autotoc_md25}
+{\ttfamily utils\+::min\+\_\+vector\+\_\+size} represent the minimum size of any vector (the default is {\ttfamily 100000}).\hypertarget{index_autotoc_md26}{}\doxysubsubsection{upsize policy}\label{index_autotoc_md26}
+{\ttfamily utils\+::upsize\+\_\+policy} represent the multiplier applied when upsizing a vector (the default is {\ttfamily 1.\+1}). It avoid frequent upsizing by giving a small margin.\hypertarget{index_autotoc_md27}{}\doxysubsubsection{downsize policy}\label{index_autotoc_md27}
 {\ttfamily utils\+::downsize\+\_\+policy} reprensent the threshold multiplier to downsize a vector (the default is {\ttfamily 0.\+85}). A vector won\textquotesingle{}t be downsized until the requested size is smaller than this ultiplier times the capacity of the given vector.
 
 {\bfseries{!! this multiplier should always be smaller than the inverse of upsize\+\_\+policy to avoid upsizing-\/downsizing loop !!}} 
