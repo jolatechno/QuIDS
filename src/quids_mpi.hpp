@@ -4,6 +4,8 @@
 
 #include <mpi.h>
 
+#include "utils/mpi_utils.hpp"
+
 #ifndef MIN_EQUALIZE_SIZE
 	#define MIN_EQUALIZE_SIZE 100
 #endif
@@ -11,85 +13,41 @@
 	#define EQUALIZE_INBALANCE 0.05
 #endif
 
+/// mpi implementation namespace
 namespace quids::mpi {
-	namespace utils {        
-		#include "utils/mpi_utils.hpp"
-	}
-
-	/* mpi auto type */
+	/// mpi datatype corresponding to probabilities.
 	const static MPI_Datatype Proba_MPI_Datatype = utils::get_mpi_datatype((PROBA_TYPE)0);
+	/// mpi datatype corresponding to complex magnitudes.
 	const static MPI_Datatype mag_MPI_Datatype = utils::get_mpi_datatype((std::complex<PROBA_TYPE>)0);
 
-	/* 
-	global variables
-	*/
+	/// minimum number of object that should be attained (in at least one node) before equalizing (load-sharing) bewteen nodes.
 	size_t min_equalize_size = MIN_EQUALIZE_SIZE;
+	/// maximum imbalance between nodes (max_obj - avg_obj)/max_obj allowed before equalizing.
 	float equalize_inbalance = EQUALIZE_INBALANCE;
 
-	/* forward typedef */
+	/// mpi iteration type
 	typedef class mpi_iteration mpi_it_t;
+	/// mpi symbolic iteration type
 	typedef class mpi_symbolic_iteration mpi_sy_it_t;
 
-	/*
-	mpi iteration class
-	*/
+	/// mpi iteration (wave function) class, ineriting from the quids::iteration class
 	class mpi_iteration : public quids::iteration {
-	private:
-		friend mpi_symbolic_iteration;
-		friend void inline simulate(mpi_it_t &iteration, quids::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, quids::debug_t mid_step_function);
-
-		void equalize_symbolic(MPI_Comm communicator);
-		void normalize(MPI_Comm communicator, quids::debug_t mid_step_function=[](const char*){});
-
-
-
-		/*
-		utils functions
-		*/
-		size_t inline get_mem_size(MPI_Comm communicator) const {
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
-
-			size_t total_size, local_size = iteration_memory_size*magnitude.size() + objects.size();
-			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			return total_size;
-		}
-		size_t inline get_total_truncated_num_object(MPI_Comm communicator) const {
-			size_t total_truncated_num_object;
-			MPI_Allreduce(&truncated_num_object, &total_truncated_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			return total_truncated_num_object;
-		}
-
-		/*
-		function to compute the maximum and minimum per node size
-		*/
-		float get_avg_num_symbolic_object_per_task(MPI_Comm communicator) const {
-			size_t total_num_object_per_node = get_num_symbolic_object();
-			MPI_Allreduce(MPI_IN_PLACE, &total_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-
-			int size;
-			MPI_Comm_size(communicator, &size);
-
-			return (float)total_num_object_per_node/size;
-		}
-		size_t get_max_num_symbolic_object_per_task(MPI_Comm communicator) const {
-			size_t max_num_object_per_node = get_num_symbolic_object();
-			MPI_Allreduce(MPI_IN_PLACE, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
-			return max_num_object_per_node;
-		}
-		size_t get_max_num_object_per_task(MPI_Comm communicator) const {
-			size_t max_num_object_per_node;
-			MPI_Allreduce(&num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
-			return max_num_object_per_node;
-		}
-
-
-		size_t get_truncated_mem_size(size_t begin_num_object=0) const;
 	public:
+		/// total probability retained locally after previous truncation (if any).
 		PROBA_TYPE node_total_proba = 0;
 
+		/// simple empty wavefunction constructor.
 		mpi_iteration() {}
+		/// constructor that insert a single object with magnitude 1
+		/**
+		 * @param[in] object_begin_,object_end_ delimitations of the object to insert.
+		 */
 		mpi_iteration(char* object_begin_, char* object_end_) : quids::iteration(object_begin_, object_end_) {}
 
+		/// getter for the total amount of distributed objects.
+		/**
+		 * @param[in] communicator MPI communcator.
+		 */
 		size_t get_total_num_object(MPI_Comm communicator) const {
 			/* accumulate number of node */
 			size_t total_num_object;
@@ -97,10 +55,28 @@ namespace quids::mpi {
 
 			return total_num_object;
 		}
-		PROBA_TYPE average_value(std::function<PROBA_TYPE(char const *object_begin, char const *object_end)> const observable) const {
+		/// getter for the total amount of distributed symbolic objects.
+		/**
+		 * @param[in] communicator MPI communcator.
+		 */
+		size_t get_total_num_symbolic_object(MPI_Comm communicator) const {
+			size_t total_num_child = get_num_symbolic_object();
+			MPI_Allreduce(MPI_IN_PLACE, &total_num_child, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return total_num_child;
+		}
+		/// function to get the average local value of a custom observable.
+		/**
+		 * @param[in] observable observable that should be computed.
+		 */
+		PROBA_TYPE average_value(const quids::observable_t observable) const {
 			return node_total_proba == 0 ? 0 : quids::iteration::average_value(observable) / node_total_proba * total_proba;
 		}
-		PROBA_TYPE average_value(std::function<PROBA_TYPE(char const *object_begin, char const *object_end)> const observable, MPI_Comm communicator) const {
+		/// function to get the average value of a custom observable accross the total distributed wave function.
+		/**
+		 * @param[in] observable observable that should be computed.
+		 * @param[in] communicator MPI communcator.
+		 */
+		PROBA_TYPE average_value(const quids::observable_t 	observable, MPI_Comm communicator) const {
 			/* compute local average */
 			PROBA_TYPE avg = quids::iteration::average_value(observable);
 
@@ -108,6 +84,13 @@ namespace quids::mpi {
 			MPI_Allreduce(MPI_IN_PLACE, &avg, 1, Proba_MPI_Datatype, MPI_SUM, communicator);
 			return avg;
 		}
+		/// function to send objects (from the "tail" of the memory representation).
+		/**
+		 * @param[in] num_object_sent number of object to be sent.
+		 * @param[in] node node identifier that objects should be sent to.
+		 * @params[in] communicator MPI communcator.
+		 * @params[in] send_num_child wether to also send the number of children per object or not.
+		 */
 		void send_objects(size_t num_object_sent, int node, MPI_Comm communicator, bool send_num_child=false) {
 			const static size_t max_int = 1 << 31 - 1;
 
@@ -153,6 +136,13 @@ namespace quids::mpi {
 				pop(num_object_sent, false);
 			}
 		}
+		/// function to receive objects (at the "tail" of the memory representation).
+		/**
+		 * @param[in] node node identifier that objects should be received from.
+		 * @params[in] communicator MPI communcator.
+		 * @params[in] receive_num_child wether to also receive the number of children per object or not.
+		 * @params[in] max_mem the maximum amount of memory that can be received, -1 means no limits.
+		 */
 		void receive_objects(int node, MPI_Comm communicator, bool receive_num_child=false, size_t max_mem=-1) {
 			const static size_t max_int = 1 << 31 - 1;
 
@@ -208,18 +198,105 @@ namespace quids::mpi {
 			}
 		}
 
+		/// equalize the number of object across node pairs.
+		/**
+		 * @param[in] communicator MPI communcator.
+		 */
 		void equalize(MPI_Comm communicator);
+		/// distribute objects eqaully from a single node to all others.
+		/**
+		 * @param[in] communicator MPI communcator.
+		 * @param[in] node node identifier that objects should be distributed from.
+		 */
 		void distribute_objects(MPI_Comm communicator, int node_id);
+		/// gather objects to a single node from all others.
+		/**
+		 * @param[in] communicator MPI communcator.
+		 * @param[in] node node identifier that objects should be gathered to.
+		 */
 		void gather_objects(MPI_Comm communicator, int node_id);
 
-		size_t get_total_num_symbolic_object(MPI_Comm communicator) const {
-			size_t total_num_child = get_num_symbolic_object();
-			MPI_Allreduce(MPI_IN_PLACE, &total_num_child, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			return total_num_child;
+	private:
+		friend mpi_symbolic_iteration;
+		friend void inline simulate(mpi_it_t &iteration, quids::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, quids::debug_t mid_step_function);
+
+		void equalize_symbolic(MPI_Comm communicator);
+		void normalize(MPI_Comm communicator, quids::debug_t mid_step_function=[](const char*){});
+
+
+
+		/*
+		utils functions
+		*/
+		size_t inline get_mem_size(MPI_Comm communicator) const {
+			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
+
+			size_t total_size, local_size = iteration_memory_size*magnitude.size() + objects.size();
+			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return total_size;
 		}
+		size_t inline get_total_truncated_num_object(MPI_Comm communicator) const {
+			size_t total_truncated_num_object;
+			MPI_Allreduce(&truncated_num_object, &total_truncated_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+			return total_truncated_num_object;
+		}
+
+		/*
+		function to compute the maximum and minimum per node size
+		*/
+		float get_avg_num_symbolic_object_per_task(MPI_Comm communicator) const {
+			size_t total_num_object_per_node = get_num_symbolic_object();
+			MPI_Allreduce(MPI_IN_PLACE, &total_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+
+			int size;
+			MPI_Comm_size(communicator, &size);
+
+			return (float)total_num_object_per_node/size;
+		}
+		size_t get_max_num_symbolic_object_per_task(MPI_Comm communicator) const {
+			size_t max_num_object_per_node = get_num_symbolic_object();
+			MPI_Allreduce(MPI_IN_PLACE, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
+			return max_num_object_per_node;
+		}
+		size_t get_max_num_object_per_task(MPI_Comm communicator) const {
+			size_t max_num_object_per_node;
+			MPI_Allreduce(&num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
+			return max_num_object_per_node;
+		}
+
+
+		size_t get_truncated_mem_size(size_t begin_num_object=0) const;
 	};
 
+	/// symbolic mpi iteration (computation intermediary)
 	class mpi_symbolic_iteration : public quids::symbolic_iteration {
+	public:
+		/// simple constructor
+		mpi_symbolic_iteration() {}
+
+		/// getter for the total amount of distributed objects.
+		/**
+		 * @param[in] communicator MPI communcator.
+		 */
+		size_t inline get_total_num_object(MPI_Comm communicator) const {
+			/* accumulate number of node */
+			size_t total_num_object;
+			MPI_Allreduce(&num_object, &total_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+
+			return total_num_object;
+		}
+		/// getter for the total amount of distributed objects after duplicate elimination.
+		/**
+		 * @param[in] communicator MPI communcator.
+		 */
+		size_t inline get_total_num_object_after_interferences(MPI_Comm communicator) const {
+			/* accumulate number of node */
+			size_t total_num_object_after_interference;
+			MPI_Allreduce(&num_object_after_interferences, &total_num_object_after_interference, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+
+			return total_num_object_after_interference;
+		}
+
 	private:
 		friend mpi_iteration;
 		friend void inline simulate(mpi_it_t &iteration, quids::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object, quids::debug_t mid_step_function); 
@@ -297,28 +374,18 @@ namespace quids::mpi {
 			MPI_Allreduce(&next_iteration_num_object, &total_next_iteration_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 			return total_next_iteration_num_object;
 		}
-
-	public:
-		size_t inline get_total_num_object(MPI_Comm communicator) const {
-			/* accumulate number of node */
-			size_t total_num_object;
-			MPI_Allreduce(&num_object, &total_num_object, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-
-			return total_num_object;
-		}
-		size_t inline get_total_num_object_after_interferences(MPI_Comm communicator) const {
-			/* accumulate number of node */
-			size_t total_num_object_after_interference;
-			MPI_Allreduce(&num_object_after_interferences, &total_num_object_after_interference, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-
-			return total_num_object_after_interference;
-		}
-		mpi_symbolic_iteration() {}
 	};
 
-	/*
-	simulation function
-	*/
+	/// function to apply a dynamic to a wave function distributed accross multiple nodes
+	/**
+	 * @param[in] iteration wavefunction that the dynamic will be applied to.
+	 * @param[in] rule dynamic that will be applied.
+	 * @param[out] next_iteration wave function that will be overwritten to then contained the final wave function.
+	 * @param[out] symbolic_iteration symbolic iteration that will be used.
+	 * @param[in] communicator MPI communcator.
+	 * @param[in] max_num_object maximum number of objects to be kept per node, -1 means no maximum, 0 means automaticaly finding the maximum ammount of objects that can be kept in memory.
+	 * @param[in] mid_step_function debuging function called between steps.
+	 */
 	void simulate(mpi_it_t &iteration, quids::rule_t const *rule, mpi_it_t &next_iteration, mpi_sy_it_t &symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, quids::debug_t mid_step_function=[](const char*){}) {
 		/* get local size */
 		MPI_Comm localComm;

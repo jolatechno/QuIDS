@@ -25,8 +25,8 @@ int main(int argc, char* argv[]) {
 	quids::tolerance = 1e-8;
 
 	int size, rank, provided;
-    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-    if(provided < MPI_THREAD_MULTIPLE) {
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
+    if(provided < MPI_THREAD_SERIALIZED) {
         printf("The threading support level is lesser than that demanded.\n");
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }

@@ -1,0 +1,30 @@
+\hypertarget{random_8hpp_source}{}\doxysection{random.\+hpp}
+\label{random_8hpp_source}\index{/home/joseph/Documents/projets/programing/cpp/Quantum-\/graph-\/simulation/src/QuIDS/src/utils/random.hpp@{/home/joseph/Documents/projets/programing/cpp/Quantum-\/graph-\/simulation/src/QuIDS/src/utils/random.hpp}}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{1 \textcolor{preprocessor}{\#pragma once}}
+\DoxyCodeLine{2 }
+\DoxyCodeLine{4 \textcolor{keyword}{namespace }\mbox{\hyperlink{namespacequids_1_1utils}{quids::utils}} \{}
+\DoxyCodeLine{6     \textcolor{keyword}{class }\mbox{\hyperlink{classquids_1_1utils_1_1random__generator}{random\_generator}} \{}
+\DoxyCodeLine{7     \textcolor{keyword}{private}:}
+\DoxyCodeLine{8         uint64\_t shuffle\_table[2];}
+\DoxyCodeLine{9     \textcolor{keyword}{public}:}
+\DoxyCodeLine{10         \mbox{\hyperlink{classquids_1_1utils_1_1random__generator}{random\_generator}}() \{}
+\DoxyCodeLine{11             shuffle\_table[0] = rand();}
+\DoxyCodeLine{12             shuffle\_table[1] = rand();}
+\DoxyCodeLine{13         \}}
+\DoxyCodeLine{14 }
+\DoxyCodeLine{15         \textcolor{comment}{// The actual algorithm}}
+\DoxyCodeLine{16         \textcolor{keywordtype}{float} operator()() \{}
+\DoxyCodeLine{17             uint64\_t s1 = shuffle\_table[0];}
+\DoxyCodeLine{18             uint64\_t s0 = shuffle\_table[1];}
+\DoxyCodeLine{19             uint64\_t result = s0 + s1;}
+\DoxyCodeLine{20             shuffle\_table[0] = s0;}
+\DoxyCodeLine{21             s1 \string^= s1 << 23;}
+\DoxyCodeLine{22             shuffle\_table[1] = s1 \string^ s0 \string^ (s1 >> 18) \string^ (s0 >> 5);}
+\DoxyCodeLine{23             \textcolor{keywordflow}{return} (\textcolor{keywordtype}{float})result / (float)((uint64\_t)0xffffffff);}
+\DoxyCodeLine{24         \}}
+\DoxyCodeLine{25     \};}
+\DoxyCodeLine{26 \}}
+
+\end{DoxyCode}

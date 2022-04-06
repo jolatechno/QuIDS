@@ -1,0 +1,910 @@
+\hypertarget{quids__mpi_8hpp_source}{}\doxysection{quids\+\_\+mpi.\+hpp}
+\label{quids__mpi_8hpp_source}\index{/home/joseph/Documents/projets/programing/cpp/Quantum-\/graph-\/simulation/src/QuIDS/src/quids\_mpi.hpp@{/home/joseph/Documents/projets/programing/cpp/Quantum-\/graph-\/simulation/src/QuIDS/src/quids\_mpi.hpp}}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{1 \textcolor{preprocessor}{\#pragma once}}
+\DoxyCodeLine{2 }
+\DoxyCodeLine{3 \textcolor{preprocessor}{\#include "{}quids.hpp"{}}}
+\DoxyCodeLine{4 }
+\DoxyCodeLine{5 \textcolor{preprocessor}{\#include <mpi.h>}}
+\DoxyCodeLine{6 }
+\DoxyCodeLine{7 \textcolor{preprocessor}{\#include "{}utils/mpi\_utils.hpp"{}}}
+\DoxyCodeLine{8 }
+\DoxyCodeLine{9 \textcolor{preprocessor}{\#ifndef MIN\_EQUALIZE\_SIZE}}
+\DoxyCodeLine{10 \textcolor{preprocessor}{    \#define MIN\_EQUALIZE\_SIZE 100}}
+\DoxyCodeLine{11 \textcolor{preprocessor}{\#endif}}
+\DoxyCodeLine{12 \textcolor{preprocessor}{\#ifndef EQUALIZE\_INBALANCE}}
+\DoxyCodeLine{13 \textcolor{preprocessor}{    \#define EQUALIZE\_INBALANCE 0.05}}
+\DoxyCodeLine{14 \textcolor{preprocessor}{\#endif}}
+\DoxyCodeLine{15 }
+\DoxyCodeLine{17 \textcolor{keyword}{namespace }\mbox{\hyperlink{namespacequids_1_1mpi}{quids::mpi}} \{}
+\DoxyCodeLine{19     \textcolor{keyword}{const} \textcolor{keyword}{static} MPI\_Datatype Proba\_MPI\_Datatype = \mbox{\hyperlink{namespacequids_1_1mpi_1_1utils_acb65382b618071f4807c93138ee174ee}{utils::get\_mpi\_datatype}}((PROBA\_TYPE)0);}
+\DoxyCodeLine{21     \textcolor{keyword}{const} \textcolor{keyword}{static} MPI\_Datatype mag\_MPI\_Datatype = \mbox{\hyperlink{namespacequids_1_1mpi_1_1utils_acb65382b618071f4807c93138ee174ee}{utils::get\_mpi\_datatype}}((std::complex<PROBA\_TYPE>)0);}
+\DoxyCodeLine{22 }
+\DoxyCodeLine{24     \textcolor{keywordtype}{size\_t} \mbox{\hyperlink{namespacequids_1_1mpi_a31fde7b46759670da2fe0f6b3731f5c0}{min\_equalize\_size}} = MIN\_EQUALIZE\_SIZE;}
+\DoxyCodeLine{26     \textcolor{keywordtype}{float} \mbox{\hyperlink{namespacequids_1_1mpi_ab5de5240ccfc019063996bdc48e7a20b}{equalize\_inbalance}} = EQUALIZE\_INBALANCE;}
+\DoxyCodeLine{27 }
+\DoxyCodeLine{29     \textcolor{keyword}{typedef} \textcolor{keyword}{class }\mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration}{mpi\_iteration}} \mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\_it\_t}};}
+\DoxyCodeLine{31     \textcolor{keyword}{typedef} \textcolor{keyword}{class }\mbox{\hyperlink{classquids_1_1mpi_1_1mpi__symbolic__iteration}{mpi\_symbolic\_iteration}} \mbox{\hyperlink{namespacequids_1_1mpi_a3e3b2dbb59ff2b0f9b997fb9bf196cc8}{mpi\_sy\_it\_t}};}
+\DoxyCodeLine{32 }
+\DoxyCodeLine{34     \textcolor{keyword}{class }\mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration}{mpi\_iteration}} : \textcolor{keyword}{public} \mbox{\hyperlink{classquids_1_1iteration}{quids::iteration}} \{}
+\DoxyCodeLine{35     \textcolor{keyword}{public}:}
+\DoxyCodeLine{37         PROBA\_TYPE \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}{node\_total\_proba}} = 0;}
+\DoxyCodeLine{38 }
+\DoxyCodeLine{40         \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ac872b4a8cace2aa4208e2cce9e2f077c}{mpi\_iteration}}() \{\}}
+\DoxyCodeLine{42 }
+\DoxyCodeLine{45         \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_af19eb4a102ff5f3e7aacd63eb470f3fc}{mpi\_iteration}}(\textcolor{keywordtype}{char}* object\_begin\_, \textcolor{keywordtype}{char}* object\_end\_) : \mbox{\hyperlink{namespacequids}{quids}}::\mbox{\hyperlink{classquids_1_1iteration}{iteration}}(object\_begin\_, object\_end\_) \{\}}
+\DoxyCodeLine{46 }
+\DoxyCodeLine{48 }
+\DoxyCodeLine{51         \textcolor{keywordtype}{size\_t} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a02ec85e300629005ca50614f0eed752a}{get\_total\_num\_object}}(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{52             \textcolor{comment}{/* accumulate number of node */}}
+\DoxyCodeLine{53             \textcolor{keywordtype}{size\_t} total\_num\_object;}
+\DoxyCodeLine{54             MPI\_Allreduce(\&\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}, \&total\_num\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{55 }
+\DoxyCodeLine{56             \textcolor{keywordflow}{return} total\_num\_object;}
+\DoxyCodeLine{57         \}}
+\DoxyCodeLine{59 }
+\DoxyCodeLine{62         \textcolor{keywordtype}{size\_t} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a4d653ffa3fd47132b57d5f0d74e65a92}{get\_total\_num\_symbolic\_object}}(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{63             \textcolor{keywordtype}{size\_t} total\_num\_child = get\_num\_symbolic\_object();}
+\DoxyCodeLine{64             MPI\_Allreduce(MPI\_IN\_PLACE, \&total\_num\_child, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{65             \textcolor{keywordflow}{return} total\_num\_child;}
+\DoxyCodeLine{66         \}}
+\DoxyCodeLine{68 }
+\DoxyCodeLine{71         PROBA\_TYPE \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a208da77ef960514bb57d0f9c6f9db567}{average\_value}}(\textcolor{keyword}{const} \mbox{\hyperlink{namespacequids_ab614af3adb7a49a771409f0d8c81b081}{quids::observable\_t}} observable)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{72             \textcolor{keywordflow}{return} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}{node\_total\_proba}} == 0 ? 0 : \mbox{\hyperlink{classquids_1_1iteration_a605ea87c36fba513f9ced985a56a14f0}{quids::iteration::average\_value}}(observable) / \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}{node\_total\_proba}} * \mbox{\hyperlink{classquids_1_1iteration_ad330de0af20f855358d13da0cf55d014}{total\_proba}};}
+\DoxyCodeLine{73         \}}
+\DoxyCodeLine{75 }
+\DoxyCodeLine{79         PROBA\_TYPE \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a81f55d1714eb28d8e39fefcdf6144a1b}{average\_value}}(\textcolor{keyword}{const} \mbox{\hyperlink{namespacequids_ab614af3adb7a49a771409f0d8c81b081}{quids::observable\_t}}  observable, MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{80             \textcolor{comment}{/* compute local average */}}
+\DoxyCodeLine{81             PROBA\_TYPE avg = \mbox{\hyperlink{classquids_1_1iteration_a605ea87c36fba513f9ced985a56a14f0}{quids::iteration::average\_value}}(observable);}
+\DoxyCodeLine{82 }
+\DoxyCodeLine{83             \textcolor{comment}{/* accumulate average value */}}
+\DoxyCodeLine{84             MPI\_Allreduce(MPI\_IN\_PLACE, \&avg, 1, Proba\_MPI\_Datatype, MPI\_SUM, communicator);}
+\DoxyCodeLine{85             \textcolor{keywordflow}{return} avg;}
+\DoxyCodeLine{86         \}}
+\DoxyCodeLine{88 }
+\DoxyCodeLine{94         \textcolor{keywordtype}{void} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ac6bbfe01b075868e82de88151e1a8fa1}{send\_objects}}(\textcolor{keywordtype}{size\_t} num\_object\_sent, \textcolor{keywordtype}{int} node, MPI\_Comm communicator, \textcolor{keywordtype}{bool} send\_num\_child=\textcolor{keyword}{false}) \{}
+\DoxyCodeLine{95             \textcolor{keyword}{const} \textcolor{keyword}{static} \textcolor{keywordtype}{size\_t} max\_int = 1 << 31 -\/ 1;}
+\DoxyCodeLine{96 }
+\DoxyCodeLine{97             \textcolor{comment}{/* send size */}}
+\DoxyCodeLine{98             MPI\_Send(\&num\_object\_sent, 1, MPI\_UNSIGNED\_LONG\_LONG, node, 0 \textcolor{comment}{/* tag */}, communicator);}
+\DoxyCodeLine{99             \textcolor{keywordflow}{if} (num\_object\_sent == 0)}
+\DoxyCodeLine{100                 \textcolor{keywordflow}{return};}
+\DoxyCodeLine{101             \textcolor{keywordtype}{size\_t} begin = \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} -\/ num\_object\_sent;}
+\DoxyCodeLine{102             \textcolor{keywordtype}{size\_t} send\_object\_size = object\_begin[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}] -\/ object\_begin[begin];}
+\DoxyCodeLine{103             MPI\_Send(\&send\_object\_size, 1, MPI\_UNSIGNED\_LONG\_LONG, node, 0 \textcolor{comment}{/* tag */}, communicator);}
+\DoxyCodeLine{104 }
+\DoxyCodeLine{105             \textcolor{comment}{/* verify send */}}
+\DoxyCodeLine{106             \textcolor{keywordtype}{bool} send;}
+\DoxyCodeLine{107             MPI\_Recv(\&send, 1, MPI\_UNSIGNED\_LONG\_LONG, node, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{108 }
+\DoxyCodeLine{109             \textcolor{keywordflow}{if} (send) \{}
+\DoxyCodeLine{110                 \textcolor{comment}{/* prepare send */}}
+\DoxyCodeLine{111                 \textcolor{keywordtype}{size\_t} send\_object\_begin = object\_begin[begin];}
+\DoxyCodeLine{112 \textcolor{preprocessor}{                \#pragma omp parallel for }}
+\DoxyCodeLine{113                 \textcolor{keywordflow}{for} (\textcolor{keywordtype}{size\_t} i = begin + 1; i <= \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}; ++i)}
+\DoxyCodeLine{114                     object\_begin[i] -\/= send\_object\_begin;}
+\DoxyCodeLine{115 }
+\DoxyCodeLine{116                 \textcolor{comment}{/* send properties */}}
+\DoxyCodeLine{117                 MPI\_Send(\&magnitude[begin], num\_object\_sent, mag\_MPI\_Datatype, node, 0 \textcolor{comment}{/* tag */}, communicator);}
+\DoxyCodeLine{118                 MPI\_Send(\&object\_begin[begin + 1], num\_object\_sent, MPI\_UNSIGNED\_LONG\_LONG, node, 0 \textcolor{comment}{/* tag */}, communicator);}
+\DoxyCodeLine{119 }
+\DoxyCodeLine{120                 \textcolor{comment}{/* send objects */}}
+\DoxyCodeLine{121                 \textcolor{keywordtype}{size\_t} send\_object\_size = object\_begin[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}];}
+\DoxyCodeLine{122                 \textcolor{keywordflow}{while} (send\_object\_size > max\_int) \{}
+\DoxyCodeLine{123                     MPI\_Send(\&objects[send\_object\_begin], max\_int, MPI\_CHAR, node, 0 \textcolor{comment}{/* tag */}, communicator);}
+\DoxyCodeLine{124 }
+\DoxyCodeLine{125                     send\_object\_size -\/= max\_int;}
+\DoxyCodeLine{126                     send\_object\_begin += max\_int;}
+\DoxyCodeLine{127                 \}}
+\DoxyCodeLine{128 }
+\DoxyCodeLine{129                 MPI\_Send(\&objects[send\_object\_begin], send\_object\_size, MPI\_CHAR, node, 0 \textcolor{comment}{/* tag */}, communicator);}
+\DoxyCodeLine{130 }
+\DoxyCodeLine{131                 \textcolor{keywordflow}{if} (send\_num\_child)}
+\DoxyCodeLine{132                     \textcolor{comment}{/* send num child */}}
+\DoxyCodeLine{133                     MPI\_Send(\&num\_childs[begin], num\_object\_sent, MPI\_UNSIGNED\_LONG\_LONG, node, 0 \textcolor{comment}{/* tag */}, communicator);}
+\DoxyCodeLine{134 }
+\DoxyCodeLine{135                 \textcolor{comment}{/* pop */}}
+\DoxyCodeLine{136                 \mbox{\hyperlink{classquids_1_1iteration_a7d940691bcce7bd1d14b32cbb0a91ffe}{pop}}(num\_object\_sent, \textcolor{keyword}{false});}
+\DoxyCodeLine{137             \}}
+\DoxyCodeLine{138         \}}
+\DoxyCodeLine{140 }
+\DoxyCodeLine{146         \textcolor{keywordtype}{void} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a30e7a9e5c0175fd1f3f274e104f12450}{receive\_objects}}(\textcolor{keywordtype}{int} node, MPI\_Comm communicator, \textcolor{keywordtype}{bool} receive\_num\_child=\textcolor{keyword}{false}, \textcolor{keywordtype}{size\_t} max\_mem=-\/1) \{}
+\DoxyCodeLine{147             \textcolor{keyword}{const} \textcolor{keyword}{static} \textcolor{keywordtype}{size\_t} max\_int = 1 << 31 -\/ 1;}
+\DoxyCodeLine{148 }
+\DoxyCodeLine{149             \textcolor{comment}{/* receive size */}}
+\DoxyCodeLine{150             \textcolor{keywordtype}{size\_t} num\_object\_sent, send\_object\_size;}
+\DoxyCodeLine{151             MPI\_Recv(\&num\_object\_sent, 1, MPI\_UNSIGNED\_LONG\_LONG, node, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{152             \textcolor{keywordflow}{if} (num\_object\_sent == 0)}
+\DoxyCodeLine{153                 \textcolor{keywordflow}{return};}
+\DoxyCodeLine{154             MPI\_Recv(\&send\_object\_size, 1, MPI\_UNSIGNED\_LONG\_LONG, node, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{155 }
+\DoxyCodeLine{156             \textcolor{comment}{/* verify memory limit */}}
+\DoxyCodeLine{157             \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} iteration\_memory\_size = 2*\textcolor{keyword}{sizeof}(PROBA\_TYPE) + 4*\textcolor{keyword}{sizeof}(\textcolor{keywordtype}{size\_t})  + \textcolor{keyword}{sizeof}(float);}
+\DoxyCodeLine{158             \textcolor{keywordtype}{bool} recv = num\_object\_sent*iteration\_memory\_size + send\_object\_size < max\_mem;}
+\DoxyCodeLine{159             MPI\_Send(\&recv, 1, MPI\_CHAR, node, 0 \textcolor{comment}{/* tag*/}, communicator);}
+\DoxyCodeLine{160 }
+\DoxyCodeLine{161             \textcolor{keywordflow}{if} (recv) \{}
+\DoxyCodeLine{162                 \textcolor{comment}{/* prepare state */}}
+\DoxyCodeLine{163                 \textcolor{keywordtype}{size\_t} send\_object\_begin = object\_begin[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}];}
+\DoxyCodeLine{164                 resize(\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} + num\_object\_sent);}
+\DoxyCodeLine{165                 allocate(send\_object\_begin + send\_object\_size);}
+\DoxyCodeLine{166 }
+\DoxyCodeLine{167                 \textcolor{comment}{/* receive properties */}}
+\DoxyCodeLine{168                 MPI\_Recv(\&magnitude[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}], num\_object\_sent, mag\_MPI\_Datatype, node, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{169                 MPI\_Recv(\&object\_begin[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} + 1], num\_object\_sent, MPI\_UNSIGNED\_LONG\_LONG, node, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{170 }
+\DoxyCodeLine{171                 \textcolor{comment}{/* receive objects */}}
+\DoxyCodeLine{172                 \textcolor{keywordtype}{size\_t} object\_offset = send\_object\_begin;}
+\DoxyCodeLine{173                 \textcolor{keywordflow}{while} (send\_object\_size > max\_int) \{}
+\DoxyCodeLine{174                     MPI\_Recv(\&objects[send\_object\_begin], max\_int, MPI\_CHAR, node, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{175 }
+\DoxyCodeLine{176                     send\_object\_size -\/= max\_int;}
+\DoxyCodeLine{177                     send\_object\_begin += max\_int;}
+\DoxyCodeLine{178                 \}}
+\DoxyCodeLine{179                 }
+\DoxyCodeLine{180                 MPI\_Recv(\&objects[send\_object\_begin], send\_object\_size, MPI\_CHAR, node, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{181 }
+\DoxyCodeLine{182                 \textcolor{comment}{/* correct values */}}
+\DoxyCodeLine{183 \textcolor{preprocessor}{                \#pragma omp parallel for }}
+\DoxyCodeLine{184                 \textcolor{keywordflow}{for} (\textcolor{keywordtype}{size\_t} i = \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} + 1; i <= \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} + num\_object\_sent; ++i)}
+\DoxyCodeLine{185                     object\_begin[i] += object\_offset;}
+\DoxyCodeLine{186 }
+\DoxyCodeLine{187                 \textcolor{keywordflow}{if} (receive\_num\_child) \{}
+\DoxyCodeLine{188                     \textcolor{comment}{/* receive num child */}}
+\DoxyCodeLine{189                     MPI\_Recv(\&num\_childs[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}], num\_object\_sent, MPI\_UNSIGNED\_LONG\_LONG, node, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{190 }
+\DoxyCodeLine{191                     \textcolor{comment}{/* partial sum */}}
+\DoxyCodeLine{192                     num\_childs[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}] += child\_begin[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}];}
+\DoxyCodeLine{193                     \_\_gnu\_parallel::partial\_sum(num\_childs.begin() + \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}, num\_childs.begin() + \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} + num\_object\_sent, child\_begin.begin() + \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} + 1);}
+\DoxyCodeLine{194                     num\_childs[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}] -\/= child\_begin[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}];}
+\DoxyCodeLine{195                 \}}
+\DoxyCodeLine{196 }
+\DoxyCodeLine{197                 \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} += num\_object\_sent;}
+\DoxyCodeLine{198             \}}
+\DoxyCodeLine{199         \}}
+\DoxyCodeLine{200 }
+\DoxyCodeLine{202 }
+\DoxyCodeLine{205         \textcolor{keywordtype}{void} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a0329ef9825ea660dd76cbcf3781d204d}{equalize}}(MPI\_Comm communicator);}
+\DoxyCodeLine{207 }
+\DoxyCodeLine{211         \textcolor{keywordtype}{void} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a003ba03b8fa1d998a12b9ec912026cd9}{distribute\_objects}}(MPI\_Comm communicator, \textcolor{keywordtype}{int} node\_id);}
+\DoxyCodeLine{213 }
+\DoxyCodeLine{217         \textcolor{keywordtype}{void} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_abfcdae7f899aef08f9f5081e850fd228}{gather\_objects}}(MPI\_Comm communicator, \textcolor{keywordtype}{int} node\_id);}
+\DoxyCodeLine{218 }
+\DoxyCodeLine{219     \textcolor{keyword}{private}:}
+\DoxyCodeLine{220         \textcolor{keyword}{friend} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__symbolic__iteration}{mpi\_symbolic\_iteration}};}
+\DoxyCodeLine{221         \textcolor{keyword}{friend} \textcolor{keywordtype}{void} \textcolor{keyword}{inline} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a9f1608c653c2dcf627b4242913e0c27d}{simulate}}(\mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\_it\_t}} \&\mbox{\hyperlink{classquids_1_1iteration}{iteration}}, \mbox{\hyperlink{namespacequids_a62455c8f5240a575676aace3a25dfae3}{quids::rule\_t}} \textcolor{keyword}{const} *\mbox{\hyperlink{classquids_1_1rule}{rule}}, \mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\_it\_t}} \&next\_iteration, \mbox{\hyperlink{namespacequids_1_1mpi_a3e3b2dbb59ff2b0f9b997fb9bf196cc8}{mpi\_sy\_it\_t}} \&\mbox{\hyperlink{classquids_1_1symbolic__iteration}{symbolic\_iteration}}, MPI\_Comm communicator, \textcolor{keywordtype}{size\_t} max\_num\_object, \mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{quids::debug\_t}} mid\_step\_function);}
+\DoxyCodeLine{222 }
+\DoxyCodeLine{223         \textcolor{keywordtype}{void} equalize\_symbolic(MPI\_Comm communicator);}
+\DoxyCodeLine{224         \textcolor{keywordtype}{void} normalize(MPI\_Comm communicator, \mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{quids::debug\_t}} mid\_step\_function=[](\textcolor{keyword}{const} \textcolor{keywordtype}{char}*)\{\});}
+\DoxyCodeLine{225 }
+\DoxyCodeLine{226 }
+\DoxyCodeLine{227 }
+\DoxyCodeLine{228         \textcolor{comment}{/*}}
+\DoxyCodeLine{229 \textcolor{comment}{        utils functions}}
+\DoxyCodeLine{230 \textcolor{comment}{        */}}
+\DoxyCodeLine{231         \textcolor{keywordtype}{size\_t} \textcolor{keyword}{inline} get\_mem\_size(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{232             \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} iteration\_memory\_size = 2*\textcolor{keyword}{sizeof}(PROBA\_TYPE) + 4*\textcolor{keyword}{sizeof}(\textcolor{keywordtype}{size\_t}) + \textcolor{keyword}{sizeof}(float);}
+\DoxyCodeLine{233 }
+\DoxyCodeLine{234             \textcolor{keywordtype}{size\_t} total\_size, local\_size = iteration\_memory\_size*magnitude.size() + objects.size();}
+\DoxyCodeLine{235             MPI\_Allreduce(\&local\_size, \&total\_size, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{236             \textcolor{keywordflow}{return} total\_size;}
+\DoxyCodeLine{237         \}}
+\DoxyCodeLine{238         \textcolor{keywordtype}{size\_t} \textcolor{keyword}{inline} get\_total\_truncated\_num\_object(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{239             \textcolor{keywordtype}{size\_t} total\_truncated\_num\_object;}
+\DoxyCodeLine{240             MPI\_Allreduce(\&truncated\_num\_object, \&total\_truncated\_num\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{241             \textcolor{keywordflow}{return} total\_truncated\_num\_object;}
+\DoxyCodeLine{242         \}}
+\DoxyCodeLine{243 }
+\DoxyCodeLine{244         \textcolor{comment}{/*}}
+\DoxyCodeLine{245 \textcolor{comment}{        function to compute the maximum and minimum per node size}}
+\DoxyCodeLine{246 \textcolor{comment}{        */}}
+\DoxyCodeLine{247         \textcolor{keywordtype}{float} get\_avg\_num\_symbolic\_object\_per\_task(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{248             \textcolor{keywordtype}{size\_t} total\_num\_object\_per\_node = get\_num\_symbolic\_object();}
+\DoxyCodeLine{249             MPI\_Allreduce(MPI\_IN\_PLACE, \&total\_num\_object\_per\_node, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{250 }
+\DoxyCodeLine{251             \textcolor{keywordtype}{int} size;}
+\DoxyCodeLine{252             MPI\_Comm\_size(communicator, \&size);}
+\DoxyCodeLine{253 }
+\DoxyCodeLine{254             \textcolor{keywordflow}{return} (\textcolor{keywordtype}{float})total\_num\_object\_per\_node/size;}
+\DoxyCodeLine{255         \}}
+\DoxyCodeLine{256         \textcolor{keywordtype}{size\_t} get\_max\_num\_symbolic\_object\_per\_task(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{257             \textcolor{keywordtype}{size\_t} max\_num\_object\_per\_node = get\_num\_symbolic\_object();}
+\DoxyCodeLine{258             MPI\_Allreduce(MPI\_IN\_PLACE, \&max\_num\_object\_per\_node, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_MAX, communicator);}
+\DoxyCodeLine{259             \textcolor{keywordflow}{return} max\_num\_object\_per\_node;}
+\DoxyCodeLine{260         \}}
+\DoxyCodeLine{261         \textcolor{keywordtype}{size\_t} get\_max\_num\_object\_per\_task(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{262             \textcolor{keywordtype}{size\_t} max\_num\_object\_per\_node;}
+\DoxyCodeLine{263             MPI\_Allreduce(\&\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}, \&max\_num\_object\_per\_node, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_MAX, communicator);}
+\DoxyCodeLine{264             \textcolor{keywordflow}{return} max\_num\_object\_per\_node;}
+\DoxyCodeLine{265         \}}
+\DoxyCodeLine{266 }
+\DoxyCodeLine{267 }
+\DoxyCodeLine{268         \textcolor{keywordtype}{size\_t} get\_truncated\_mem\_size(\textcolor{keywordtype}{size\_t} begin\_num\_object=0) \textcolor{keyword}{const};}
+\DoxyCodeLine{269     \};}
+\DoxyCodeLine{270 }
+\DoxyCodeLine{272     \textcolor{keyword}{class }\mbox{\hyperlink{classquids_1_1mpi_1_1mpi__symbolic__iteration}{mpi\_symbolic\_iteration}} : \textcolor{keyword}{public} \mbox{\hyperlink{classquids_1_1symbolic__iteration}{quids::symbolic\_iteration}} \{}
+\DoxyCodeLine{273     \textcolor{keyword}{public}:}
+\DoxyCodeLine{275         \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__symbolic__iteration_a0ebd120eecb3b99621d32cd4cb1fcd45}{mpi\_symbolic\_iteration}}() \{\}}
+\DoxyCodeLine{276 }
+\DoxyCodeLine{278 }
+\DoxyCodeLine{281         \textcolor{keywordtype}{size\_t} \textcolor{keyword}{inline} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__symbolic__iteration_a5936605d2f46fdc8f35d96586559975d}{get\_total\_num\_object}}(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{282             \textcolor{comment}{/* accumulate number of node */}}
+\DoxyCodeLine{283             \textcolor{keywordtype}{size\_t} total\_num\_object;}
+\DoxyCodeLine{284             MPI\_Allreduce(\&\mbox{\hyperlink{classquids_1_1symbolic__iteration_a688bb468e98b73bd13f81d7915dc3a2f}{num\_object}}, \&total\_num\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{285 }
+\DoxyCodeLine{286             \textcolor{keywordflow}{return} total\_num\_object;}
+\DoxyCodeLine{287         \}}
+\DoxyCodeLine{289 }
+\DoxyCodeLine{292         \textcolor{keywordtype}{size\_t} \textcolor{keyword}{inline} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__symbolic__iteration_acb37b890bbb9883c8c9550ff8e429e55}{get\_total\_num\_object\_after\_interferences}}(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{293             \textcolor{comment}{/* accumulate number of node */}}
+\DoxyCodeLine{294             \textcolor{keywordtype}{size\_t} total\_num\_object\_after\_interference;}
+\DoxyCodeLine{295             MPI\_Allreduce(\&\mbox{\hyperlink{classquids_1_1symbolic__iteration_a54dda8c91c4bf8f7a097910ff4fbe34b}{num\_object\_after\_interferences}}, \&total\_num\_object\_after\_interference, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{296 }
+\DoxyCodeLine{297             \textcolor{keywordflow}{return} total\_num\_object\_after\_interference;}
+\DoxyCodeLine{298         \}}
+\DoxyCodeLine{299 }
+\DoxyCodeLine{300     \textcolor{keyword}{private}:}
+\DoxyCodeLine{301         \textcolor{keyword}{friend} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration}{mpi\_iteration}};}
+\DoxyCodeLine{302         \textcolor{keyword}{friend} \textcolor{keywordtype}{void} \textcolor{keyword}{inline} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__symbolic__iteration_a9f1608c653c2dcf627b4242913e0c27d}{simulate}}(\mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\_it\_t}} \&\mbox{\hyperlink{classquids_1_1iteration}{iteration}}, \mbox{\hyperlink{namespacequids_a62455c8f5240a575676aace3a25dfae3}{quids::rule\_t}} \textcolor{keyword}{const} *\mbox{\hyperlink{classquids_1_1rule}{rule}}, \mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\_it\_t}} \&next\_iteration, \mbox{\hyperlink{namespacequids_1_1mpi_a3e3b2dbb59ff2b0f9b997fb9bf196cc8}{mpi\_sy\_it\_t}} \&\mbox{\hyperlink{classquids_1_1symbolic__iteration}{symbolic\_iteration}}, MPI\_Comm communicator, \textcolor{keywordtype}{size\_t} max\_num\_object, \mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{quids::debug\_t}} mid\_step\_function); }
+\DoxyCodeLine{303 }
+\DoxyCodeLine{304         \mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{quids::utils::fast\_vector<mag\_t>}} partitioned\_mag;}
+\DoxyCodeLine{305         \mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{quids::utils::fast\_vector<size\_t>}} partitioned\_hash;}
+\DoxyCodeLine{306         \mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{quids::utils::fast\_vector}}<\textcolor{keywordtype}{char} \textcolor{comment}{/*bool*/}> partitioned\_is\_unique;}
+\DoxyCodeLine{307 }
+\DoxyCodeLine{308         \mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{quids::utils::fast\_vector<mag\_t>}} mag\_buffer;}
+\DoxyCodeLine{309         \mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{quids::utils::fast\_vector<size\_t>}} hash\_buffer;}
+\DoxyCodeLine{310         \mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{quids::utils::fast\_vector<int>}} node\_id\_buffer;}
+\DoxyCodeLine{311         \mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{quids::utils::fast\_vector}}<\textcolor{keywordtype}{char} \textcolor{comment}{/*bool*/}> is\_unique\_buffer;}
+\DoxyCodeLine{312 }
+\DoxyCodeLine{313         \textcolor{keywordtype}{void} compute\_collisions(MPI\_Comm communicator, \mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{quids::debug\_t}} mid\_step\_function=[](\textcolor{keyword}{const} \textcolor{keywordtype}{char}*)\{\});}
+\DoxyCodeLine{314         \textcolor{keywordtype}{void} mpi\_resize(\textcolor{keywordtype}{size\_t} size) \{}
+\DoxyCodeLine{315 \textcolor{preprocessor}{            \#pragma omp parallel sections}}
+\DoxyCodeLine{316             \{}
+\DoxyCodeLine{317 \textcolor{preprocessor}{                \#pragma omp section}}
+\DoxyCodeLine{318                 partitioned\_mag.resize(size);}
+\DoxyCodeLine{319 }
+\DoxyCodeLine{320 \textcolor{preprocessor}{                \#pragma omp section}}
+\DoxyCodeLine{321                 partitioned\_hash.resize(size);}
+\DoxyCodeLine{322 }
+\DoxyCodeLine{323 \textcolor{preprocessor}{                \#pragma omp section}}
+\DoxyCodeLine{324                 partitioned\_is\_unique.resize(size);}
+\DoxyCodeLine{325             \}}
+\DoxyCodeLine{326         \}}
+\DoxyCodeLine{327         \textcolor{keywordtype}{void} buffer\_resize(\textcolor{keywordtype}{size\_t} size) \{}
+\DoxyCodeLine{328 \textcolor{preprocessor}{            \#pragma omp parallel sections}}
+\DoxyCodeLine{329             \{}
+\DoxyCodeLine{330 \textcolor{preprocessor}{                \#pragma omp section}}
+\DoxyCodeLine{331                 mag\_buffer.resize(size);}
+\DoxyCodeLine{332 }
+\DoxyCodeLine{333 \textcolor{preprocessor}{                \#pragma omp section}}
+\DoxyCodeLine{334                 hash\_buffer.resize(size);}
+\DoxyCodeLine{335 }
+\DoxyCodeLine{336 \textcolor{preprocessor}{                \#pragma omp section}}
+\DoxyCodeLine{337                 node\_id\_buffer.resize(size);}
+\DoxyCodeLine{338 }
+\DoxyCodeLine{339 \textcolor{preprocessor}{                \#pragma omp section}}
+\DoxyCodeLine{340                 is\_unique\_buffer.resize(size);}
+\DoxyCodeLine{341 }
+\DoxyCodeLine{342 \textcolor{preprocessor}{                \#pragma omp section}}
+\DoxyCodeLine{343                 \textcolor{keywordflow}{if} (size > next\_oid\_partitioner\_buffer.size())}
+\DoxyCodeLine{344                     next\_oid\_partitioner\_buffer.resize(size);}
+\DoxyCodeLine{345             \}}
+\DoxyCodeLine{346         \}}
+\DoxyCodeLine{347 }
+\DoxyCodeLine{348 }
+\DoxyCodeLine{349 }
+\DoxyCodeLine{350         \textcolor{comment}{/*}}
+\DoxyCodeLine{351 \textcolor{comment}{        utils functions}}
+\DoxyCodeLine{352 \textcolor{comment}{        */}}
+\DoxyCodeLine{353         \textcolor{keywordtype}{float} \textcolor{keyword}{inline} get\_average\_object\_size(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{354             \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{float} hash\_map\_size = HASH\_MAP\_OVERHEAD*2*\textcolor{keyword}{sizeof}(size\_t);}
+\DoxyCodeLine{355 }
+\DoxyCodeLine{356             \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} symbolic\_iteration\_memory\_size = (1 + 1) + (2 + 2)*\textcolor{keyword}{sizeof}(PROBA\_TYPE) + (5 + 1)*\textcolor{keyword}{sizeof}(size\_t) + \textcolor{keyword}{sizeof}(uint32\_t) + \textcolor{keyword}{sizeof}(float);}
+\DoxyCodeLine{357 }
+\DoxyCodeLine{358             \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} mpi\_symbolic\_iteration\_memory\_size = 1 + 2*\textcolor{keyword}{sizeof}(PROBA\_TYPE) + 1*\textcolor{keyword}{sizeof}(\textcolor{keywordtype}{size\_t}) + \textcolor{keyword}{sizeof}(int);}
+\DoxyCodeLine{359             \textcolor{keywordflow}{return} (\textcolor{keywordtype}{float})symbolic\_iteration\_memory\_size + (float)mpi\_symbolic\_iteration\_memory\_size + hash\_map\_size;}
+\DoxyCodeLine{360         \}}
+\DoxyCodeLine{361         \textcolor{keywordtype}{size\_t} \textcolor{keyword}{inline} get\_mem\_size(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{362             \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} symbolic\_iteration\_memory\_size = (1 + 1) + (2 + 2)*\textcolor{keyword}{sizeof}(PROBA\_TYPE) + (5 + 1)*\textcolor{keyword}{sizeof}(size\_t) + \textcolor{keyword}{sizeof}(uint32\_t) + \textcolor{keyword}{sizeof}(float);}
+\DoxyCodeLine{363             \textcolor{keywordtype}{size\_t} memory\_size = magnitude.size()*symbolic\_iteration\_memory\_size;}
+\DoxyCodeLine{364 }
+\DoxyCodeLine{365             \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} mpi\_symbolic\_iteration\_memory\_size = 1 + 2*\textcolor{keyword}{sizeof}(PROBA\_TYPE) + 1*\textcolor{keyword}{sizeof}(\textcolor{keywordtype}{size\_t}) + \textcolor{keyword}{sizeof}(int);}
+\DoxyCodeLine{366             memory\_size += mag\_buffer.size()*mpi\_symbolic\_iteration\_memory\_size;}
+\DoxyCodeLine{367 }
+\DoxyCodeLine{368             \textcolor{keywordtype}{size\_t} total\_size = mpi\_symbolic\_iteration\_memory\_size*magnitude.size();}
+\DoxyCodeLine{369             MPI\_Allreduce(MPI\_IN\_PLACE, \&total\_size, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{370             \textcolor{keywordflow}{return} total\_size;}
+\DoxyCodeLine{371         \}}
+\DoxyCodeLine{372         \textcolor{keywordtype}{size\_t} \textcolor{keyword}{inline} get\_total\_next\_iteration\_num\_object(MPI\_Comm communicator)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{373             \textcolor{keywordtype}{size\_t} total\_next\_iteration\_num\_object;}
+\DoxyCodeLine{374             MPI\_Allreduce(\&next\_iteration\_num\_object, \&total\_next\_iteration\_num\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{375             \textcolor{keywordflow}{return} total\_next\_iteration\_num\_object;}
+\DoxyCodeLine{376         \}}
+\DoxyCodeLine{377     \};}
+\DoxyCodeLine{378 }
+\DoxyCodeLine{380 }
+\DoxyCodeLine{389     \textcolor{keywordtype}{void} \mbox{\hyperlink{namespacequids_1_1mpi_ab589d2622e28bfe6e3522a103c841450}{simulate}}(\mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\_it\_t}} \&\mbox{\hyperlink{classquids_1_1iteration}{iteration}}, \mbox{\hyperlink{namespacequids_a62455c8f5240a575676aace3a25dfae3}{quids::rule\_t}} \textcolor{keyword}{const} *\mbox{\hyperlink{classquids_1_1rule}{rule}}, \mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\_it\_t}} \&next\_iteration, \mbox{\hyperlink{namespacequids_1_1mpi_a3e3b2dbb59ff2b0f9b997fb9bf196cc8}{mpi\_sy\_it\_t}} \&\mbox{\hyperlink{classquids_1_1symbolic__iteration}{symbolic\_iteration}}, MPI\_Comm communicator, \textcolor{keywordtype}{size\_t} max\_num\_object=0, \mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{quids::debug\_t}} mid\_step\_function=[](\textcolor{keyword}{const} \textcolor{keywordtype}{char}*)\{\}) \{}
+\DoxyCodeLine{390         \textcolor{comment}{/* get local size */}}
+\DoxyCodeLine{391         MPI\_Comm localComm;}
+\DoxyCodeLine{392         \textcolor{keywordtype}{int} rank, size, local\_size;}
+\DoxyCodeLine{393         MPI\_Comm\_size(communicator, \&size);}
+\DoxyCodeLine{394         MPI\_Comm\_rank(communicator, \&rank);}
+\DoxyCodeLine{395         MPI\_Comm\_split\_type(communicator, MPI\_COMM\_TYPE\_SHARED, rank, MPI\_INFO\_NULL, \&localComm);}
+\DoxyCodeLine{396         MPI\_Comm\_size(localComm, \&local\_size);}
+\DoxyCodeLine{397 }
+\DoxyCodeLine{398 }
+\DoxyCodeLine{399 }
+\DoxyCodeLine{400         }
+\DoxyCodeLine{401 }
+\DoxyCodeLine{402 }
+\DoxyCodeLine{403         \textcolor{keywordflow}{if} (size == 1)}
+\DoxyCodeLine{404             \textcolor{keywordflow}{return} \mbox{\hyperlink{namespacequids_a0cd589223d6f94d98d0d52849bfcd76a}{quids::simulate}}(\mbox{\hyperlink{classquids_1_1iteration}{iteration}}, \mbox{\hyperlink{classquids_1_1rule}{rule}}, next\_iteration, \mbox{\hyperlink{classquids_1_1symbolic__iteration}{symbolic\_iteration}}, max\_num\_object, mid\_step\_function);}
+\DoxyCodeLine{405 }
+\DoxyCodeLine{406         \textcolor{comment}{/* start actual simulation */}}
+\DoxyCodeLine{407         \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.compute\_num\_child(\mbox{\hyperlink{classquids_1_1rule}{rule}}, mid\_step\_function);}
+\DoxyCodeLine{408         \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.truncated\_num\_object = \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}};}
+\DoxyCodeLine{409 }
+\DoxyCodeLine{410         \textcolor{comment}{/* equalize symbolic objects */}}
+\DoxyCodeLine{411         mid\_step\_function(\textcolor{stringliteral}{"{}equalize\_child"{}});}
+\DoxyCodeLine{412         \textcolor{keywordflow}{for} (\textcolor{keywordtype}{int} max\_equalize = std::log2(size); max\_equalize >= 0; -\/-\/max\_equalize) \{}
+\DoxyCodeLine{413             \textcolor{comment}{/* check for condition */}}
+\DoxyCodeLine{414             \textcolor{keywordtype}{size\_t} max\_n\_object = \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.get\_max\_num\_object\_per\_task(communicator);}
+\DoxyCodeLine{415             \textcolor{keywordtype}{size\_t} max\_n\_child = \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.get\_max\_num\_symbolic\_object\_per\_task(communicator);}
+\DoxyCodeLine{416             \textcolor{keywordtype}{float} inbalance = ((float)max\_n\_child -\/ \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.get\_avg\_num\_symbolic\_object\_per\_task(communicator))/max\_n\_child;}
+\DoxyCodeLine{417 }
+\DoxyCodeLine{418             \textcolor{keywordflow}{if} (max\_n\_object < \mbox{\hyperlink{namespacequids_1_1mpi_a31fde7b46759670da2fe0f6b3731f5c0}{min\_equalize\_size}} || inbalance < \mbox{\hyperlink{namespacequids_1_1mpi_ab5de5240ccfc019063996bdc48e7a20b}{equalize\_inbalance}})}
+\DoxyCodeLine{419                 \textcolor{keywordflow}{break};}
+\DoxyCodeLine{420 }
+\DoxyCodeLine{421             \textcolor{comment}{/* actually equalize */}}
+\DoxyCodeLine{422             \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.equalize\_symbolic(communicator);}
+\DoxyCodeLine{423             \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.truncated\_num\_object = \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}};}
+\DoxyCodeLine{424         \}}
+\DoxyCodeLine{425 }
+\DoxyCodeLine{426         \textcolor{comment}{/* prepare truncate */}}
+\DoxyCodeLine{427         mid\_step\_function(\textcolor{stringliteral}{"{}truncate\_symbolic -\/ prepare"{}});}
+\DoxyCodeLine{428         \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.prepare\_truncate(mid\_step\_function);}
+\DoxyCodeLine{429 }
+\DoxyCodeLine{430         \textcolor{comment}{/* max\_num\_object */}}
+\DoxyCodeLine{431         mid\_step\_function(\textcolor{stringliteral}{"{}truncate\_symbolic"{}});}
+\DoxyCodeLine{432         \textcolor{keywordflow}{if} (max\_num\_object == 0) \{}
+\DoxyCodeLine{433             \textcolor{comment}{/* available memory */}}
+\DoxyCodeLine{434             \textcolor{keywordtype}{size\_t} avail\_memory = next\_iteration.get\_mem\_size(localComm) + \mbox{\hyperlink{classquids_1_1symbolic__iteration}{symbolic\_iteration}}.get\_mem\_size(localComm) + \mbox{\hyperlink{namespacequids_1_1utils_a594be390cd1aec6c1c991ee8242917b6}{quids::utils::get\_free\_mem}}();}
+\DoxyCodeLine{435             \textcolor{keywordtype}{size\_t} target\_memory = avail\_memory/local\_size*(1 -\/ \mbox{\hyperlink{namespacequids_acf286be928cefbb5ad9e672e1999de1b}{quids::safety\_margin}});}
+\DoxyCodeLine{436 }
+\DoxyCodeLine{437             \textcolor{comment}{/* actually truncate by binary search */}}
+\DoxyCodeLine{438             \textcolor{keywordflow}{if} (\mbox{\hyperlink{classquids_1_1iteration}{iteration}}.get\_truncated\_mem\_size() > target\_memory) \{}
+\DoxyCodeLine{439                 \textcolor{keywordtype}{size\_t} begin = 0, end = \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}};}
+\DoxyCodeLine{440                 \textcolor{keywordflow}{while} (end > begin + 1) \{}
+\DoxyCodeLine{441                     \textcolor{keywordtype}{size\_t} middle = (end + begin) / 2;}
+\DoxyCodeLine{442                     \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.truncate(begin, middle, mid\_step\_function);}
+\DoxyCodeLine{443 }
+\DoxyCodeLine{444                     \textcolor{keywordtype}{size\_t} used\_memory = \mbox{\hyperlink{classquids_1_1iteration}{iteration}}.get\_truncated\_mem\_size(begin);}
+\DoxyCodeLine{445                     \textcolor{keywordflow}{if} (used\_memory < target\_memory) \{}
+\DoxyCodeLine{446                         target\_memory -\/= used\_memory;}
+\DoxyCodeLine{447                         begin = middle;}
+\DoxyCodeLine{448                     \} \textcolor{keywordflow}{else}}
+\DoxyCodeLine{449                         end = middle;}
+\DoxyCodeLine{450                 \}}
+\DoxyCodeLine{451             \}}
+\DoxyCodeLine{452         \} \textcolor{keywordflow}{else}}
+\DoxyCodeLine{453             iteration.truncate(0, max\_num\_object/local\_size, mid\_step\_function);}
+\DoxyCodeLine{454 }
+\DoxyCodeLine{455         \textcolor{comment}{/* downsize if needed */}}
+\DoxyCodeLine{456         \textcolor{keywordflow}{if} (iteration.num\_object > 0) \{}
+\DoxyCodeLine{457             \textcolor{keywordflow}{if} (iteration.truncated\_num\_object < next\_iteration.num\_object)}
+\DoxyCodeLine{458                 next\_iteration.resize(iteration.truncated\_num\_object);}
+\DoxyCodeLine{459             \textcolor{keywordtype}{size\_t} next\_object\_size = iteration.truncated\_num\_object*iteration.get\_object\_length()/iteration.num\_object;}
+\DoxyCodeLine{460             \textcolor{keywordflow}{if} (next\_object\_size < next\_iteration.objects.size())}
+\DoxyCodeLine{461                 next\_iteration.allocate(next\_object\_size);}
+\DoxyCodeLine{462         \}}
+\DoxyCodeLine{463 }
+\DoxyCodeLine{464         \textcolor{comment}{/* rest of the simulation */}}
+\DoxyCodeLine{465         iteration.generate\_symbolic\_iteration(rule, symbolic\_iteration, mid\_step\_function);}
+\DoxyCodeLine{466         symbolic\_iteration.compute\_collisions(communicator, mid\_step\_function);}
+\DoxyCodeLine{467         symbolic\_iteration.next\_iteration\_num\_object = symbolic\_iteration.num\_object\_after\_interferences;}
+\DoxyCodeLine{468 }
+\DoxyCodeLine{469 }
+\DoxyCodeLine{470 }
+\DoxyCodeLine{471         \textcolor{comment}{/* prepare truncate */}}
+\DoxyCodeLine{472         mid\_step\_function(\textcolor{stringliteral}{"{}truncate -\/ prepare"{}});}
+\DoxyCodeLine{473         symbolic\_iteration.prepare\_truncate(mid\_step\_function);}
+\DoxyCodeLine{474 }
+\DoxyCodeLine{475         \textcolor{comment}{/* second max\_num\_object */}}
+\DoxyCodeLine{476         mid\_step\_function(\textcolor{stringliteral}{"{}truncate"{}});}
+\DoxyCodeLine{477         \textcolor{keywordflow}{if} (max\_num\_object == 0) \{}
+\DoxyCodeLine{478 }
+\DoxyCodeLine{479             \textcolor{comment}{/* available memory */}}
+\DoxyCodeLine{480             \textcolor{keywordtype}{size\_t} avail\_memory = next\_iteration.get\_mem\_size(localComm) + \mbox{\hyperlink{namespacequids_1_1utils_a594be390cd1aec6c1c991ee8242917b6}{quids::utils::get\_free\_mem}}();}
+\DoxyCodeLine{481             \textcolor{keywordtype}{size\_t} target\_memory = avail\_memory/local\_size*(1 -\/ \mbox{\hyperlink{namespacequids_acf286be928cefbb5ad9e672e1999de1b}{quids::safety\_margin}});}
+\DoxyCodeLine{482 }
+\DoxyCodeLine{483             \textcolor{comment}{/* actually truncate by binary search */}}
+\DoxyCodeLine{484             \textcolor{keywordflow}{if} (symbolic\_iteration.get\_truncated\_mem\_size() > target\_memory) \{}
+\DoxyCodeLine{485                 \textcolor{keywordtype}{size\_t} begin = 0, end = symbolic\_iteration.num\_object\_after\_interferences;}
+\DoxyCodeLine{486                 \textcolor{keywordflow}{while} (end > begin + 1) \{}
+\DoxyCodeLine{487                     \textcolor{keywordtype}{size\_t} middle = (end + begin) / 2;}
+\DoxyCodeLine{488                     symbolic\_iteration.truncate(begin, middle, mid\_step\_function);}
+\DoxyCodeLine{489 }
+\DoxyCodeLine{490                     \textcolor{keywordtype}{size\_t} used\_memory = symbolic\_iteration.get\_truncated\_mem\_size(begin);}
+\DoxyCodeLine{491                     \textcolor{keywordflow}{if} (used\_memory < target\_memory) \{}
+\DoxyCodeLine{492                         target\_memory -\/= used\_memory;}
+\DoxyCodeLine{493                         begin = middle;}
+\DoxyCodeLine{494                     \} \textcolor{keywordflow}{else}}
+\DoxyCodeLine{495                         end = middle;}
+\DoxyCodeLine{496                 \}}
+\DoxyCodeLine{497             \}}
+\DoxyCodeLine{498         \} \textcolor{keywordflow}{else}}
+\DoxyCodeLine{499             symbolic\_iteration.truncate(0, max\_num\_object/local\_size, mid\_step\_function);}
+\DoxyCodeLine{500 }
+\DoxyCodeLine{501         \textcolor{comment}{/* finalize simulation */}}
+\DoxyCodeLine{502         symbolic\_iteration.finalize(rule, iteration, next\_iteration, mid\_step\_function);}
+\DoxyCodeLine{503         next\_iteration.normalize(communicator, mid\_step\_function);}
+\DoxyCodeLine{504 }
+\DoxyCodeLine{505         MPI\_Comm\_free(\&localComm);}
+\DoxyCodeLine{506     \}}
+\DoxyCodeLine{507 }
+\DoxyCodeLine{508     \textcolor{comment}{/*}}
+\DoxyCodeLine{509 \textcolor{comment}{    get the truncated memory size}}
+\DoxyCodeLine{510 \textcolor{comment}{    */}}
+\DoxyCodeLine{511     \textcolor{keywordtype}{size\_t} mpi\_iteration::get\_truncated\_mem\_size(\textcolor{keywordtype}{size\_t} begin\_num\_object)\textcolor{keyword}{ const }\{}
+\DoxyCodeLine{512         \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} iteration\_memory\_size = 2*\textcolor{keyword}{sizeof}(PROBA\_TYPE) + 4*\textcolor{keyword}{sizeof}(\textcolor{keywordtype}{size\_t}) + \textcolor{keyword}{sizeof}(float);}
+\DoxyCodeLine{513 }
+\DoxyCodeLine{514         \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{float} hash\_map\_size = HASH\_MAP\_OVERHEAD*2*\textcolor{keyword}{sizeof}(size\_t);}
+\DoxyCodeLine{515         \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} symbolic\_iteration\_memory\_size = (1 + 1) + (2 + 2)*\textcolor{keyword}{sizeof}(PROBA\_TYPE) + (5 + 1)*\textcolor{keyword}{sizeof}(size\_t) + \textcolor{keyword}{sizeof}(uint32\_t) + \textcolor{keyword}{sizeof}(float);}
+\DoxyCodeLine{516         \textcolor{keyword}{static} \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} mpi\_symbolic\_iteration\_memory\_size = 1 + 2*\textcolor{keyword}{sizeof}(PROBA\_TYPE) + 1*\textcolor{keyword}{sizeof}(\textcolor{keywordtype}{size\_t}) + \textcolor{keyword}{sizeof}(int);}
+\DoxyCodeLine{517 }
+\DoxyCodeLine{518         \textcolor{keywordtype}{size\_t} mem\_size = iteration\_memory\_size*(truncated\_num\_object -\/ begin\_num\_object);}
+\DoxyCodeLine{519         \textcolor{keywordflow}{for} (\textcolor{keywordtype}{size\_t} i = begin\_num\_object; i < truncated\_num\_object; ++i) \{}
+\DoxyCodeLine{520             \textcolor{keywordtype}{size\_t} oid = truncated\_oid[i];}
+\DoxyCodeLine{521 }
+\DoxyCodeLine{522             mem\_size += object\_begin[oid + 1] -\/ object\_begin[oid];}
+\DoxyCodeLine{523             mem\_size += num\_childs[oid]*(symbolic\_iteration\_memory\_size + mpi\_symbolic\_iteration\_memory\_size + hash\_map\_size);}
+\DoxyCodeLine{524         \}}
+\DoxyCodeLine{525 }
+\DoxyCodeLine{526         \textcolor{keywordflow}{return} mem\_size;}
+\DoxyCodeLine{527     \}}
+\DoxyCodeLine{528 }
+\DoxyCodeLine{529     \textcolor{comment}{/*}}
+\DoxyCodeLine{530 \textcolor{comment}{    distributed interference function}}
+\DoxyCodeLine{531 \textcolor{comment}{    */}}
+\DoxyCodeLine{532     \textcolor{keywordtype}{void} mpi\_symbolic\_iteration::compute\_collisions(MPI\_Comm communicator, \mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{quids::debug\_t}} mid\_step\_function) \{}
+\DoxyCodeLine{533         \textcolor{keywordtype}{int} size, rank;}
+\DoxyCodeLine{534         MPI\_Comm\_size(communicator, \&size);}
+\DoxyCodeLine{535         MPI\_Comm\_rank(communicator, \&rank);}
+\DoxyCodeLine{536 }
+\DoxyCodeLine{537         \textcolor{keywordflow}{if} (size == 1)}
+\DoxyCodeLine{538             \textcolor{keywordflow}{return} quids::symbolic\_iteration::compute\_collisions(mid\_step\_function);}
+\DoxyCodeLine{539 }
+\DoxyCodeLine{540         \textcolor{keywordtype}{int} num\_threads;}
+\DoxyCodeLine{541 \textcolor{preprocessor}{        \#pragma omp parallel}}
+\DoxyCodeLine{542 \textcolor{preprocessor}{        \#pragma omp single}}
+\DoxyCodeLine{543         num\_threads = omp\_get\_num\_threads();}
+\DoxyCodeLine{544 }
+\DoxyCodeLine{545         \textcolor{keywordtype}{int} \textcolor{keyword}{const} n\_segment = size*num\_threads;}
+\DoxyCodeLine{546         \textcolor{keywordtype}{int} \textcolor{keyword}{const} num\_bucket = quids::utils::nearest\_power\_of\_two(\mbox{\hyperlink{namespacequids_a967bbc4ed348a75e24789554a64f8d62}{load\_balancing\_bucket\_per\_thread}}*n\_segment);}
+\DoxyCodeLine{547         \textcolor{keywordtype}{size\_t} \textcolor{keyword}{const} offset = 8*\textcolor{keyword}{sizeof}(size\_t) -\/ quids::utils::log\_2\_upper\_bound(num\_bucket);}
+\DoxyCodeLine{548 }
+\DoxyCodeLine{549         std::vector<int> load\_balancing\_begin(n\_segment + 1, 0);}
+\DoxyCodeLine{550         std::vector<size\_t> partition\_begin(num\_bucket + 1, 0);}
+\DoxyCodeLine{551         std::vector<size\_t> total\_partition\_begin(num\_bucket + 1, 0);}
+\DoxyCodeLine{552 }
+\DoxyCodeLine{553         std::vector<int> local\_disp(n\_segment + 1);}
+\DoxyCodeLine{554         std::vector<int> local\_count(n\_segment);}
+\DoxyCodeLine{555         std::vector<int> global\_disp(n\_segment + 1, 0);}
+\DoxyCodeLine{556         std::vector<int> global\_count(n\_segment);}
+\DoxyCodeLine{557 }
+\DoxyCodeLine{558         std::vector<int> send\_disp(size + 1);}
+\DoxyCodeLine{559         std::vector<int> send\_count(size);}
+\DoxyCodeLine{560         std::vector<int> receive\_disp(size + 1);}
+\DoxyCodeLine{561         std::vector<int> receive\_count(size);}
+\DoxyCodeLine{562 }
+\DoxyCodeLine{563         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ prepare"{}});}
+\DoxyCodeLine{564         mpi\_resize(\mbox{\hyperlink{classquids_1_1symbolic__iteration_a688bb468e98b73bd13f81d7915dc3a2f}{num\_object}});}
+\DoxyCodeLine{565 }
+\DoxyCodeLine{566 }
+\DoxyCodeLine{567 }
+\DoxyCodeLine{568             }
+\DoxyCodeLine{569 }
+\DoxyCodeLine{570         \textcolor{comment}{/* !!!!!!!!!!!!!!!!}}
+\DoxyCodeLine{571 \textcolor{comment}{        partition}}
+\DoxyCodeLine{572 \textcolor{comment}{        !!!!!!!!!!!!!!!! */}}
+\DoxyCodeLine{573         quids::utils::parallel\_generalized\_partition\_from\_iota(\&next\_oid[0], \&next\_oid[0] + \mbox{\hyperlink{classquids_1_1symbolic__iteration_a688bb468e98b73bd13f81d7915dc3a2f}{num\_object}}, 0,}
+\DoxyCodeLine{574             partition\_begin.begin(), partition\_begin.end(),}
+\DoxyCodeLine{575             [\&](\textcolor{keywordtype}{size\_t} \textcolor{keyword}{const} oid) \{}
+\DoxyCodeLine{576                 return hash[oid] >> offset;}
+\DoxyCodeLine{577             \});}
+\DoxyCodeLine{578 }
+\DoxyCodeLine{579         \textcolor{comment}{/* generate partitioned hash */}}
+\DoxyCodeLine{580 \textcolor{preprocessor}{        \#pragma omp parallel for}}
+\DoxyCodeLine{581         \textcolor{keywordflow}{for} (\textcolor{keywordtype}{size\_t} \textcolor{keywordtype}{id} = 0; \textcolor{keywordtype}{id} < \mbox{\hyperlink{classquids_1_1symbolic__iteration_a688bb468e98b73bd13f81d7915dc3a2f}{num\_object}}; ++id) \{}
+\DoxyCodeLine{582             \textcolor{keywordtype}{size\_t} oid = next\_oid[id];}
+\DoxyCodeLine{583 }
+\DoxyCodeLine{584             partitioned\_mag[id] = magnitude[oid];}
+\DoxyCodeLine{585             partitioned\_hash[id] = hash[oid];}
+\DoxyCodeLine{586         \}}
+\DoxyCodeLine{587 }
+\DoxyCodeLine{588 }
+\DoxyCodeLine{589 }
+\DoxyCodeLine{590 }
+\DoxyCodeLine{591 }
+\DoxyCodeLine{592 }
+\DoxyCodeLine{593 }
+\DoxyCodeLine{594         \textcolor{comment}{/* !!!!!!!!!!!!!!!!}}
+\DoxyCodeLine{595 \textcolor{comment}{        load-\/balance}}
+\DoxyCodeLine{596 \textcolor{comment}{        !!!!!!!!!!!!!!!! */}}
+\DoxyCodeLine{597         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ com"{}});}
+\DoxyCodeLine{598         MPI\_Allreduce(\&partition\_begin[1], \&total\_partition\_begin[1],}
+\DoxyCodeLine{599             num\_bucket, MPI\_UNSIGNED\_LONG\_LONG, MPI\_SUM, communicator);}
+\DoxyCodeLine{600 }
+\DoxyCodeLine{601         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ prepare"{}});}
+\DoxyCodeLine{602         \mbox{\hyperlink{namespacequids_1_1utils_a26acad53fb0779fa4d590533dbf48d7b}{quids::utils::load\_balancing\_from\_prefix\_sum}}(total\_partition\_begin.begin(), total\_partition\_begin.end(),}
+\DoxyCodeLine{603             load\_balancing\_begin.begin(), load\_balancing\_begin.end());}
+\DoxyCodeLine{604 }
+\DoxyCodeLine{605         \textcolor{comment}{/* recompute local count and disp */}}
+\DoxyCodeLine{606         local\_disp[0] = 0;}
+\DoxyCodeLine{607         \textcolor{keywordflow}{for} (\textcolor{keywordtype}{int} i = 1; i <= n\_segment; ++i) \{}
+\DoxyCodeLine{608             local\_disp[i] = partition\_begin[load\_balancing\_begin[i]];}
+\DoxyCodeLine{609             local\_count[i -\/ 1] = local\_disp[i] -\/ local\_disp[i -\/ 1];}
+\DoxyCodeLine{610         \}}
+\DoxyCodeLine{611 }
+\DoxyCodeLine{612 }
+\DoxyCodeLine{613 }
+\DoxyCodeLine{614 }
+\DoxyCodeLine{615 }
+\DoxyCodeLine{616 }
+\DoxyCodeLine{617         \textcolor{comment}{/* !!!!!!!!!!!!!!!!}}
+\DoxyCodeLine{618 \textcolor{comment}{        share}}
+\DoxyCodeLine{619 \textcolor{comment}{        !!!!!!!!!!!!!!!! */}}
+\DoxyCodeLine{620         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ com"{}});}
+\DoxyCodeLine{621         MPI\_Alltoall(\&local\_count[0], num\_threads, MPI\_INT, \&global\_count[0], num\_threads, MPI\_INT, communicator);}
+\DoxyCodeLine{622 }
+\DoxyCodeLine{623         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ prepare"{}});}
+\DoxyCodeLine{624         std::partial\_sum(\&global\_count[0], \&global\_count[0] + n\_segment, \&global\_disp[1]);}
+\DoxyCodeLine{625 }
+\DoxyCodeLine{626         \textcolor{comment}{/* recompute send and receive count and disp */}}
+\DoxyCodeLine{627         send\_disp[0] = 0; receive\_count[0] = 0;}
+\DoxyCodeLine{628         \textcolor{keywordflow}{for} (\textcolor{keywordtype}{int} i = 1; i <= size; ++i) \{}
+\DoxyCodeLine{629             send\_disp[i] = local\_disp[i*num\_threads];}
+\DoxyCodeLine{630             send\_count[i -\/ 1] = send\_disp[i] -\/ send\_disp[i -\/ 1];}
+\DoxyCodeLine{631 }
+\DoxyCodeLine{632             receive\_disp[i] = global\_disp[i*num\_threads];}
+\DoxyCodeLine{633             receive\_count[i -\/ 1] = receive\_disp[i] -\/ receive\_disp[i -\/ 1];}
+\DoxyCodeLine{634         \}}
+\DoxyCodeLine{635 }
+\DoxyCodeLine{636         \textcolor{comment}{/* resize */}}
+\DoxyCodeLine{637         buffer\_resize(receive\_disp[size]);}
+\DoxyCodeLine{638 }
+\DoxyCodeLine{639         \textcolor{comment}{/* actualy share partition */}}
+\DoxyCodeLine{640         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ com"{}});}
+\DoxyCodeLine{641         MPI\_Alltoallv(\&partitioned\_hash[0], \&send\_count[0], \&send\_disp[0], MPI\_UNSIGNED\_LONG\_LONG,}
+\DoxyCodeLine{642             \&hash\_buffer[0], \&receive\_count[0], \&receive\_disp[0], MPI\_UNSIGNED\_LONG\_LONG, communicator);}
+\DoxyCodeLine{643         MPI\_Alltoallv(\&partitioned\_mag[0], \&send\_count[0], \&send\_disp[0], mag\_MPI\_Datatype,}
+\DoxyCodeLine{644             \&mag\_buffer[0], \&receive\_count[0], \&receive\_disp[0], mag\_MPI\_Datatype, communicator);}
+\DoxyCodeLine{645 }
+\DoxyCodeLine{646 }
+\DoxyCodeLine{647 }
+\DoxyCodeLine{648 }
+\DoxyCodeLine{649 }
+\DoxyCodeLine{650 }
+\DoxyCodeLine{651         \textcolor{comment}{/* !!!!!!!!!!!!!!!!}}
+\DoxyCodeLine{652 \textcolor{comment}{        compute-\/collision}}
+\DoxyCodeLine{653 \textcolor{comment}{        !!!!!!!!!!!!!!!! */}}
+\DoxyCodeLine{654         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ prepare"{}});}
+\DoxyCodeLine{655         \textcolor{comment}{/* prepare node\_id buffer */}}
+\DoxyCodeLine{656         \textcolor{keywordflow}{for} (\textcolor{keywordtype}{int} node = 0; node < size; ++node) \{}
+\DoxyCodeLine{657             \textcolor{keywordtype}{size\_t} begin = receive\_disp[node], end = receive\_disp[node + 1];}
+\DoxyCodeLine{658 \textcolor{preprocessor}{            \#pragma omp parallel for}}
+\DoxyCodeLine{659             \textcolor{keywordflow}{for} (\textcolor{keywordtype}{size\_t} i = begin; i < end; ++i)}
+\DoxyCodeLine{660                 node\_id\_buffer[i] = node;}
+\DoxyCodeLine{661         \}}
+\DoxyCodeLine{662 }
+\DoxyCodeLine{663         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ insert"{}});}
+\DoxyCodeLine{664 \textcolor{preprocessor}{        \#pragma omp parallel}}
+\DoxyCodeLine{665         \{}
+\DoxyCodeLine{666             std::vector<int> global\_num\_object\_after\_interferences(size, 0);}
+\DoxyCodeLine{667 }
+\DoxyCodeLine{668             \textcolor{keywordtype}{int} \textcolor{keyword}{const} thread\_id = omp\_get\_thread\_num();}
+\DoxyCodeLine{669             robin\_hood::unordered\_map<size\_t, size\_t> elimination\_map;}
+\DoxyCodeLine{670 }
+\DoxyCodeLine{671             \textcolor{comment}{/* compute total\_size */}}
+\DoxyCodeLine{672             \textcolor{keywordtype}{size\_t} total\_size = 0;}
+\DoxyCodeLine{673             \textcolor{keywordflow}{for} (\textcolor{keywordtype}{int} node\_id = 0; node\_id < size; ++node\_id)}
+\DoxyCodeLine{674                 total\_size += global\_count[node\_id*num\_threads + thread\_id];}
+\DoxyCodeLine{675             elimination\_map.reserve(total\_size);}
+\DoxyCodeLine{676 }
+\DoxyCodeLine{677             \textcolor{comment}{/* insert into hashmap */}}
+\DoxyCodeLine{678             \textcolor{keywordflow}{for} (\textcolor{keywordtype}{int} node\_id = 0; node\_id < size; ++node\_id) \{}
+\DoxyCodeLine{679                 \textcolor{keywordtype}{size\_t} begin = global\_disp[node\_id*num\_threads + thread\_id], end = global\_disp[node\_id*num\_threads + thread\_id + 1];}
+\DoxyCodeLine{680                 \textcolor{keywordflow}{for} (\textcolor{keywordtype}{size\_t} oid = begin; oid < end; ++oid) \{}
+\DoxyCodeLine{681 }
+\DoxyCodeLine{682                     \textcolor{comment}{/* accessing key */}}
+\DoxyCodeLine{683                     \textcolor{keyword}{auto} [it, unique] = elimination\_map.insert(\{hash\_buffer[oid], oid\});}
+\DoxyCodeLine{684                     \textcolor{keywordflow}{if} (unique) \{}
+\DoxyCodeLine{685                         \textcolor{comment}{/* increment values */}}
+\DoxyCodeLine{686                         ++global\_num\_object\_after\_interferences[node\_id];}
+\DoxyCodeLine{687                         is\_unique\_buffer[oid] = \textcolor{keyword}{true};}
+\DoxyCodeLine{688                     \} \textcolor{keywordflow}{else} \{}
+\DoxyCodeLine{689                         \textcolor{keyword}{auto} other\_oid = it-\/>second;}
+\DoxyCodeLine{690                         \textcolor{keyword}{auto} other\_node\_id = node\_id\_buffer[other\_oid];}
+\DoxyCodeLine{691 }
+\DoxyCodeLine{692                         \textcolor{keywordtype}{bool} is\_greater = global\_num\_object\_after\_interferences[node\_id] >= global\_num\_object\_after\_interferences[other\_node\_id];}
+\DoxyCodeLine{693                         \textcolor{keywordflow}{if} (is\_greater) \{}
+\DoxyCodeLine{694                             \textcolor{comment}{/* if it exist add the probabilities */}}
+\DoxyCodeLine{695                             mag\_buffer[other\_oid] += mag\_buffer[oid];}
+\DoxyCodeLine{696                             is\_unique\_buffer[oid] = \textcolor{keyword}{false};}
+\DoxyCodeLine{697                         \} \textcolor{keywordflow}{else} \{}
+\DoxyCodeLine{698                             \textcolor{comment}{/* keep this graph */}}
+\DoxyCodeLine{699                             it-\/>second = oid;}
+\DoxyCodeLine{700 }
+\DoxyCodeLine{701                             \textcolor{comment}{/* if the size aren't balanced, add the probabilities */}}
+\DoxyCodeLine{702                             mag\_buffer[oid] += mag\_buffer[other\_oid];}
+\DoxyCodeLine{703                             is\_unique\_buffer[oid] = \textcolor{keyword}{true};}
+\DoxyCodeLine{704                             is\_unique\_buffer[other\_oid] = \textcolor{keyword}{false};}
+\DoxyCodeLine{705 }
+\DoxyCodeLine{706                             \textcolor{comment}{/* increment values */}}
+\DoxyCodeLine{707                             ++global\_num\_object\_after\_interferences[node\_id];}
+\DoxyCodeLine{708                             -\/-\/global\_num\_object\_after\_interferences[other\_node\_id];}
+\DoxyCodeLine{709                         \}}
+\DoxyCodeLine{710                     \}}
+\DoxyCodeLine{711                 \}}
+\DoxyCodeLine{712             \}}
+\DoxyCodeLine{713         \}}
+\DoxyCodeLine{714 }
+\DoxyCodeLine{715 }
+\DoxyCodeLine{716 }
+\DoxyCodeLine{717 }
+\DoxyCodeLine{718 }
+\DoxyCodeLine{719 }
+\DoxyCodeLine{720         }
+\DoxyCodeLine{721         \textcolor{comment}{/* !!!!!!!!!!!!!!!!}}
+\DoxyCodeLine{722 \textcolor{comment}{        share-\/back}}
+\DoxyCodeLine{723 \textcolor{comment}{        !!!!!!!!!!!!!!!! */}}
+\DoxyCodeLine{724         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ com"{}});}
+\DoxyCodeLine{725         MPI\_Alltoallv(\&mag\_buffer[0], \&receive\_count[0], \&receive\_disp[0], mag\_MPI\_Datatype,}
+\DoxyCodeLine{726             \&partitioned\_mag[0], \&send\_count[0], \&send\_disp[0], mag\_MPI\_Datatype, communicator);}
+\DoxyCodeLine{727         MPI\_Alltoallv(\&is\_unique\_buffer[0], \&receive\_count[0], \&receive\_disp[0], MPI\_CHAR,}
+\DoxyCodeLine{728             \&partitioned\_is\_unique[0], \&send\_count[0], \&send\_disp[0], MPI\_CHAR, communicator);}
+\DoxyCodeLine{729 }
+\DoxyCodeLine{730         \textcolor{comment}{/* un-\/partition magnitude */}}
+\DoxyCodeLine{731         mid\_step\_function(\textcolor{stringliteral}{"{}compute\_collisions -\/ finalize"{}});}
+\DoxyCodeLine{732 \textcolor{preprocessor}{        \#pragma omp parallel for}}
+\DoxyCodeLine{733         \textcolor{keywordflow}{for} (\textcolor{keywordtype}{size\_t} \textcolor{keywordtype}{id} = 0; \textcolor{keywordtype}{id} < \mbox{\hyperlink{classquids_1_1symbolic__iteration_a688bb468e98b73bd13f81d7915dc3a2f}{num\_object}}; ++id) \{}
+\DoxyCodeLine{734             \textcolor{keywordtype}{size\_t} oid = next\_oid[id];}
+\DoxyCodeLine{735 }
+\DoxyCodeLine{736             is\_unique[oid] = partitioned\_is\_unique[id];}
+\DoxyCodeLine{737             magnitude[oid] = partitioned\_mag[id];}
+\DoxyCodeLine{738         \}}
+\DoxyCodeLine{739 }
+\DoxyCodeLine{740 }
+\DoxyCodeLine{741 }
+\DoxyCodeLine{742 }
+\DoxyCodeLine{743 }
+\DoxyCodeLine{744 }
+\DoxyCodeLine{745         }
+\DoxyCodeLine{746         \textcolor{comment}{/* !!!!!!!!!!!!!!!!}}
+\DoxyCodeLine{747 \textcolor{comment}{        partition}}
+\DoxyCodeLine{748 \textcolor{comment}{        !!!!!!!!!!!!!!!! */}}
+\DoxyCodeLine{749         \textcolor{keywordtype}{size\_t}* partitioned\_it = \_\_gnu\_parallel::partition(\&next\_oid[0], \&next\_oid[0] + \mbox{\hyperlink{classquids_1_1symbolic__iteration_a688bb468e98b73bd13f81d7915dc3a2f}{num\_object}},}
+\DoxyCodeLine{750             [\&](\textcolor{keywordtype}{size\_t} \textcolor{keyword}{const} \&oid) \{}
+\DoxyCodeLine{751                 \textcolor{keywordflow}{if} (!is\_unique[oid])}
+\DoxyCodeLine{752                     \textcolor{keywordflow}{return} \textcolor{keyword}{false};}
+\DoxyCodeLine{753 }
+\DoxyCodeLine{754                 \textcolor{keywordflow}{return} std::norm(magnitude[oid]) > \mbox{\hyperlink{namespacequids_ae6148553f287fa7c670cc8d0a729fe8d}{tolerance}};}
+\DoxyCodeLine{755             \});}
+\DoxyCodeLine{756         \mbox{\hyperlink{classquids_1_1symbolic__iteration_a54dda8c91c4bf8f7a097910ff4fbe34b}{num\_object\_after\_interferences}} = std::distance(\&next\_oid[0], partitioned\_it);}
+\DoxyCodeLine{757     \}}
+\DoxyCodeLine{758 }
+\DoxyCodeLine{759     \textcolor{comment}{/*}}
+\DoxyCodeLine{760 \textcolor{comment}{    distributed normalization function}}
+\DoxyCodeLine{761 \textcolor{comment}{    */}}
+\DoxyCodeLine{762     \textcolor{keywordtype}{void} mpi\_iteration::normalize(MPI\_Comm communicator, \mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{quids::debug\_t}} mid\_step\_function) \{}
+\DoxyCodeLine{763         \textcolor{comment}{/* !!!!!!!!!!!!!!!!}}
+\DoxyCodeLine{764 \textcolor{comment}{        normalize}}
+\DoxyCodeLine{765 \textcolor{comment}{         !!!!!!!!!!!!!!!! */}}
+\DoxyCodeLine{766         mid\_step\_function(\textcolor{stringliteral}{"{}normalize"{}});}
+\DoxyCodeLine{767 }
+\DoxyCodeLine{768         \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}{node\_total\_proba}} = 0;}
+\DoxyCodeLine{769         \mbox{\hyperlink{classquids_1_1iteration_ad330de0af20f855358d13da0cf55d014}{total\_proba}} = 0;}
+\DoxyCodeLine{770 }
+\DoxyCodeLine{771 \textcolor{preprocessor}{        \#pragma omp parallel for reduction(+:node\_total\_proba)}}
+\DoxyCodeLine{772         \textcolor{keywordflow}{for} (\textcolor{keywordtype}{size\_t} oid = 0; oid < \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}; ++oid)}
+\DoxyCodeLine{773             \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}{node\_total\_proba}} += std::norm(magnitude[oid]);}
+\DoxyCodeLine{774 }
+\DoxyCodeLine{775         \textcolor{comment}{/* accumulate probabilities on the master node */}}
+\DoxyCodeLine{776         MPI\_Allreduce(\&\mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}{node\_total\_proba}}, \&\mbox{\hyperlink{classquids_1_1iteration_ad330de0af20f855358d13da0cf55d014}{total\_proba}}, 1, Proba\_MPI\_Datatype, MPI\_SUM, communicator);}
+\DoxyCodeLine{777         PROBA\_TYPE normalization\_factor = std::sqrt(\mbox{\hyperlink{classquids_1_1iteration_ad330de0af20f855358d13da0cf55d014}{total\_proba}});}
+\DoxyCodeLine{778 }
+\DoxyCodeLine{779         \textcolor{keywordflow}{if} (normalization\_factor != 1)}
+\DoxyCodeLine{780 \textcolor{preprocessor}{            \#pragma omp parallel for }}
+\DoxyCodeLine{781             \textcolor{keywordflow}{for} (\textcolor{keywordtype}{size\_t} oid = 0; oid < \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}; ++oid)}
+\DoxyCodeLine{782                 magnitude[oid] /= normalization\_factor;}
+\DoxyCodeLine{783 }
+\DoxyCodeLine{784         \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}{node\_total\_proba}} /= \mbox{\hyperlink{classquids_1_1iteration_ad330de0af20f855358d13da0cf55d014}{total\_proba}};}
+\DoxyCodeLine{785 }
+\DoxyCodeLine{786         mid\_step\_function(\textcolor{stringliteral}{"{}end"{}});}
+\DoxyCodeLine{787     \}}
+\DoxyCodeLine{788 }
+\DoxyCodeLine{789     \textcolor{comment}{/*}}
+\DoxyCodeLine{790 \textcolor{comment}{    "{}utility"{} functions from here on:}}
+\DoxyCodeLine{791 \textcolor{comment}{    */}}
+\DoxyCodeLine{792     \textcolor{comment}{/*}}
+\DoxyCodeLine{793 \textcolor{comment}{    equalize the number of objects across nodes}}
+\DoxyCodeLine{794 \textcolor{comment}{    */}}
+\DoxyCodeLine{795     \textcolor{keywordtype}{void} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a0329ef9825ea660dd76cbcf3781d204d}{mpi\_iteration::equalize}}(MPI\_Comm communicator) \{}
+\DoxyCodeLine{796         MPI\_Request request = MPI\_REQUEST\_NULL;}
+\DoxyCodeLine{797 }
+\DoxyCodeLine{798         MPI\_Comm localComm;}
+\DoxyCodeLine{799         \textcolor{keywordtype}{int} rank, size, local\_size;}
+\DoxyCodeLine{800         MPI\_Comm\_size(communicator, \&size);}
+\DoxyCodeLine{801         MPI\_Comm\_rank(communicator, \&rank);}
+\DoxyCodeLine{802         MPI\_Comm\_split\_type(communicator, MPI\_COMM\_TYPE\_SHARED, rank, MPI\_INFO\_NULL, \&localComm);}
+\DoxyCodeLine{803         MPI\_Comm\_size(localComm, \&local\_size);}
+\DoxyCodeLine{804 }
+\DoxyCodeLine{805         \textcolor{keywordtype}{int} this\_pair\_id;}
+\DoxyCodeLine{806         \textcolor{keywordflow}{if} (rank == 0) \{}
+\DoxyCodeLine{807             \textcolor{comment}{/* gather sizes */}}
+\DoxyCodeLine{808             std::vector<size\_t> sizes(size, 0);}
+\DoxyCodeLine{809             MPI\_Gather(\&\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}, 1, MPI\_UNSIGNED\_LONG\_LONG, \&sizes[0], 1, MPI\_UNSIGNED\_LONG\_LONG, 0, communicator);}
+\DoxyCodeLine{810 }
+\DoxyCodeLine{811             \textcolor{comment}{/* compute pair\_id*/}}
+\DoxyCodeLine{812             std::vector<int> pair\_id(size, 0);}
+\DoxyCodeLine{813             \mbox{\hyperlink{namespacequids_1_1mpi_1_1utils_a557281f8db1c0cf80b3d9d6cd9563315}{utils::make\_equal\_pairs}}(\&sizes[0], \&sizes[0] + size, \&pair\_id[0]);}
+\DoxyCodeLine{814 }
+\DoxyCodeLine{815             \textcolor{comment}{/* scatter pair\_id */}}
+\DoxyCodeLine{816             MPI\_Scatter(\&pair\_id[0], 1, MPI\_INT, \&this\_pair\_id, 1, MPI\_INT, 0, communicator);}
+\DoxyCodeLine{817         \} \textcolor{keywordflow}{else} \{}
+\DoxyCodeLine{818             \textcolor{comment}{/* gather sizes */}}
+\DoxyCodeLine{819             MPI\_Gather(\&\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}, 1, MPI\_UNSIGNED\_LONG\_LONG, NULL, 1, MPI\_UNSIGNED\_LONG\_LONG, 0, communicator);}
+\DoxyCodeLine{820 }
+\DoxyCodeLine{821             \textcolor{comment}{/* scatter pair\_id */}}
+\DoxyCodeLine{822             MPI\_Scatter(NULL, 1, MPI\_INT, \&this\_pair\_id, 1, MPI\_INT, 0, communicator);}
+\DoxyCodeLine{823         \}}
+\DoxyCodeLine{824 }
+\DoxyCodeLine{825         \textcolor{comment}{/* get available memory */}}
+\DoxyCodeLine{826         MPI\_Barrier(localComm);}
+\DoxyCodeLine{827         \textcolor{keywordtype}{size\_t} total\_iteration\_size, iteration\_size = quids::iteration::get\_mem\_size();}
+\DoxyCodeLine{828         MPI\_Allreduce(\&iteration\_size, \&total\_iteration\_size, 1, Proba\_MPI\_Datatype, MPI\_SUM, localComm);}
+\DoxyCodeLine{829         \textcolor{keywordtype}{size\_t} avail\_memory = ((\mbox{\hyperlink{namespacequids_1_1utils_a594be390cd1aec6c1c991ee8242917b6}{quids::utils::get\_free\_mem}}() + total\_iteration\_size)/local\_size -\/ iteration\_size)*(1 -\/ \mbox{\hyperlink{namespacequids_acf286be928cefbb5ad9e672e1999de1b}{quids::safety\_margin}});}
+\DoxyCodeLine{830         MPI\_Barrier(localComm);}
+\DoxyCodeLine{831 }
+\DoxyCodeLine{832         \textcolor{comment}{/* skip if this node is alone */}}
+\DoxyCodeLine{833         \textcolor{keywordflow}{if} (this\_pair\_id == rank)}
+\DoxyCodeLine{834             \textcolor{keywordflow}{return};}
+\DoxyCodeLine{835 }
+\DoxyCodeLine{836         \textcolor{comment}{/* get the number of objects of the respective pairs */}}
+\DoxyCodeLine{837         \textcolor{keywordtype}{size\_t} other\_num\_object;}
+\DoxyCodeLine{838         MPI\_Isend(\&\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}, 1, MPI\_UNSIGNED\_LONG\_LONG, this\_pair\_id, 0 \textcolor{comment}{/* tag */}, communicator, \&request);}
+\DoxyCodeLine{839         MPI\_Isend(\&\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}, 1, MPI\_UNSIGNED\_LONG\_LONG, this\_pair\_id, 0 \textcolor{comment}{/* tag */}, communicator, \&request);}
+\DoxyCodeLine{840         }
+\DoxyCodeLine{841         MPI\_Recv(\&other\_num\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, this\_pair\_id, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{842         MPI\_Recv(\&other\_num\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, this\_pair\_id, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{843 }
+\DoxyCodeLine{844         \textcolor{comment}{/* equalize amoung pairs */}}
+\DoxyCodeLine{845         \textcolor{keywordflow}{if} (\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} > other\_num\_object) \{}
+\DoxyCodeLine{846             \textcolor{keywordtype}{size\_t} num\_object\_sent = (\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} -\/  other\_num\_object) / 2;}
+\DoxyCodeLine{847             \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ac6bbfe01b075868e82de88151e1a8fa1}{send\_objects}}(num\_object\_sent, this\_pair\_id, communicator, \textcolor{keyword}{false});}
+\DoxyCodeLine{848         \} \textcolor{keywordflow}{else} \textcolor{keywordflow}{if} (\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}} < other\_num\_object)}
+\DoxyCodeLine{849             \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a30e7a9e5c0175fd1f3f274e104f12450}{receive\_objects}}(this\_pair\_id, communicator, \textcolor{keyword}{false}, avail\_memory);}
+\DoxyCodeLine{850     \}}
+\DoxyCodeLine{851 }
+\DoxyCodeLine{852     \textcolor{comment}{/*}}
+\DoxyCodeLine{853 \textcolor{comment}{    equalize symbolic object across nodes}}
+\DoxyCodeLine{854 \textcolor{comment}{    */}}
+\DoxyCodeLine{855     \textcolor{keywordtype}{void} mpi\_iteration::equalize\_symbolic(MPI\_Comm communicator) \{}
+\DoxyCodeLine{856         MPI\_Request request = MPI\_REQUEST\_NULL;}
+\DoxyCodeLine{857 }
+\DoxyCodeLine{858         MPI\_Comm localComm;}
+\DoxyCodeLine{859         \textcolor{keywordtype}{int} rank, size, local\_size;}
+\DoxyCodeLine{860         MPI\_Comm\_size(communicator, \&size);}
+\DoxyCodeLine{861         MPI\_Comm\_rank(communicator, \&rank);}
+\DoxyCodeLine{862         MPI\_Comm\_split\_type(communicator, MPI\_COMM\_TYPE\_SHARED, rank, MPI\_INFO\_NULL, \&localComm);}
+\DoxyCodeLine{863         MPI\_Comm\_size(localComm, \&local\_size);}
+\DoxyCodeLine{864 }
+\DoxyCodeLine{865         \textcolor{comment}{/* compute the number of symbolic objects */}}
+\DoxyCodeLine{866         \textcolor{keywordtype}{size\_t} num\_symbolic\_object = child\_begin[\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}];}
+\DoxyCodeLine{867 }
+\DoxyCodeLine{868         \textcolor{keywordtype}{int} this\_pair\_id;}
+\DoxyCodeLine{869         \textcolor{keywordflow}{if} (rank == 0) \{}
+\DoxyCodeLine{870             \textcolor{comment}{/* gather sizes */}}
+\DoxyCodeLine{871             std::vector<size\_t> sizes(size, 0);}
+\DoxyCodeLine{872             MPI\_Gather(\&num\_symbolic\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, \&sizes[0], 1, MPI\_UNSIGNED\_LONG\_LONG, 0, communicator);}
+\DoxyCodeLine{873 }
+\DoxyCodeLine{874             \textcolor{comment}{/* compute pair\_id*/}}
+\DoxyCodeLine{875             std::vector<int> pair\_id(size, 0);}
+\DoxyCodeLine{876             \mbox{\hyperlink{namespacequids_1_1mpi_1_1utils_a557281f8db1c0cf80b3d9d6cd9563315}{utils::make\_equal\_pairs}}(\&sizes[0], \&sizes[0] + size, \&pair\_id[0]);}
+\DoxyCodeLine{877 }
+\DoxyCodeLine{878             \textcolor{comment}{/* scatter pair\_id */}}
+\DoxyCodeLine{879             MPI\_Scatter(\&pair\_id[0], 1, MPI\_INT, \&this\_pair\_id, 1, MPI\_INT, 0, communicator);}
+\DoxyCodeLine{880         \} \textcolor{keywordflow}{else} \{}
+\DoxyCodeLine{881             \textcolor{comment}{/* gather sizes */}}
+\DoxyCodeLine{882             MPI\_Gather(\&num\_symbolic\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, NULL, 1, MPI\_UNSIGNED\_LONG\_LONG, 0, communicator);}
+\DoxyCodeLine{883 }
+\DoxyCodeLine{884             \textcolor{comment}{/* scatter pair\_id */}}
+\DoxyCodeLine{885             MPI\_Scatter(NULL, 1, MPI\_INT, \&this\_pair\_id, 1, MPI\_INT, 0, communicator);}
+\DoxyCodeLine{886         \}}
+\DoxyCodeLine{887         }
+\DoxyCodeLine{888         \textcolor{comment}{/* get available memory */}}
+\DoxyCodeLine{889         MPI\_Barrier(localComm);}
+\DoxyCodeLine{890         \textcolor{keywordtype}{size\_t} total\_iteration\_size, iteration\_size = quids::iteration::get\_mem\_size();}
+\DoxyCodeLine{891         MPI\_Allreduce(\&iteration\_size, \&total\_iteration\_size, 1, Proba\_MPI\_Datatype, MPI\_SUM, localComm);}
+\DoxyCodeLine{892         \textcolor{keywordtype}{size\_t} avail\_memory = ((\mbox{\hyperlink{namespacequids_1_1utils_a594be390cd1aec6c1c991ee8242917b6}{quids::utils::get\_free\_mem}}() + total\_iteration\_size)/local\_size -\/ iteration\_size)*(1 -\/ \mbox{\hyperlink{namespacequids_acf286be928cefbb5ad9e672e1999de1b}{quids::safety\_margin}});}
+\DoxyCodeLine{893         MPI\_Barrier(localComm);}
+\DoxyCodeLine{894 }
+\DoxyCodeLine{895         \textcolor{comment}{/* skip if this node is alone */}}
+\DoxyCodeLine{896         \textcolor{keywordflow}{if} (this\_pair\_id == rank)}
+\DoxyCodeLine{897             \textcolor{keywordflow}{return};}
+\DoxyCodeLine{898 }
+\DoxyCodeLine{899         \textcolor{comment}{/* get the number of objects of the respective pairs */}}
+\DoxyCodeLine{900         \textcolor{keywordtype}{size\_t} other\_num\_object;}
+\DoxyCodeLine{901         \textcolor{keywordtype}{size\_t} other\_max\_symbolic\_object\_size;}
+\DoxyCodeLine{902         }
+\DoxyCodeLine{903         MPI\_Isend(\&num\_symbolic\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, this\_pair\_id, 0 \textcolor{comment}{/* tag */}, communicator, \&request);}
+\DoxyCodeLine{904         MPI\_Isend(\&max\_symbolic\_object\_size, 1, MPI\_UNSIGNED\_LONG\_LONG, this\_pair\_id, 0 \textcolor{comment}{/* tag */}, communicator, \&request);}
+\DoxyCodeLine{905 }
+\DoxyCodeLine{906         MPI\_Recv(\&other\_num\_object, 1, MPI\_UNSIGNED\_LONG\_LONG, this\_pair\_id, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{907         MPI\_Recv(\&other\_max\_symbolic\_object\_size, 1, MPI\_UNSIGNED\_LONG\_LONG, this\_pair\_id, 0 \textcolor{comment}{/* tag */}, communicator, MPI\_STATUS\_IGNORE);}
+\DoxyCodeLine{908 }
+\DoxyCodeLine{909         max\_symbolic\_object\_size = std::max(max\_symbolic\_object\_size, other\_max\_symbolic\_object\_size);}
+\DoxyCodeLine{910 }
+\DoxyCodeLine{911         \textcolor{comment}{/* equalize amoung pairs */}}
+\DoxyCodeLine{912         \textcolor{keywordflow}{if} (num\_symbolic\_object > other\_num\_object) \{}
+\DoxyCodeLine{913             \textcolor{keywordtype}{size\_t} num\_symbolic\_object\_to\_send = (num\_symbolic\_object -\/ other\_num\_object) / 2;}
+\DoxyCodeLine{914 }
+\DoxyCodeLine{915             \textcolor{comment}{/* find the actual number of object to send */}}
+\DoxyCodeLine{916             \textcolor{keyword}{auto} limit\_it = std::lower\_bound(child\_begin.begin(), child\_begin.begin() + \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}, num\_symbolic\_object -\/ num\_symbolic\_object\_to\_send);}
+\DoxyCodeLine{917             \textcolor{keywordtype}{size\_t} num\_object\_sent = std::distance(limit\_it, child\_begin.begin() + \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}});}
+\DoxyCodeLine{918 }
+\DoxyCodeLine{919             \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ac6bbfe01b075868e82de88151e1a8fa1}{send\_objects}}(num\_object\_sent, this\_pair\_id, communicator, \textcolor{keyword}{true});}
+\DoxyCodeLine{920         \} \textcolor{keywordflow}{else} \textcolor{keywordflow}{if} (num\_symbolic\_object < other\_num\_object)}
+\DoxyCodeLine{921             \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a30e7a9e5c0175fd1f3f274e104f12450}{receive\_objects}}(this\_pair\_id, communicator, \textcolor{keyword}{true}, avail\_memory);}
+\DoxyCodeLine{922     \}}
+\DoxyCodeLine{923 }
+\DoxyCodeLine{924     \textcolor{comment}{/*}}
+\DoxyCodeLine{925 \textcolor{comment}{    function to distribute objects across nodes}}
+\DoxyCodeLine{926 \textcolor{comment}{    */}}
+\DoxyCodeLine{927     \textcolor{keywordtype}{void} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a003ba03b8fa1d998a12b9ec912026cd9}{mpi\_iteration::distribute\_objects}}(MPI\_Comm communicator, \textcolor{keywordtype}{int} node\_id=0) \{}
+\DoxyCodeLine{928         \textcolor{keywordtype}{int} size, rank;}
+\DoxyCodeLine{929         MPI\_Comm\_size(communicator, \&size);}
+\DoxyCodeLine{930         MPI\_Comm\_rank(communicator, \&rank);}
+\DoxyCodeLine{931 }
+\DoxyCodeLine{932         \textcolor{keywordtype}{size\_t} initial\_num\_object = \mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}};}
+\DoxyCodeLine{933         \textcolor{keywordflow}{if} (rank == node\_id) \{}
+\DoxyCodeLine{934             \textcolor{keywordflow}{for} (\textcolor{keywordtype}{int} node = 1; node < size; ++node) \{}
+\DoxyCodeLine{935                 \textcolor{keywordtype}{int} node\_to\_send = node <= node\_id ? node -\/ 1 : node; \textcolor{comment}{//skip this node}}
+\DoxyCodeLine{936                 \textcolor{keywordtype}{size\_t} num\_object\_sent = (initial\_num\_object * (node + 1)) / size -\/ (initial\_num\_object * node) / size; \textcolor{comment}{//better way to spread evently}}
+\DoxyCodeLine{937 }
+\DoxyCodeLine{938                 \textcolor{comment}{/* send objects */}}
+\DoxyCodeLine{939                 \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ac6bbfe01b075868e82de88151e1a8fa1}{send\_objects}}(num\_object\_sent, node\_to\_send, communicator);}
+\DoxyCodeLine{940             \}}
+\DoxyCodeLine{941 }
+\DoxyCodeLine{942         \} \textcolor{keywordflow}{else}}
+\DoxyCodeLine{943             \textcolor{comment}{/* receive objects */}}
+\DoxyCodeLine{944             \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a30e7a9e5c0175fd1f3f274e104f12450}{receive\_objects}}(node\_id, communicator);}
+\DoxyCodeLine{945     \}}
+\DoxyCodeLine{946 }
+\DoxyCodeLine{947     \textcolor{comment}{/*}}
+\DoxyCodeLine{948 \textcolor{comment}{    function to gather object from all nodes}}
+\DoxyCodeLine{949 \textcolor{comment}{    */}}
+\DoxyCodeLine{950     \textcolor{keywordtype}{void} \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_abfcdae7f899aef08f9f5081e850fd228}{mpi\_iteration::gather\_objects}}(MPI\_Comm communicator, \textcolor{keywordtype}{int} node\_id=0) \{}
+\DoxyCodeLine{951         \textcolor{keywordtype}{int} size, rank;}
+\DoxyCodeLine{952         MPI\_Comm\_size(communicator, \&size);}
+\DoxyCodeLine{953         MPI\_Comm\_rank(communicator, \&rank);}
+\DoxyCodeLine{954 }
+\DoxyCodeLine{955         \textcolor{keywordflow}{if} (rank == node\_id) \{}
+\DoxyCodeLine{956             \textcolor{keywordflow}{for} (\textcolor{keywordtype}{int} node = 1; node < size; ++node) \{}
+\DoxyCodeLine{957                 \textcolor{keywordtype}{int} receive\_node = node <= node\_id ? node -\/ 1 : node;}
+\DoxyCodeLine{958 }
+\DoxyCodeLine{959                 \textcolor{comment}{/* receive objects */}}
+\DoxyCodeLine{960                 \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a30e7a9e5c0175fd1f3f274e104f12450}{receive\_objects}}(receive\_node, communicator);}
+\DoxyCodeLine{961             \}}
+\DoxyCodeLine{962 }
+\DoxyCodeLine{963         \} \textcolor{keywordflow}{else}}
+\DoxyCodeLine{964             \textcolor{comment}{/* send objects */}}
+\DoxyCodeLine{965             \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ac6bbfe01b075868e82de88151e1a8fa1}{send\_objects}}(\mbox{\hyperlink{classquids_1_1iteration_ada9a7c0e3d1ab4624e618154f02e0769}{num\_object}}, node\_id, communicator);}
+\DoxyCodeLine{966 }
+\DoxyCodeLine{967         \textcolor{comment}{/* compute node\_total\_proba */}}
+\DoxyCodeLine{968         \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}{node\_total\_proba}} = rank == node\_id;}
+\DoxyCodeLine{969     \}}
+\DoxyCodeLine{970 \}}
+
+\end{DoxyCode}

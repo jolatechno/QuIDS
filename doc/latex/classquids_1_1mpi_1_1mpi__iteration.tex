@@ -1,0 +1,257 @@
+\hypertarget{classquids_1_1mpi_1_1mpi__iteration}{}\doxysection{quids\+::mpi\+::mpi\+\_\+iteration Class Reference}
+\label{classquids_1_1mpi_1_1mpi__iteration}\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+
+
+mpi iteration (wave function) class, ineriting from the \mbox{\hyperlink{classquids_1_1iteration}{quids\+::iteration}} class  
+
+
+
+
+{\ttfamily \#include $<$quids\+\_\+mpi.\+hpp$>$}
+
+Inheritance diagram for quids\+::mpi\+::mpi\+\_\+iteration\+:\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=2.000000cm]{classquids_1_1mpi_1_1mpi__iteration}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_ac872b4a8cace2aa4208e2cce9e2f077c}\label{classquids_1_1mpi_1_1mpi__iteration_ac872b4a8cace2aa4208e2cce9e2f077c}} 
+{\bfseries mpi\+\_\+iteration} ()
+\begin{DoxyCompactList}\small\item\em simple empty wavefunction constructor. \end{DoxyCompactList}\item 
+\mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_af19eb4a102ff5f3e7aacd63eb470f3fc}{mpi\+\_\+iteration}} (char $\ast$object\+\_\+begin\+\_\+, char $\ast$object\+\_\+end\+\_\+)
+\begin{DoxyCompactList}\small\item\em constructor that insert a single object with magnitude 1 \end{DoxyCompactList}\item 
+size\+\_\+t \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a02ec85e300629005ca50614f0eed752a}{get\+\_\+total\+\_\+num\+\_\+object}} (MPI\+\_\+\+Comm communicator) const
+\begin{DoxyCompactList}\small\item\em getter for the total amount of distributed objects. \end{DoxyCompactList}\item 
+size\+\_\+t \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a4d653ffa3fd47132b57d5f0d74e65a92}{get\+\_\+total\+\_\+num\+\_\+symbolic\+\_\+object}} (MPI\+\_\+\+Comm communicator) const
+\begin{DoxyCompactList}\small\item\em getter for the total amount of distributed symbolic objects. \end{DoxyCompactList}\item 
+PROBA\+\_\+\+TYPE \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a208da77ef960514bb57d0f9c6f9db567}{average\+\_\+value}} (const \mbox{\hyperlink{namespacequids_ab614af3adb7a49a771409f0d8c81b081}{quids\+::observable\+\_\+t}} observable) const
+\begin{DoxyCompactList}\small\item\em function to get the average local value of a custom observable. \end{DoxyCompactList}\item 
+PROBA\+\_\+\+TYPE \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a81f55d1714eb28d8e39fefcdf6144a1b}{average\+\_\+value}} (const \mbox{\hyperlink{namespacequids_ab614af3adb7a49a771409f0d8c81b081}{quids\+::observable\+\_\+t}} observable, MPI\+\_\+\+Comm communicator) const
+\begin{DoxyCompactList}\small\item\em function to get the average value of a custom observable accross the total distributed wave function. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_ac6bbfe01b075868e82de88151e1a8fa1}{send\+\_\+objects}} (size\+\_\+t num\+\_\+object\+\_\+sent, int node, MPI\+\_\+\+Comm communicator, bool send\+\_\+num\+\_\+child=false)
+\begin{DoxyCompactList}\small\item\em function to send objects (from the \char`\"{}tail\char`\"{} of the memory representation). \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a30e7a9e5c0175fd1f3f274e104f12450}{receive\+\_\+objects}} (int node, MPI\+\_\+\+Comm communicator, bool receive\+\_\+num\+\_\+child=false, size\+\_\+t max\+\_\+mem=-\/1)
+\begin{DoxyCompactList}\small\item\em function to receive objects (at the \char`\"{}tail\char`\"{} of the memory representation). \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a0329ef9825ea660dd76cbcf3781d204d}{equalize}} (MPI\+\_\+\+Comm communicator)
+\begin{DoxyCompactList}\small\item\em equalize the number of object across node pairs. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a003ba03b8fa1d998a12b9ec912026cd9}{distribute\+\_\+objects}} (MPI\+\_\+\+Comm communicator, int node\+\_\+id)
+\begin{DoxyCompactList}\small\item\em distribute objects eqaully from a single node to all others. \end{DoxyCompactList}\item 
+void \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_abfcdae7f899aef08f9f5081e850fd228}{gather\+\_\+objects}} (MPI\+\_\+\+Comm communicator, int node\+\_\+id)
+\begin{DoxyCompactList}\small\item\em gather objects to a single node from all others. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Data Fields}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}\label{classquids_1_1mpi_1_1mpi__iteration_ae39b5b42cb8f60a5673f4b01d15ab495}} 
+PROBA\+\_\+\+TYPE {\bfseries node\+\_\+total\+\_\+proba} = 0
+\begin{DoxyCompactList}\small\item\em total probability retained locally after previous truncation (if any). \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Friends}
+\begin{DoxyCompactItemize}
+\item 
+void \mbox{\hyperlink{classquids_1_1mpi_1_1mpi__iteration_a9f1608c653c2dcf627b4242913e0c27d}{simulate}} (\mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\+\_\+it\+\_\+t}} \&\mbox{\hyperlink{classquids_1_1iteration}{iteration}}, \mbox{\hyperlink{namespacequids_a62455c8f5240a575676aace3a25dfae3}{quids\+::rule\+\_\+t}} const $\ast$\mbox{\hyperlink{classquids_1_1rule}{rule}}, \mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\+\_\+it\+\_\+t}} \&next\+\_\+iteration, \mbox{\hyperlink{namespacequids_1_1mpi_a3e3b2dbb59ff2b0f9b997fb9bf196cc8}{mpi\+\_\+sy\+\_\+it\+\_\+t}} \&\mbox{\hyperlink{classquids_1_1symbolic__iteration}{symbolic\+\_\+iteration}}, MPI\+\_\+\+Comm communicator, size\+\_\+t max\+\_\+num\+\_\+object, \mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{quids\+::debug\+\_\+t}} mid\+\_\+step\+\_\+function)
+\begin{DoxyCompactList}\small\item\em function to apply a dynamic to a wave function distributed accross multiple nodes \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Additional Inherited Members}
+
+
+\doxysubsection{Detailed Description}
+mpi iteration (wave function) class, ineriting from the \mbox{\hyperlink{classquids_1_1iteration}{quids\+::iteration}} class 
+
+\doxysubsection{Constructor \& Destructor Documentation}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_af19eb4a102ff5f3e7aacd63eb470f3fc}\label{classquids_1_1mpi_1_1mpi__iteration_af19eb4a102ff5f3e7aacd63eb470f3fc}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!mpi\_iteration@{mpi\_iteration}}
+\index{mpi\_iteration@{mpi\_iteration}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{mpi\_iteration()}{mpi\_iteration()}}
+{\footnotesize\ttfamily quids\+::mpi\+::mpi\+\_\+iteration\+::mpi\+\_\+iteration (\begin{DoxyParamCaption}\item[{char $\ast$}]{object\+\_\+begin\+\_\+,  }\item[{char $\ast$}]{object\+\_\+end\+\_\+ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+constructor that insert a single object with magnitude 1 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em object\+\_\+begin\+\_\+,object\+\_\+end\+\_\+} & delimitations of the object to insert. \\
+\hline
+\end{DoxyParams}
+
+
+\doxysubsection{Member Function Documentation}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_a208da77ef960514bb57d0f9c6f9db567}\label{classquids_1_1mpi_1_1mpi__iteration_a208da77ef960514bb57d0f9c6f9db567}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!average\_value@{average\_value}}
+\index{average\_value@{average\_value}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{average\_value()}{average\_value()}\hspace{0.1cm}{\footnotesize\ttfamily [1/2]}}
+{\footnotesize\ttfamily PROBA\+\_\+\+TYPE quids\+::mpi\+::mpi\+\_\+iteration\+::average\+\_\+value (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{namespacequids_ab614af3adb7a49a771409f0d8c81b081}{quids\+::observable\+\_\+t}}}]{observable }\end{DoxyParamCaption}) const\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+function to get the average local value of a custom observable. 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em observable} & observable that should be computed. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_a81f55d1714eb28d8e39fefcdf6144a1b}\label{classquids_1_1mpi_1_1mpi__iteration_a81f55d1714eb28d8e39fefcdf6144a1b}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!average\_value@{average\_value}}
+\index{average\_value@{average\_value}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{average\_value()}{average\_value()}\hspace{0.1cm}{\footnotesize\ttfamily [2/2]}}
+{\footnotesize\ttfamily PROBA\+\_\+\+TYPE quids\+::mpi\+::mpi\+\_\+iteration\+::average\+\_\+value (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{namespacequids_ab614af3adb7a49a771409f0d8c81b081}{quids\+::observable\+\_\+t}}}]{observable,  }\item[{MPI\+\_\+\+Comm}]{communicator }\end{DoxyParamCaption}) const\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+function to get the average value of a custom observable accross the total distributed wave function. 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em observable} & observable that should be computed. \\
+\hline
+\mbox{\texttt{ in}}  & {\em communicator} & MPI communcator. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_a003ba03b8fa1d998a12b9ec912026cd9}\label{classquids_1_1mpi_1_1mpi__iteration_a003ba03b8fa1d998a12b9ec912026cd9}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!distribute\_objects@{distribute\_objects}}
+\index{distribute\_objects@{distribute\_objects}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{distribute\_objects()}{distribute\_objects()}}
+{\footnotesize\ttfamily void quids\+::mpi\+::mpi\+\_\+iteration\+::distribute\+\_\+objects (\begin{DoxyParamCaption}\item[{MPI\+\_\+\+Comm}]{communicator,  }\item[{int}]{node\+\_\+id = {\ttfamily 0} }\end{DoxyParamCaption})}
+
+
+
+distribute objects eqaully from a single node to all others. 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em communicator} & MPI communcator. \\
+\hline
+\mbox{\texttt{ in}}  & {\em node} & node identifier that objects should be distributed from. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_a0329ef9825ea660dd76cbcf3781d204d}\label{classquids_1_1mpi_1_1mpi__iteration_a0329ef9825ea660dd76cbcf3781d204d}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!equalize@{equalize}}
+\index{equalize@{equalize}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{equalize()}{equalize()}}
+{\footnotesize\ttfamily void quids\+::mpi\+::mpi\+\_\+iteration\+::equalize (\begin{DoxyParamCaption}\item[{MPI\+\_\+\+Comm}]{communicator }\end{DoxyParamCaption})}
+
+
+
+equalize the number of object across node pairs. 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em communicator} & MPI communcator. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_abfcdae7f899aef08f9f5081e850fd228}\label{classquids_1_1mpi_1_1mpi__iteration_abfcdae7f899aef08f9f5081e850fd228}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!gather\_objects@{gather\_objects}}
+\index{gather\_objects@{gather\_objects}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{gather\_objects()}{gather\_objects()}}
+{\footnotesize\ttfamily void quids\+::mpi\+::mpi\+\_\+iteration\+::gather\+\_\+objects (\begin{DoxyParamCaption}\item[{MPI\+\_\+\+Comm}]{communicator,  }\item[{int}]{node\+\_\+id = {\ttfamily 0} }\end{DoxyParamCaption})}
+
+
+
+gather objects to a single node from all others. 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em communicator} & MPI communcator. \\
+\hline
+\mbox{\texttt{ in}}  & {\em node} & node identifier that objects should be gathered to. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_a02ec85e300629005ca50614f0eed752a}\label{classquids_1_1mpi_1_1mpi__iteration_a02ec85e300629005ca50614f0eed752a}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!get\_total\_num\_object@{get\_total\_num\_object}}
+\index{get\_total\_num\_object@{get\_total\_num\_object}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{get\_total\_num\_object()}{get\_total\_num\_object()}}
+{\footnotesize\ttfamily size\+\_\+t quids\+::mpi\+::mpi\+\_\+iteration\+::get\+\_\+total\+\_\+num\+\_\+object (\begin{DoxyParamCaption}\item[{MPI\+\_\+\+Comm}]{communicator }\end{DoxyParamCaption}) const\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+getter for the total amount of distributed objects. 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em communicator} & MPI communcator. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_a4d653ffa3fd47132b57d5f0d74e65a92}\label{classquids_1_1mpi_1_1mpi__iteration_a4d653ffa3fd47132b57d5f0d74e65a92}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!get\_total\_num\_symbolic\_object@{get\_total\_num\_symbolic\_object}}
+\index{get\_total\_num\_symbolic\_object@{get\_total\_num\_symbolic\_object}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{get\_total\_num\_symbolic\_object()}{get\_total\_num\_symbolic\_object()}}
+{\footnotesize\ttfamily size\+\_\+t quids\+::mpi\+::mpi\+\_\+iteration\+::get\+\_\+total\+\_\+num\+\_\+symbolic\+\_\+object (\begin{DoxyParamCaption}\item[{MPI\+\_\+\+Comm}]{communicator }\end{DoxyParamCaption}) const\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+getter for the total amount of distributed symbolic objects. 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em communicator} & MPI communcator. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_a30e7a9e5c0175fd1f3f274e104f12450}\label{classquids_1_1mpi_1_1mpi__iteration_a30e7a9e5c0175fd1f3f274e104f12450}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!receive\_objects@{receive\_objects}}
+\index{receive\_objects@{receive\_objects}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{receive\_objects()}{receive\_objects()}}
+{\footnotesize\ttfamily void quids\+::mpi\+::mpi\+\_\+iteration\+::receive\+\_\+objects (\begin{DoxyParamCaption}\item[{int}]{node,  }\item[{MPI\+\_\+\+Comm}]{communicator,  }\item[{bool}]{receive\+\_\+num\+\_\+child = {\ttfamily false},  }\item[{size\+\_\+t}]{max\+\_\+mem = {\ttfamily -\/1} }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+function to receive objects (at the \char`\"{}tail\char`\"{} of the memory representation). 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em node} & node identifier that objects should be received from. @params\mbox{[}in\mbox{]} communicator MPI communcator. @params\mbox{[}in\mbox{]} receive\+\_\+num\+\_\+child wether to also receive the number of children per object or not. @params\mbox{[}in\mbox{]} max\+\_\+mem the maximum amount of memory that can be received, -\/1 means no limits. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_ac6bbfe01b075868e82de88151e1a8fa1}\label{classquids_1_1mpi_1_1mpi__iteration_ac6bbfe01b075868e82de88151e1a8fa1}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!send\_objects@{send\_objects}}
+\index{send\_objects@{send\_objects}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{send\_objects()}{send\_objects()}}
+{\footnotesize\ttfamily void quids\+::mpi\+::mpi\+\_\+iteration\+::send\+\_\+objects (\begin{DoxyParamCaption}\item[{size\+\_\+t}]{num\+\_\+object\+\_\+sent,  }\item[{int}]{node,  }\item[{MPI\+\_\+\+Comm}]{communicator,  }\item[{bool}]{send\+\_\+num\+\_\+child = {\ttfamily false} }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+
+function to send objects (from the \char`\"{}tail\char`\"{} of the memory representation). 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em num\+\_\+object\+\_\+sent} & number of object to be sent. \\
+\hline
+\mbox{\texttt{ in}}  & {\em node} & node identifier that objects should be sent to. @params\mbox{[}in\mbox{]} communicator MPI communcator. @params\mbox{[}in\mbox{]} send\+\_\+num\+\_\+child wether to also send the number of children per object or not. \\
+\hline
+\end{DoxyParams}
+
+
+\doxysubsection{Friends And Related Function Documentation}
+\mbox{\Hypertarget{classquids_1_1mpi_1_1mpi__iteration_a9f1608c653c2dcf627b4242913e0c27d}\label{classquids_1_1mpi_1_1mpi__iteration_a9f1608c653c2dcf627b4242913e0c27d}} 
+\index{quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}!simulate@{simulate}}
+\index{simulate@{simulate}!quids::mpi::mpi\_iteration@{quids::mpi::mpi\_iteration}}
+\doxysubsubsection{\texorpdfstring{simulate}{simulate}}
+{\footnotesize\ttfamily void simulate (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\+\_\+it\+\_\+t}} \&}]{iteration,  }\item[{\mbox{\hyperlink{namespacequids_a62455c8f5240a575676aace3a25dfae3}{quids\+::rule\+\_\+t}} const $\ast$}]{rule,  }\item[{\mbox{\hyperlink{namespacequids_1_1mpi_a35f6cb8275fdb46ab6042a3e4bd799ba}{mpi\+\_\+it\+\_\+t}} \&}]{next\+\_\+iteration,  }\item[{\mbox{\hyperlink{namespacequids_1_1mpi_a3e3b2dbb59ff2b0f9b997fb9bf196cc8}{mpi\+\_\+sy\+\_\+it\+\_\+t}} \&}]{symbolic\+\_\+iteration,  }\item[{MPI\+\_\+\+Comm}]{communicator,  }\item[{size\+\_\+t}]{max\+\_\+num\+\_\+object = {\ttfamily 0},  }\item[{\mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{quids\+::debug\+\_\+t}}}]{mid\+\_\+step\+\_\+function = {\ttfamily \mbox{[}\mbox{]}(const~char$\ast$)\{\}} }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [friend]}}
+
+
+
+function to apply a dynamic to a wave function distributed accross multiple nodes 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em iteration} & wavefunction that the dynamic will be applied to. \\
+\hline
+\mbox{\texttt{ in}}  & {\em rule} & dynamic that will be applied. \\
+\hline
+\mbox{\texttt{ out}}  & {\em next\+\_\+iteration} & wave function that will be overwritten to then contained the final wave function. \\
+\hline
+\mbox{\texttt{ out}}  & {\em \mbox{\hyperlink{classquids_1_1symbolic__iteration}{symbolic\+\_\+iteration}}} & symbolic iteration that will be used. \\
+\hline
+\mbox{\texttt{ in}}  & {\em communicator} & MPI communcator. \\
+\hline
+\mbox{\texttt{ in}}  & {\em max\+\_\+num\+\_\+object} & maximum number of objects to be kept per node, -\/1 means no maximum, 0 means automaticaly finding the maximum ammount of objects that can be kept in memory. \\
+\hline
+\mbox{\texttt{ in}}  & {\em mid\+\_\+step\+\_\+function} & debuging function called between steps. \\
+\hline
+\end{DoxyParams}
+
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/home/joseph/\+Documents/projets/programing/cpp/\+Quantum-\/graph-\/simulation/src/\+Qu\+IDS/src/quids\+\_\+mpi.\+hpp\end{DoxyCompactItemize}

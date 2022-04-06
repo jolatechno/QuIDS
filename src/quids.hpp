@@ -10,14 +10,20 @@
 
 #include "utils/libs/robin_hood.h"
 
+#include "utils/vector.hpp"
+#include "utils/load_balancing.hpp"
+#include "utils/algorithm.hpp"
+#include "utils/memory.hpp"
+#include "utils/random.hpp"
+
 #ifndef PROBA_TYPE
-	#define PROBA_TYPE double
+	#define PROBA_TYPE double /// typedefinition of probability type
 #endif
 #ifndef HASH_MAP_OVERHEAD
-	#define HASH_MAP_OVERHEAD 1.7
+	#define HASH_MAP_OVERHEAD 1.7 /// overhead per 64-bit key and value insertion in hashmap (robinhood)
 #endif
 #ifndef TOLERANCE
-	#define TOLERANCE 1e-30;
+	#define TOLERANCE 1e-100;
 #endif
 #ifndef SAFETY_MARGIN
 	#define SAFETY_MARGIN 0.2
@@ -37,58 +43,194 @@ defining openmp function's return values if openmp isn't installed or loaded
 	#include <omp.h>
 #endif
 
+/// QuIDS namespace
 namespace quids {
-	namespace utils {
-		#include "utils/vector.hpp"
-		#include "utils/load_balancing.hpp"
-		#include "utils/algorithm.hpp"
-		#include "utils/memory.hpp"
-		#include "utils/random.hpp"
-	}
-
-	/*
-	global variable definition
-	*/
+	/// tolerance for objects (remove objects with a smaller probability)
 	PROBA_TYPE tolerance = TOLERANCE;
+	/// memory safety margin (0.2 = 80% memory usage target)
 	float safety_margin = SAFETY_MARGIN;
+	/// number of load balancing buckets per thread
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
 	#ifdef SIMPLE_TRUNCATION
+		/// simple truncation toggle - disable probabilistic truncation, increasing "accuracy" but reducing the representability of truncation. Set true by the presence of the SIMPLE_TRUNCATION flag.
 		bool simple_truncation = true;
 	#else
+		/// simple truncation toggle - disable probabilistic truncation, increasing "accuracy" but reducing the representability of truncation. Set false (default) by the absence of the SIMPLE_TRUNCATION flag.
 		bool simple_truncation = false;
 	#endif
 
-	/* forward typedef */
+	/// complex magnitude type
 	typedef std::complex<PROBA_TYPE> mag_t;
+	/// iteration class type
 	typedef class iteration it_t;
+	/// symbolic iteration type
 	typedef class symbolic_iteration sy_it_t;
+	/// dynamic (or rule) type
 	typedef class rule rule_t;
+	/// simple "modifier" type (single input, single output of same size dynamic)
 	typedef std::function<void(char* parent_begin, char* parent_end, mag_t &mag)> modifier_t;
+	/// observable definition typedef
+	typedef std::function<PROBA_TYPE(char const *object_begin, char const *object_end)> observable_t;
+	/// debuging function type
 	typedef std::function<void(const char* step)> debug_t;
 
-	/* 
-	rule virtual class
-	*/
+	/// class represneting a dynamic (or rule).
 	class rule {
 	public:
+		/// base constructor
 		rule() {};
+		/// function geting the number of children
+		/** 
+		 * @param[in] parent_begin,parent_end delimitation of the parent object memory representation.
+		 * @param[out] num_child number of children objects.
+		 * @param[out] max_child_size upper bound (can be unacurate) of the size of childrens.
+		 */
 		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const = 0;
+		/// function generating a child, and computing its magnitude and size.
+		/** 
+		 * @param[in] parent_begin,parent_end delimitation of the parent object memory representation.
+		 * @param[out] child_begin start of the memory representation of the child memory representation.
+		 * @param[in] child_id children identifier among its siblings.
+		 * @param[out] size child object memory representation size.
+		 * @param[out] mag magnitude of the children object (input should be the parent magnitude).
+		 */
 		virtual inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id, size_t &size, mag_t &mag) const = 0;
+		/// function generating a child, without computing its magnitude and size.
+		/** 
+		 * @param[in] parent_begin,parent_end delimitation of the parent object memory representation.
+		 * @param[out] child_begin start of the memory representation of the child memory representation.
+		 * @param[in] child_id children identifier among its siblings.
+		 */
 		virtual inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id) const { //can be overwritten
 			size_t size_placeholder;
 			mag_t mag_placeholder;
 			populate_child(parent_begin, parent_end, child_begin, child_id,
 				size_placeholder, mag_placeholder);
 		}
-		virtual inline size_t hasher(char const *parent_begin, char const *parent_end) const { //can be overwritten
-			return std::hash<std::string_view>()(std::string_view(parent_begin, std::distance(parent_begin, parent_end)));
+		/// optional function hashing an object.
+		/** 
+		 * Base implementation simply hashes the memory representation of an object.
+		 * User should provide this function if objects that should be considered equals have different memory representation.
+		 * @param[in] object_begin,object_end delimitation of the object to hash memory representation.
+		 */
+		virtual inline size_t hasher(char const *object_begin, char const *object_end) const {
+			return std::hash<std::string_view>()(std::string_view(object_begin, std::distance(object_begin, object_end)));
 		}
 	};
 
-	/*
-	iteration class
-	*/
+	/// iteration (wave function) representation class
 	class iteration {
+	public:
+		/// number of objects contained in the wave function
+		size_t num_object = 0;
+		/// total probability retained after previous truncation (if any).
+		PROBA_TYPE total_proba = 1;
+
+		/// simple empty wavefunction constructor
+		iteration() {
+			resize(0);
+			allocate(0);
+			object_begin[0] = 0;
+		}
+		/// constructor that insert a single object with magnitude 1
+		/**
+		 * @param[in] object_begin_,object_end_ delimitations of the object to insert.
+		 */
+		iteration(char* object_begin_, char* object_end_) : iteration() {
+			append(object_begin_, object_end_);
+		}
+		/// function that insert a single object with a given magnitude
+		/**
+		 * @param[in] object_begin_,object_end_ delimitations of the object to insert.
+		 * @param[in] mag magnitude given to the object after insertion
+		 */
+		void append(char const *object_begin_, char const *object_end_, mag_t const mag=1) {
+			size_t offset = object_begin[num_object];
+			size_t size = std::distance(object_begin_, object_end_);
+
+			resize(++num_object);
+			allocate(offset + size);
+
+			for (size_t i = 0; i < size; ++i)
+				objects[offset + i] = object_begin_[i];
+
+			magnitude[num_object - 1] = mag;
+			object_begin[num_object] = offset + size;
+		}
+		/// function that removes a given number of object from the "tail" of the memory representation
+		/**
+		 * @param[in] n number of objects to remove
+		 * @param[in] normalize wether to normalize after removing objects or not
+		 */
+		void pop(size_t n=1, bool normalize_=true) {
+			if (n < 1)
+				return;
+
+			num_object -= n;
+			allocate(object_begin[num_object]);
+			resize(num_object);
+
+			if (normalize_) normalize();
+		}
+		/// function to get the average value of a custom observable
+		/**
+		 * @param[in] observable observable that should be computed.
+		 */
+		PROBA_TYPE average_value(const observable_t observable) const {
+			PROBA_TYPE avg = 0;
+			if (num_object == 0)
+				return avg;
+
+			#pragma omp parallel
+			{	
+				/* compute average per thread */
+				PROBA_TYPE local_avg = 0;
+				#pragma omp for 
+				for (size_t oid = 0; oid < num_object; ++oid) {
+					size_t size;
+					std::complex<PROBA_TYPE> mag;
+
+					/* get object and accumulate */
+					char const *this_object_begin;
+					get_object(oid, this_object_begin, size, mag);
+					local_avg += observable(this_object_begin, this_object_begin + size) * std::norm(mag);
+				}
+
+				/* accumulate thread averages */
+				#pragma omp critical
+				avg += local_avg;
+			}
+
+			return avg;
+		}
+		/// function to access a particular object (read-write access)
+		/**
+		 * @param[in] object_id identifier of the object to get (0 being the first object etc...).
+		 * @param[out] object_begin_ begining of the object memory representation.
+		 * @param[out] object_size size of the memory representation of the object.
+		 * @param[out] mag magnitude of the object.
+		 */
+		void get_object(size_t const object_id, char *& object_begin_, size_t &object_size, mag_t *&mag) {
+			size_t this_object_begin = object_begin[object_id];
+			object_size = object_begin[object_id + 1] - this_object_begin;
+			mag = &magnitude[object_id];
+			object_begin_ = &objects[this_object_begin];
+		}
+		/// function to access a particular object (read-only access)
+		/**
+		 * @param[in] object_id identifier of the object to get (0 being the first object etc...).
+		 * @param[out] object_begin_ begining of the object memory representation.
+		 * @param[out] object_size size of the memory representation of the object.
+		 * @param[out] mag magnitude of the object.
+		 */
+		void get_object(size_t const object_id, char const *& object_begin_, size_t &object_size, mag_t &mag) const {
+			size_t this_object_begin = object_begin[object_id];
+			object_size = object_begin[object_id + 1] - this_object_begin;
+			mag = magnitude[object_id];
+			object_begin_ = &objects[this_object_begin];
+		}
+
+	private:
 		friend symbolic_iteration;
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function);  
 		friend void inline simulate(it_t &iteration, modifier_t const rule);
@@ -105,6 +247,7 @@ namespace quids {
 		mutable utils::fast_vector<size_t> truncated_oid;
 		mutable utils::fast_vector<float> random_selector;
 
+		//! @cond
 		void inline resize(size_t num_object) const {
 			#pragma omp parallel sections
 			{
@@ -145,7 +288,9 @@ namespace quids {
 		size_t get_object_length() const {
 			return object_begin[num_object];
 		}
-
+		size_t get_num_symbolic_object() const {
+			return __gnu_parallel::accumulate(&num_childs[0], &num_childs[0] + num_object, (size_t)0);
+		}
 
 
 		void compute_num_child(rule_t const *rule, debug_t mid_step_function=[](const char*){}) const;
@@ -155,90 +300,21 @@ namespace quids {
 		void generate_symbolic_iteration(rule_t const *rule, sy_it_t &symbolic_iteration, debug_t mid_step_function=[](const char*){}) const;
 		void apply_modifier(modifier_t const rule);
 		void normalize(debug_t mid_step_function=[](const char*){});
-
-	public:
-		size_t num_object = 0;
-		PROBA_TYPE total_proba = 1;
-
-		iteration() {
-			resize(0);
-			allocate(0);
-			object_begin[0] = 0;
-		}
-		iteration(char* object_begin_, char* object_end_) : iteration() {
-			append(object_begin_, object_end_);
-		}
-		size_t get_num_symbolic_object() const {
-			return __gnu_parallel::accumulate(&num_childs[0], &num_childs[0] + num_object, (size_t)0);
-		}
-		void append(char const *object_begin_, char const *object_end_, mag_t const mag=1) {
-			size_t offset = object_begin[num_object];
-			size_t size = std::distance(object_begin_, object_end_);
-
-			resize(++num_object);
-			allocate(offset + size);
-
-			for (size_t i = 0; i < size; ++i)
-				objects[offset + i] = object_begin_[i];
-
-			magnitude[num_object - 1] = mag;
-			object_begin[num_object] = offset + size;
-		}
-		void pop(size_t n=1, bool normalize_=true) {
-			if (n < 1)
-				return;
-
-			num_object -= n;
-			allocate(object_begin[num_object]);
-			resize(num_object);
-
-			if (normalize_) normalize();
-		}
-		PROBA_TYPE average_value(std::function<PROBA_TYPE(char const *object_begin, char const *object_end)> const observable) const {
-			PROBA_TYPE avg = 0;
-			if (num_object == 0)
-				return avg;
-
-			#pragma omp parallel
-			{	
-				/* compute average per thread */
-				PROBA_TYPE local_avg = 0;
-				#pragma omp for 
-				for (size_t oid = 0; oid < num_object; ++oid) {
-					size_t size;
-					std::complex<PROBA_TYPE> mag;
-
-					/* get object and accumulate */
-					char const *this_object_begin;
-					get_object(oid, this_object_begin, size, mag);
-					local_avg += observable(this_object_begin, this_object_begin + size) * std::norm(mag);
-				}
-
-				/* accumulate thread averages */
-				#pragma omp critical
-				avg += local_avg;
-			}
-
-			return avg;
-		}
-		void get_object(size_t const object_id, char *& object_begin_, size_t &object_size, mag_t *&mag) {
-			size_t this_object_begin = object_begin[object_id];
-			object_size = object_begin[object_id + 1] - this_object_begin;
-			mag = &magnitude[object_id];
-			object_begin_ = &objects[this_object_begin];
-		}
-		void get_object(size_t const object_id, char const *& object_begin_, size_t &object_size, mag_t &mag) const {
-			size_t this_object_begin = object_begin[object_id];
-			object_size = object_begin[object_id + 1] - this_object_begin;
-			mag = magnitude[object_id];
-			object_begin_ = &objects[this_object_begin];
-		}
+		//! @endcond
 	};
 
-	/*
-	symboluc iteration class
-	*/
+	/// symbolic iteration (computation intermediary)
 	class symbolic_iteration {
+	public:
+		/// simple constructor
+		symbolic_iteration() {}
+		
+		/// number of objects considered in the symbolic step
+		size_t num_object = 0;
+		/// number of objects obrained after eliminating duplicates
+		size_t num_object_after_interferences = 0;
+
+	private:
 		friend iteration;
 		friend void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object, debug_t mid_step_function); 
 
@@ -257,6 +333,7 @@ namespace quids {
 		utils::fast_vector<float> random_selector;
 		utils::fast_vector<size_t> next_oid_partitioner_buffer;
 
+		//! @cond
 		void inline resize(size_t num_object) {
 			#pragma omp parallel sections
 			{
@@ -321,20 +398,26 @@ namespace quids {
 		void truncate(size_t begin_num_object, size_t max_num_object, debug_t mid_step_function=[](const char*){});
 		void prepare_truncate(debug_t mid_step_function=[](const char*){});
 		void finalize(rule_t const *rule, it_t const &last_iteration, it_t &next_iteration, debug_t mid_step_function=[](const char*){});
-
-	public:
-		size_t num_object = 0;
-		size_t num_object_after_interferences = 0;
-
-		symbolic_iteration() {}
+		//! @endcond
 	};
 
-	/*
-	simulation function
-	*/
+	/// function to apply a modifer to a wave function
+	/**
+	 * @param[in] iteration wavefunction that the modifier will be applied to.
+	 * @param[in] rule modifer that will be applied
+	 */
 	void inline simulate(it_t &iteration, modifier_t const rule) {
 		iteration.apply_modifier(rule);
 	}
+	/// function to apply a dynamic to a wavefunction
+	/**
+	 * @param[in] iteration wavefunction that the dynamic will be applied to.
+	 * @param[in] rule dynamic that will be applied.
+	 * @param[out] next_iteration wave function that will be overwritten to then contained the final wave function.
+	 * @param[out] symbolic_iteration symbolic iteration that will be used.
+	 * @param[in] max_num_object maximum number of objects to be kept, -1 means no maximum, 0 means automaticaly finding the maximum ammount of objects that can be kept in memory.
+	 * @param[in] mid_step_function debuging function called between steps.
+	 */
 	void inline simulate(it_t &iteration, rule_t const *rule, it_t &next_iteration, sy_it_t &symbolic_iteration, size_t max_num_object=0, debug_t mid_step_function=[](const char*){}) {	
 		/* compute the number of child */
 		iteration.compute_num_child(rule, mid_step_function);

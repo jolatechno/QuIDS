@@ -1,0 +1,109 @@
+\hypertarget{classquids_1_1symbolic__iteration}{}\doxysection{quids\+::symbolic\+\_\+iteration Class Reference}
+\label{classquids_1_1symbolic__iteration}\index{quids::symbolic\_iteration@{quids::symbolic\_iteration}}
+
+
+symbolic iteration (computation intermediary)  
+
+
+
+
+{\ttfamily \#include $<$quids.\+hpp$>$}
+
+Inheritance diagram for quids\+::symbolic\+\_\+iteration\+:\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=2.000000cm]{classquids_1_1symbolic__iteration}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a5523845c09534d44e9a357e9d2e3a0a8}\label{classquids_1_1symbolic__iteration_a5523845c09534d44e9a357e9d2e3a0a8}} 
+{\bfseries symbolic\+\_\+iteration} ()
+\begin{DoxyCompactList}\small\item\em simple constructor \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Data Fields}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a688bb468e98b73bd13f81d7915dc3a2f}\label{classquids_1_1symbolic__iteration_a688bb468e98b73bd13f81d7915dc3a2f}} 
+size\+\_\+t {\bfseries num\+\_\+object} = 0
+\begin{DoxyCompactList}\small\item\em number of objects considered in the symbolic step \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a54dda8c91c4bf8f7a097910ff4fbe34b}\label{classquids_1_1symbolic__iteration_a54dda8c91c4bf8f7a097910ff4fbe34b}} 
+size\+\_\+t {\bfseries num\+\_\+object\+\_\+after\+\_\+interferences} = 0
+\begin{DoxyCompactList}\small\item\em number of objects obrained after eliminating duplicates \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Protected Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a0d1935b9da406bd06276c253780003b7}\label{classquids_1_1symbolic__iteration_a0d1935b9da406bd06276c253780003b7}} 
+size\+\_\+t {\bfseries next\+\_\+iteration\+\_\+num\+\_\+object} = 0
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a37d7875de2c3e9d9d1eb8027a8197786}\label{classquids_1_1symbolic__iteration_a37d7875de2c3e9d9d1eb8027a8197786}} 
+std\+::vector$<$ char $\ast$ $>$ {\bfseries placeholder}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a37a7ede2fbaaf4fcfa3fd45d8465c0cb}\label{classquids_1_1symbolic__iteration_a37a7ede2fbaaf4fcfa3fd45d8465c0cb}} 
+\mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{utils\+::fast\+\_\+vector}}$<$ \mbox{\hyperlink{namespacequids_a13a066a7f98435d1c84f2318439d4f0b}{mag\+\_\+t}} $>$ {\bfseries magnitude}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a2a0309bff5dede5910b354f0b2c39fd6}\label{classquids_1_1symbolic__iteration_a2a0309bff5dede5910b354f0b2c39fd6}} 
+\mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{utils\+::fast\+\_\+vector}}$<$ size\+\_\+t $>$ {\bfseries next\+\_\+oid}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a778bce3cee842a1ee325736ed6079752}\label{classquids_1_1symbolic__iteration_a778bce3cee842a1ee325736ed6079752}} 
+\mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{utils\+::fast\+\_\+vector}}$<$ char $>$ {\bfseries is\+\_\+unique}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a678d6f78aef1f69b514426791b3e4969}\label{classquids_1_1symbolic__iteration_a678d6f78aef1f69b514426791b3e4969}} 
+\mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{utils\+::fast\+\_\+vector}}$<$ size\+\_\+t $>$ {\bfseries size}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a9579599067d06faf4710b403bac39b04}\label{classquids_1_1symbolic__iteration_a9579599067d06faf4710b403bac39b04}} 
+\mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{utils\+::fast\+\_\+vector}}$<$ size\+\_\+t $>$ {\bfseries hash}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a7cce4ba867739df791d6e2a1413dd97e}\label{classquids_1_1symbolic__iteration_a7cce4ba867739df791d6e2a1413dd97e}} 
+\mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{utils\+::fast\+\_\+vector}}$<$ size\+\_\+t $>$ {\bfseries parent\+\_\+oid}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a146942baa57e75447077f2b97a2a9be7}\label{classquids_1_1symbolic__iteration_a146942baa57e75447077f2b97a2a9be7}} 
+\mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{utils\+::fast\+\_\+vector}}$<$ uint32\+\_\+t $>$ {\bfseries child\+\_\+id}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a218afaef9cc371336b74bb08e12e2f6b}\label{classquids_1_1symbolic__iteration_a218afaef9cc371336b74bb08e12e2f6b}} 
+\mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{utils\+::fast\+\_\+vector}}$<$ float $>$ {\bfseries random\+\_\+selector}
+\item 
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a21e940b25cc24c4a39b0ebc7ff287b47}\label{classquids_1_1symbolic__iteration_a21e940b25cc24c4a39b0ebc7ff287b47}} 
+\mbox{\hyperlink{classquids_1_1utils_1_1fast__vector}{utils\+::fast\+\_\+vector}}$<$ size\+\_\+t $>$ {\bfseries next\+\_\+oid\+\_\+partitioner\+\_\+buffer}
+\end{DoxyCompactItemize}
+\doxysubsection*{Friends}
+\begin{DoxyCompactItemize}
+\item 
+void \mbox{\hyperlink{classquids_1_1symbolic__iteration_a09d4f5a2ab584cbdd6374a78cad50ec0}{simulate}} (\mbox{\hyperlink{namespacequids_a60a676728450b703f98f219a0ee7e5f2}{it\+\_\+t}} \&\mbox{\hyperlink{classquids_1_1iteration}{iteration}}, \mbox{\hyperlink{namespacequids_a62455c8f5240a575676aace3a25dfae3}{rule\+\_\+t}} const $\ast$\mbox{\hyperlink{classquids_1_1rule}{rule}}, \mbox{\hyperlink{namespacequids_a60a676728450b703f98f219a0ee7e5f2}{it\+\_\+t}} \&next\+\_\+iteration, \mbox{\hyperlink{namespacequids_a2f3cfcb2f4d55d58993493426aafb2fe}{sy\+\_\+it\+\_\+t}} \&\mbox{\hyperlink{classquids_1_1symbolic__iteration}{symbolic\+\_\+iteration}}, size\+\_\+t max\+\_\+num\+\_\+object, \mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{debug\+\_\+t}} mid\+\_\+step\+\_\+function)
+\begin{DoxyCompactList}\small\item\em function to apply a dynamic to a wavefunction \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+symbolic iteration (computation intermediary) 
+
+\doxysubsection{Friends And Related Function Documentation}
+\mbox{\Hypertarget{classquids_1_1symbolic__iteration_a09d4f5a2ab584cbdd6374a78cad50ec0}\label{classquids_1_1symbolic__iteration_a09d4f5a2ab584cbdd6374a78cad50ec0}} 
+\index{quids::symbolic\_iteration@{quids::symbolic\_iteration}!simulate@{simulate}}
+\index{simulate@{simulate}!quids::symbolic\_iteration@{quids::symbolic\_iteration}}
+\doxysubsubsection{\texorpdfstring{simulate}{simulate}}
+{\footnotesize\ttfamily void simulate (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{namespacequids_a60a676728450b703f98f219a0ee7e5f2}{it\+\_\+t}} \&}]{iteration,  }\item[{\mbox{\hyperlink{namespacequids_a62455c8f5240a575676aace3a25dfae3}{rule\+\_\+t}} const $\ast$}]{rule,  }\item[{\mbox{\hyperlink{namespacequids_a60a676728450b703f98f219a0ee7e5f2}{it\+\_\+t}} \&}]{next\+\_\+iteration,  }\item[{\mbox{\hyperlink{namespacequids_a2f3cfcb2f4d55d58993493426aafb2fe}{sy\+\_\+it\+\_\+t}} \&}]{symbolic\+\_\+iteration,  }\item[{size\+\_\+t}]{max\+\_\+num\+\_\+object = {\ttfamily 0},  }\item[{\mbox{\hyperlink{namespacequids_a42e549faf01dce4f7e39af6770c1a780}{debug\+\_\+t}}}]{mid\+\_\+step\+\_\+function = {\ttfamily \mbox{[}\mbox{]}(const~char$\ast$)\{\}} }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [friend]}}
+
+
+
+function to apply a dynamic to a wavefunction 
+
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\texttt{ in}}  & {\em iteration} & wavefunction that the dynamic will be applied to. \\
+\hline
+\mbox{\texttt{ in}}  & {\em rule} & dynamic that will be applied. \\
+\hline
+\mbox{\texttt{ out}}  & {\em next\+\_\+iteration} & wave function that will be overwritten to then contained the final wave function. \\
+\hline
+\mbox{\texttt{ out}}  & {\em \mbox{\hyperlink{classquids_1_1symbolic__iteration}{symbolic\+\_\+iteration}}} & symbolic iteration that will be used. \\
+\hline
+\mbox{\texttt{ in}}  & {\em max\+\_\+num\+\_\+object} & maximum number of objects to be kept, -\/1 means no maximum, 0 means automaticaly finding the maximum ammount of objects that can be kept in memory. \\
+\hline
+\mbox{\texttt{ in}}  & {\em mid\+\_\+step\+\_\+function} & debuging function called between steps. \\
+\hline
+\end{DoxyParams}
+
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/home/joseph/\+Documents/projets/programing/cpp/\+Quantum-\/graph-\/simulation/src/\+Qu\+IDS/src/quids.\+hpp\end{DoxyCompactItemize}

@@ -8,8 +8,11 @@ This library is header-only, so you can simply link files in [src](./src).
 
 The only requirement is to have at least `c++2a`. Parallelism is implemented using `OpenMP`, although the pure `MPI` implementation is more efficient right now.
 
-## Usage
+## Documentation
 
+The code is documented using `doxygen`. Documentation is present at [doc/](./doc/) and is also hosted at [TO-INSERT]().
+
+## Usage
 Some rules that can be used directly, or understood as examples are implemented in [src/rules](./src/rules).
 
 Objects are represented by a simple begin and end pointer. Their exist two kind of interfaces for implementing a unitary transformation.
@@ -51,8 +54,8 @@ Simulations can also be done across nodes. For that, you'll need to replace `qui
 int main(int argc, char* argv[]) {
 	/* MPI initialization */
 	int size, rank, provided;
-	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-    if(provided < MPI_THREAD_MULTIPLE) {
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
+    if(provided < MPI_THREAD_SERIALIZED) {
         printf("The threading support level is lesser than that demanded.\n");
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
