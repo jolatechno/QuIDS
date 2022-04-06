@@ -10,7 +10,7 @@ The only requirement is to have at least `c++2a`. Parallelism is implemented usi
 
 ## Documentation
 
-The code is documented using `doxygen`. Documentation is present at [doc/](./doc/) and is also hosted at [codedocs.xyz/jolatechno/QuIDS](https://codedocs.xyz/jolatechno/QuIDS).
+The code is documented using `doxygen`. Documentation is present at [doc/](./doc/) and is also hosted at [jolatechno.github.io/QuIDS/](https://jolatechno.github.io/QuIDS/).
 
 ## Usage
 Some rules that can be used directly, or understood as examples are implemented in [src/rules](./src/rules).
