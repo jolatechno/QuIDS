@@ -23,7 +23,7 @@
 	#define HASH_MAP_OVERHEAD 1.7 /// overhead per 64-bit key and value insertion in hashmap (robinhood)
 #endif
 #ifndef TOLERANCE
-	#define TOLERANCE 1e-100;
+	#define TOLERANCE 1e-30;
 #endif
 #ifndef SAFETY_MARGIN
 	#define SAFETY_MARGIN 0.2
