@@ -34,6 +34,7 @@ namespace quids::utils {
 	class fast_vector/*numa_vector*/ {
 	private:
 	    mutable value_type* ptr = NULL;
+	    mutable value_type* unaligned_ptr = NULL;
 	    mutable size_t size_ = 0;
 	 
 	public:
@@ -80,23 +81,22 @@ namespace quids::utils {
 		"min_state_size" is the minimum size of a vector, to avoid small vectors which are bound to be resized frequently.
 		*/
 		/// align_byte_length_ should be used to reallign the buffer, which is not yet implemented as realloc doesn't allocate.
-	    void resize(size_t n, uint align_byte_length_=0) const {
+	    void resize(size_t n, const uint align_byte_length_=std::alignment_of<value_type>()) const {
 	    	n = std::max(min_vector_size, n); // never resize under min_vector_size
 
 	    	if (size_ < n || // resize if we absolutely have to because the state won't fit
 	    		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
 	    		size_ = n*upsize_policy + align_byte_length_;
-	    		ptr = (value_type*)realloc(ptr, (size_ + align_byte_length_)*sizeof(value_type));
+	    		int offset = std::distance(unaligned_ptr, ptr);
+	    		unaligned_ptr = (value_type*)realloc(unaligned_ptr, (size_ + offset)*sizeof(value_type));
 
-	    		if (ptr == NULL)
+	    		if (unaligned_ptr == NULL)
 	    			throw std::runtime_error("bad allocation in fast_vector !!");
 
-	    		if (align_byte_length_ > 8) {
-	    			ptr = (value_type*)std::align(align_byte_length_, size_ - align_byte_length_, (void*&)ptr, size_);
-
-	    			if (ptr == NULL)
-	    				throw std::runtime_error("bad alignment in fast_vector, check that align_byte_length is a power of two !!");
-	    		}
+	    		ptr = unaligned_ptr + offset;
+	    		if (align_byte_length_ > 1)
+		    		if (NULL == std::align(align_byte_length_, size_ - align_byte_length_, (void*&)ptr, size_))
+		    			throw std::runtime_error("bad alignment in fast_vector !!");
 	    	}
 	    }
 	 
