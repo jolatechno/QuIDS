@@ -230,7 +230,7 @@ namespace quids::rules::qcgd {
 		}
 
 		void randomize(quids::it_t &iter) {
-			size_t size;
+			uint size;
 			mag_t *mag_;
 			char *begin;
 			for (auto gid = 0; gid < iter.num_object; ++gid) {;
@@ -266,7 +266,7 @@ namespace quids::rules::qcgd {
 			size_t *gids = new size_t[iter.num_object];
 			std::iota(gids, gids + iter.num_object, 0);
 			__gnu_parallel::sort(gids, gids + iter.num_object, [&](size_t gid1, size_t gid2) {
-				size_t size_;
+				uint size_;
 				char const *begin_;
 
 				mag_t mag1, mag2;
@@ -280,7 +280,7 @@ namespace quids::rules::qcgd {
 			for (auto i = 0; i < num_prints; ++i) {
 				size_t gid = gids[i];
 
-				size_t size;
+				uint size;
 				mag_t mag;
 				char const *begin;
 				iter.get_object(gid, begin, size, mag);
@@ -472,7 +472,7 @@ namespace quids::rules::qcgd {
 		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
 		}
-		inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, uint &num_child, uint &max_child_size) const override {
 			max_child_size = std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -484,11 +484,11 @@ namespace quids::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_, size_t &size, mag_t &mag) const override {
+		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint const child_id_, uint &size, mag_t &mag) const override {
 			operations::copy(parent_begin, parent_end, child_begin);
 			size = std::distance(parent_begin, parent_end);
 
-			uint32_t child_id = child_id_;
+			uint child_id = child_id_;
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 			for (int i = 0; i < num_nodes; ++i) {
@@ -508,10 +508,10 @@ namespace quids::rules::qcgd {
 				}
 			}
 		}
-		inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_) const override {
+		inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint const child_id_) const override {
 			operations::copy(parent_begin, parent_end, child_begin);
 
-			uint32_t child_id = child_id_;
+			uint child_id = child_id_;
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 			for (int i = 0; i < num_nodes; ++i) {
@@ -547,7 +547,7 @@ namespace quids::rules::qcgd {
 		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
 		}
-		inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, uint &num_child, uint &max_child_size) const override {
 			max_child_size = std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -559,11 +559,11 @@ namespace quids::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_, size_t &size, mag_t &mag) const override {
+		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint const child_id_, uint &size, mag_t &mag) const override {
 			operations::copy(parent_begin, parent_end, child_begin);
 			size = std::distance(parent_begin, parent_end);
 
-			uint32_t child_id = child_id_;
+			uint child_id = child_id_;
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 			for (int i = 0; i < num_nodes; ++i) {
@@ -582,10 +582,10 @@ namespace quids::rules::qcgd {
 				}
 			}
 		}
-		inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_) const override {
+		inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint const child_id_) const override {
 			operations::copy(parent_begin, parent_end, child_begin);
 
-			uint32_t child_id = child_id_;
+			uint child_id = child_id_;
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 			for (int i = 0; i < num_nodes; ++i) {
@@ -620,7 +620,7 @@ namespace quids::rules::qcgd {
 		inline size_t hasher(char const *parent_begin, char const *parent_end) const override {
 			return graphs::hash_graph(parent_begin);
 		}
-		inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, uint &num_child, uint &max_child_size) const override {
 			max_child_size = 4*std::distance(parent_begin, parent_end);
 
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
@@ -640,8 +640,8 @@ namespace quids::rules::qcgd {
 					num_child *= 2;
 			}
 		}
-		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_, size_t &size, mag_t &mag) const override {
-			uint32_t child_id = child_id_;
+		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint const child_id_, uint &size, mag_t &mag) const override {
+			uint child_id = child_id_;
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 
 			/* check for first split or last merge */
@@ -671,7 +671,7 @@ namespace quids::rules::qcgd {
 			child_num_nodes = num_nodes + first_split - last_merge;
 
 			/* first path to get the final size */
-			uint32_t child_id_copy = child_id;
+			uint child_id_copy = child_id;
 			for (int i = first_split + last_merge; i < num_nodes - last_merge; ++i) {
 				/* get opeartions */
 				bool split, merge;
@@ -847,8 +847,8 @@ namespace quids::rules::qcgd {
 			size = std::distance(child_begin, (char*)(child_node_name_begin + graphs::node_name_begin(child_begin, child_num_nodes)));
 		}
 
-		inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id_) const override {
-			uint32_t child_id = child_id_;
+		inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint const child_id_) const override {
+			uint child_id = child_id_;
 			uint16_t num_nodes = graphs::num_nodes(parent_begin);
 
 			/* check for first split or last merge */
@@ -872,7 +872,7 @@ namespace quids::rules::qcgd {
 			child_num_nodes = num_nodes + first_split - last_merge;
 
 			/* first path to get the final size */
-			uint32_t child_id_copy = child_id;
+			uint child_id_copy = child_id;
 			for (int i = first_split + last_merge; i < num_nodes - last_merge; ++i) {
 				/* get opeartions */
 				bool split, merge;
@@ -1100,6 +1100,8 @@ namespace quids::rules::qcgd {
 
 			quids::tolerance = parse_float_with_default(string_arg, "tolerance=", ",", quids::tolerance);
 			quids::safety_margin = parse_float_with_default(string_arg, "safety_margin=", ",", quids::safety_margin);
+
+			quids::align_byte_length = parse_int_with_default(string_arg, "align=", ",", quids::align_byte_length);
 
 			quids::simple_truncation = parse_int_with_default(string_arg, "simple_truncate=", ",", quids::simple_truncation);
 			quids::load_balancing_bucket_per_thread = parse_int_with_default(string_arg, "load_balancing_bucket_per_thread=", ",", quids::load_balancing_bucket_per_thread);

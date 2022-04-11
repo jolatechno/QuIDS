@@ -9,7 +9,7 @@ namespace quids::rules::quantum_computer {
 	namespace utils {
 		void print(quids::it_t const &iter) {
 			for (auto oid = 0; oid < iter.num_object; ++oid) {
-				size_t size;
+				uint size;
 				mag_t mag;
 				char const *begin;
 				iter.get_object(oid, begin, size, mag);
@@ -33,11 +33,11 @@ namespace quids::rules::quantum_computer {
 
 	public:
 		hadamard(size_t bit_) : bit(bit_) {}
-		inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const override {
+		inline void get_num_child(char const *parent_begin, char const *parent_end, uint &num_child, uint &max_child_size) const override {
 			num_child = 2;
 			max_child_size = std::distance(parent_begin, parent_end);
 		}
-		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id, size_t &size, mag_t &mag) const override {
+		inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint const child_id, uint &size, mag_t &mag) const override {
 			static const PROBA_TYPE sqrt2 = 1/std::sqrt(2);
 			mag *= parent_begin[bit] && child_id ? -sqrt2 : sqrt2;
 

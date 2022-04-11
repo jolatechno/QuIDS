@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['equalize_5finbalance_0',['equalize_inbalance',['../namespacequids_1_1mpi.html#ab5de5240ccfc019063996bdc48e7a20b',1,'quids::mpi']]]
+  ['downsize_5fpolicy_0',['downsize_policy',['../namespacequids_1_1utils.html#a1030df3ee43b5a7caf2fcc8e4e68e281',1,'quids::utils']]]
 ];

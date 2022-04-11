@@ -1,5 +1,8 @@
 # [QuIDS](https://github.com/jolatechno/QuIDS): Quantum Irregular Dynamic Simulator 
 
+_**For now the implementation of alignment doesn't align the first object ! this should be fixed by modifying the resize function in [./src/utils/vector.hpp](./src/utils/vector.hpp)**_
+_**Alignemnt of the following objects is relative to the first object, so for now the maximum exact alignment supported is 8 (which is also the default)**_
+
 ## Installation
 
 This library is header-only, so you can simply link files in [src](./src).
@@ -118,14 +121,14 @@ class my_rule : public quids::rule_t {
 public:
 	my_rule() {};
 	inline void get_num_child(char const *parent_begin, char const *parent_end, 
-		size_t &num_child, size_t &max_child_size) const override;
+		uint &num_child, uint &max_child_size) const override;
 
 	inline void populate_child(char const *parent_begin, char const *parent_end,
-		char* const child_begin, uint32_t const child_id,
-		size_t &size, std::complex<PROBA_TYPE> &mag) const override;
+		char* const child_begin, uint const child_id,
+		uint &size, std::complex<PROBA_TYPE> &mag) const override;
 
 	inline void populate_child_simple(char const *parent_begin, char const *parent_end,
-		char* const child_begin, uint32_t const child_id) const; // optional
+		char* const child_begin, uint const child_id) const; // optional
 
 	inline size_t hasher(char const *parent_begin, char const *parent_end) const; // optional
 };
@@ -135,7 +138,7 @@ The first function, `get_num_child(...)`, finds the number of objects created th
 
 ```cpp
 inline void my_rule::get_num_child(char const *parent_begin, char const *parent_end,
-	size_t &num_child, size_t &max_child_size) const override
+	uint &num_child, uint &max_child_size) const override
 {
 	// do stuff...
 	num_child = actual_num_child;
@@ -149,8 +152,8 @@ Note that `child_id` is a number from `0` to `num_child`, and simply identify "c
 
 ```cpp
 inline void populate_child(char const *parent_begin, char const *parent_end,
-	char* const child_begin, uint32_t const child_id,
-	size_t &size, std::complex<PROBA_TYPE> &mag) const override
+	char* const child_begin, uint const child_id,
+	uint &size, std::complex<PROBA_TYPE> &mag) const override
 {
 	// modify mag...
 	// populate the child, starting at child_begin
@@ -162,8 +165,8 @@ The third function is `populate_child_simple(...)` which is simply a copy of `po
 
 ```cpp
 inline void populate_child_simple(char const *parent_begin, char const *parent_end,
-	char* const child_begin, uint32_t const child_id) const { //can be overwritten
-		size_t size_placeholder;
+	char* const child_begin, uint const child_id) const { //can be overwritten
+		uint size_placeholder;
 		mag_t mag_placeholder;
 		populate_child(parent_begin, parent_end, child_begin, child_id,
 			size_placeholder, mag_placeholder);
@@ -221,8 +224,8 @@ public:
 
 	void append(char const *object_begin_, char const *object_end_, std::complex<PROBA_TYPE> const mag=1);
 	void pop(uint n=1, bool normalize_=true);
-	void get_object(size_t const object_id, char *& object_begin, size_t &object_size, std::complex<PROBA_TYPE> *&mag);
-	void get_object(size_t const object_id, char const *& object_begin, size_t &object_size, std::complex<PROBA_TYPE> &mag) const;
+	void get_object(size_t const object_id, char *& object_begin, uint &object_size, std::complex<PROBA_TYPE> *&mag);
+	void get_object(size_t const object_id, char const *& object_begin, uint &object_size, std::complex<PROBA_TYPE> &mag) const;
 
 	template<class T>
 	T average_value(std::function<T(char const *object_begin, char const *object_end)> const &observable) const;
@@ -315,12 +318,13 @@ In addition to classes, some global parameters are used to modify the behaviour 
 	#define PROBA_TYPE double
 #endif
 #ifndef HASH_MAP_OVERHEAD
-	#define HASH_MAP_OVERHEAD 1.5
+	#define HASH_MAP_OVERHEAD 1.7
 #endif
 
 /* other default-value flags */
 
 namespace quids {
+	uint align_byte_length = alignMENT_BYTE_LENGTH;
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
@@ -362,6 +366,10 @@ The `HASH_MAP_OVERHEAD` flag represent the overhead per element of the hashmap (
 ### Global variables
 
 The default value of any of those variable can be altered at compilation, by passing an uppercase flag with the same name as the desired variable.
+
+#### align_byte_length
+
+`align_byte_length` represents the amount of byte to align objects to (default is `8`), and should be set to avoid missaligned memory access for objects that are "packed".
 
 #### tolerance
 

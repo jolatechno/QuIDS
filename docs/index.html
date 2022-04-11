@@ -65,7 +65,7 @@ $(function() {
   <div class="headertitle"><div class="title"><a href="https://github.com/jolatechno/QuIDS">QuIDS</a>: Quantum Irregular Dynamic Simulator </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p ><a class="anchor" id="md_README"></a> </p>
+<div class="textblock"><p ><a class="anchor" id="md_README"></a> <em><b>For now the implementation of alignment doesn't align the first object ! this should be fixed by modifying the resize function in <a href="./src/utils/vector.hpp">./src/utils/vector.hpp</a></b></em> <em><b>Alignemnt of the following objects is relative to the first object, so for now the maximum exact alignment supported is 8 (which is also the default)</b></em></p>
 <h1><a class="anchor" id="autotoc_md1"></a>
 Installation</h1>
 <p >This library is header-only, so you can simply link files in <a href="./src">src</a>.</p>
@@ -114,10 +114,10 @@ description</h2>
 <div class="line"> </div>
 <div class="line">    <span class="comment">/* &quot;next_state&quot; now holds an application of &quot;rule&quot; on &quot;state&quot; */</span></div>
 <div class="line">}</div>
-<div class="ttc" id="anamespacequids_html_a0cd589223d6f94d98d0d52849bfcd76a"><div class="ttname"><a href="namespacequids.html#a0cd589223d6f94d98d0d52849bfcd76a">quids::simulate</a></div><div class="ttdeci">void simulate(it_t &amp;iteration, modifier_t const rule)</div><div class="ttdoc">function to apply a modifer to a wave function</div><div class="ttdef"><b>Definition:</b> quids.hpp:409</div></div>
-<div class="ttc" id="anamespacequids_html_a2f3cfcb2f4d55d58993493426aafb2fe"><div class="ttname"><a href="namespacequids.html#a2f3cfcb2f4d55d58993493426aafb2fe">quids::sy_it_t</a></div><div class="ttdeci">class symbolic_iteration sy_it_t</div><div class="ttdoc">symbolic iteration type</div><div class="ttdef"><b>Definition:</b> quids.hpp:67</div></div>
-<div class="ttc" id="anamespacequids_html_a60a676728450b703f98f219a0ee7e5f2"><div class="ttname"><a href="namespacequids.html#a60a676728450b703f98f219a0ee7e5f2">quids::it_t</a></div><div class="ttdeci">class iteration it_t</div><div class="ttdoc">iteration class type</div><div class="ttdef"><b>Definition:</b> quids.hpp:65</div></div>
-<div class="ttc" id="anamespacequids_html_a62455c8f5240a575676aace3a25dfae3"><div class="ttname"><a href="namespacequids.html#a62455c8f5240a575676aace3a25dfae3">quids::rule_t</a></div><div class="ttdeci">class rule rule_t</div><div class="ttdoc">dynamic (or rule) type</div><div class="ttdef"><b>Definition:</b> quids.hpp:69</div></div>
+<div class="ttc" id="anamespacequids_html_a0cd589223d6f94d98d0d52849bfcd76a"><div class="ttname"><a href="namespacequids.html#a0cd589223d6f94d98d0d52849bfcd76a">quids::simulate</a></div><div class="ttdeci">void simulate(it_t &amp;iteration, modifier_t const rule)</div><div class="ttdoc">function to apply a modifer to a wave function</div><div class="ttdef"><b>Definition:</b> quids.hpp:433</div></div>
+<div class="ttc" id="anamespacequids_html_a2f3cfcb2f4d55d58993493426aafb2fe"><div class="ttname"><a href="namespacequids.html#a2f3cfcb2f4d55d58993493426aafb2fe">quids::sy_it_t</a></div><div class="ttdeci">class symbolic_iteration sy_it_t</div><div class="ttdoc">symbolic iteration type</div><div class="ttdef"><b>Definition:</b> quids.hpp:75</div></div>
+<div class="ttc" id="anamespacequids_html_a60a676728450b703f98f219a0ee7e5f2"><div class="ttname"><a href="namespacequids.html#a60a676728450b703f98f219a0ee7e5f2">quids::it_t</a></div><div class="ttdeci">class iteration it_t</div><div class="ttdoc">iteration class type</div><div class="ttdef"><b>Definition:</b> quids.hpp:73</div></div>
+<div class="ttc" id="anamespacequids_html_a62455c8f5240a575676aace3a25dfae3"><div class="ttname"><a href="namespacequids.html#a62455c8f5240a575676aace3a25dfae3">quids::rule_t</a></div><div class="ttdeci">class rule rule_t</div><div class="ttdoc">dynamic (or rule) type</div><div class="ttdef"><b>Definition:</b> quids.hpp:77</div></div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md9"></a>
 MPI support</h2>
 <p >Simulations can also be done across nodes. For that, you'll need to replace <code>quids::sy_it</code> and <code><a class="el" href="namespacequids.html#a60a676728450b703f98f219a0ee7e5f2" title="iteration class type">quids::it_t</a></code> respectivly by <code>quids::mpi::mpi_sy_it</code> and <code><a class="el" href="namespacequids_1_1mpi.html#a35f6cb8275fdb46ab6042a3e4bd799ba" title="mpi iteration type">quids::mpi::mpi_it_t</a></code>.</p>
@@ -153,9 +153,9 @@ MPI support</h2>
 <div class="line"> </div>
 <div class="line">    MPI_Finalize();</div>
 <div class="line">}</div>
-<div class="ttc" id="anamespacequids_1_1mpi_html_a35f6cb8275fdb46ab6042a3e4bd799ba"><div class="ttname"><a href="namespacequids_1_1mpi.html#a35f6cb8275fdb46ab6042a3e4bd799ba">quids::mpi::mpi_it_t</a></div><div class="ttdeci">class mpi_iteration mpi_it_t</div><div class="ttdoc">mpi iteration type</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:29</div></div>
-<div class="ttc" id="anamespacequids_1_1mpi_html_a3e3b2dbb59ff2b0f9b997fb9bf196cc8"><div class="ttname"><a href="namespacequids_1_1mpi.html#a3e3b2dbb59ff2b0f9b997fb9bf196cc8">quids::mpi::mpi_sy_it_t</a></div><div class="ttdeci">class mpi_symbolic_iteration mpi_sy_it_t</div><div class="ttdoc">mpi symbolic iteration type</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:31</div></div>
-<div class="ttc" id="anamespacequids_1_1mpi_html_ab589d2622e28bfe6e3522a103c841450"><div class="ttname"><a href="namespacequids_1_1mpi.html#ab589d2622e28bfe6e3522a103c841450">quids::mpi::simulate</a></div><div class="ttdeci">void simulate(mpi_it_t &amp;iteration, quids::rule_t const *rule, mpi_it_t &amp;next_iteration, mpi_sy_it_t &amp;symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, quids::debug_t mid_step_function=[](const char *){})</div><div class="ttdoc">function to apply a dynamic to a wave function distributed accross multiple nodes</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:389</div></div>
+<div class="ttc" id="anamespacequids_1_1mpi_html_a35f6cb8275fdb46ab6042a3e4bd799ba"><div class="ttname"><a href="namespacequids_1_1mpi.html#a35f6cb8275fdb46ab6042a3e4bd799ba">quids::mpi::mpi_it_t</a></div><div class="ttdeci">class mpi_iteration mpi_it_t</div><div class="ttdoc">mpi iteration type</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:32</div></div>
+<div class="ttc" id="anamespacequids_1_1mpi_html_a3e3b2dbb59ff2b0f9b997fb9bf196cc8"><div class="ttname"><a href="namespacequids_1_1mpi.html#a3e3b2dbb59ff2b0f9b997fb9bf196cc8">quids::mpi::mpi_sy_it_t</a></div><div class="ttdeci">class mpi_symbolic_iteration mpi_sy_it_t</div><div class="ttdoc">mpi symbolic iteration type</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:34</div></div>
+<div class="ttc" id="anamespacequids_1_1mpi_html_ab589d2622e28bfe6e3522a103c841450"><div class="ttname"><a href="namespacequids_1_1mpi.html#ab589d2622e28bfe6e3522a103c841450">quids::mpi::simulate</a></div><div class="ttdeci">void simulate(mpi_it_t &amp;iteration, quids::rule_t const *rule, mpi_it_t &amp;next_iteration, mpi_sy_it_t &amp;symbolic_iteration, MPI_Comm communicator, size_t max_num_object=0, quids::debug_t mid_step_function=[](const char *){})</div><div class="ttdoc">function to apply a dynamic to a wave function distributed accross multiple nodes</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:394</div></div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md10"></a>
 Modifiers</h2>
 <p >A <code>modifier</code> is a simple functions that takes a objects, and modify it in place, while keep its size unchanged.</p>
@@ -169,20 +169,20 @@ Rules</h2>
 <div class="line"><span class="keyword">public</span>:</div>
 <div class="line">    my_rule() {};</div>
 <div class="line">    <span class="keyword">inline</span> <span class="keywordtype">void</span> get_num_child(<span class="keywordtype">char</span> <span class="keyword">const</span> *parent_begin, <span class="keywordtype">char</span> <span class="keyword">const</span> *parent_end, </div>
-<div class="line">        <span class="keywordtype">size_t</span> &amp;num_child, <span class="keywordtype">size_t</span> &amp;max_child_size) <span class="keyword">const override</span>;</div>
+<div class="line">        uint &amp;num_child, uint &amp;max_child_size) <span class="keyword">const override</span>;</div>
 <div class="line"> </div>
 <div class="line">    <span class="keyword">inline</span> <span class="keywordtype">void</span> populate_child(<span class="keywordtype">char</span> <span class="keyword">const</span> *parent_begin, <span class="keywordtype">char</span> <span class="keyword">const</span> *parent_end,</div>
-<div class="line">        <span class="keywordtype">char</span>* <span class="keyword">const</span> child_begin, uint32_t <span class="keyword">const</span> child_id,</div>
-<div class="line">        <span class="keywordtype">size_t</span> &amp;size, std::complex&lt;PROBA_TYPE&gt; &amp;mag) <span class="keyword">const override</span>;</div>
+<div class="line">        <span class="keywordtype">char</span>* <span class="keyword">const</span> child_begin, uint <span class="keyword">const</span> child_id,</div>
+<div class="line">        uint &amp;size, std::complex&lt;PROBA_TYPE&gt; &amp;mag) <span class="keyword">const override</span>;</div>
 <div class="line"> </div>
 <div class="line">    <span class="keyword">inline</span> <span class="keywordtype">void</span> populate_child_simple(<span class="keywordtype">char</span> <span class="keyword">const</span> *parent_begin, <span class="keywordtype">char</span> <span class="keyword">const</span> *parent_end,</div>
-<div class="line">        <span class="keywordtype">char</span>* <span class="keyword">const</span> child_begin, uint32_t <span class="keyword">const</span> child_id) <span class="keyword">const</span>; <span class="comment">// optional</span></div>
+<div class="line">        <span class="keywordtype">char</span>* <span class="keyword">const</span> child_begin, uint <span class="keyword">const</span> child_id) <span class="keyword">const</span>; <span class="comment">// optional</span></div>
 <div class="line"> </div>
 <div class="line">    <span class="keyword">inline</span> <span class="keywordtype">size_t</span> hasher(<span class="keywordtype">char</span> <span class="keyword">const</span> *parent_begin, <span class="keywordtype">char</span> <span class="keyword">const</span> *parent_end) <span class="keyword">const</span>; <span class="comment">// optional</span></div>
 <div class="line">};</div>
 </div><!-- fragment --><p >The first function, <code>get_num_child(...)</code>, finds the number of objects created through the unitary transform by a given objects. It also gives an upper-bound to the size of those objects.</p>
 <div class="fragment"><div class="line"><span class="keyword">inline</span> <span class="keywordtype">void</span> my_rule::get_num_child(<span class="keywordtype">char</span> <span class="keyword">const</span> *parent_begin, <span class="keywordtype">char</span> <span class="keyword">const</span> *parent_end,</div>
-<div class="line">    <span class="keywordtype">size_t</span> &amp;num_child, <span class="keywordtype">size_t</span> &amp;max_child_size)<span class="keyword"> const override</span></div>
+<div class="line">    uint &amp;num_child, uint &amp;max_child_size)<span class="keyword"> const override</span></div>
 <div class="line"><span class="keyword"></span>{</div>
 <div class="line">    <span class="comment">// do stuff...</span></div>
 <div class="line">    num_child = actual_num_child;</div>
@@ -191,8 +191,8 @@ Rules</h2>
 </div><!-- fragment --><p >The second function, <code>populate_child(...)</code>, simply "populate" (create) an object from its parent, while also modifying its magnitude according to the unitary transformation (the starting magnitude is the parent magnitude).</p>
 <p >Note that <code>child_id</code> is a number from <code>0</code> to <code>num_child</code>, and simply identify "child" amoung its "siblings" (objects with the same "parent").</p>
 <div class="fragment"><div class="line"><span class="keyword">inline</span> <span class="keywordtype">void</span> populate_child(<span class="keywordtype">char</span> <span class="keyword">const</span> *parent_begin, <span class="keywordtype">char</span> <span class="keyword">const</span> *parent_end,</div>
-<div class="line">    <span class="keywordtype">char</span>* <span class="keyword">const</span> child_begin, uint32_t <span class="keyword">const</span> child_id,</div>
-<div class="line">    <span class="keywordtype">size_t</span> &amp;size, std::complex&lt;PROBA_TYPE&gt; &amp;mag)<span class="keyword"> const override</span></div>
+<div class="line">    <span class="keywordtype">char</span>* <span class="keyword">const</span> child_begin, uint <span class="keyword">const</span> child_id,</div>
+<div class="line">    uint &amp;size, std::complex&lt;PROBA_TYPE&gt; &amp;mag)<span class="keyword"> const override</span></div>
 <div class="line"><span class="keyword"></span>{</div>
 <div class="line">    <span class="comment">// modify mag...</span></div>
 <div class="line">    <span class="comment">// populate the child, starting at child_begin</span></div>
@@ -200,13 +200,13 @@ Rules</h2>
 <div class="line">}</div>
 </div><!-- fragment --><p >The third function is <code>populate_child_simple(...)</code> which is simply a copy of <code>populate_child(...)</code> that can skip the computation of the magnitude and the size of the child objects. If not provided the default implementation relize on <code>populate_child(...)</code>:</p>
 <div class="fragment"><div class="line"><span class="keyword">inline</span> <span class="keywordtype">void</span> populate_child_simple(<span class="keywordtype">char</span> <span class="keyword">const</span> *parent_begin, <span class="keywordtype">char</span> <span class="keyword">const</span> *parent_end,</div>
-<div class="line">    <span class="keywordtype">char</span>* <span class="keyword">const</span> child_begin, uint32_t <span class="keyword">const</span> child_id)<span class="keyword"> const </span>{ <span class="comment">//can be overwritten</span></div>
-<div class="line">        <span class="keywordtype">size_t</span> size_placeholder;</div>
+<div class="line">    <span class="keywordtype">char</span>* <span class="keyword">const</span> child_begin, uint <span class="keyword">const</span> child_id)<span class="keyword"> const </span>{ <span class="comment">//can be overwritten</span></div>
+<div class="line">        uint size_placeholder;</div>
 <div class="line">        <a class="code hl_typedef" href="namespacequids.html#a13a066a7f98435d1c84f2318439d4f0b">mag_t</a> mag_placeholder;</div>
 <div class="line">        populate_child(parent_begin, parent_end, child_begin, child_id,</div>
 <div class="line">            size_placeholder, mag_placeholder);</div>
 <div class="line">}</div>
-<div class="ttc" id="anamespacequids_html_a13a066a7f98435d1c84f2318439d4f0b"><div class="ttname"><a href="namespacequids.html#a13a066a7f98435d1c84f2318439d4f0b">quids::mag_t</a></div><div class="ttdeci">std::complex&lt; PROBA_TYPE &gt; mag_t</div><div class="ttdoc">complex magnitude type</div><div class="ttdef"><b>Definition:</b> quids.hpp:63</div></div>
+<div class="ttc" id="anamespacequids_html_a13a066a7f98435d1c84f2318439d4f0b"><div class="ttname"><a href="namespacequids.html#a13a066a7f98435d1c84f2318439d4f0b">quids::mag_t</a></div><div class="ttdeci">std::complex&lt; PROBA_TYPE &gt; mag_t</div><div class="ttdoc">complex magnitude type</div><div class="ttdef"><b>Definition:</b> quids.hpp:71</div></div>
 </div><!-- fragment --><p >The last function is a hasher for objects. If not specified, the whole memory buffer will simply be hashed. A hasher NEEDS to be provided if objects that are equal can be represented by different objects. The default implementation is:</p>
 <div class="fragment"><div class="line"><span class="keyword">inline</span> <span class="keywordtype">size_t</span> my_rule::hasher(<span class="keywordtype">char</span> <span class="keyword">const</span> *parent_begin, <span class="keywordtype">char</span> <span class="keyword">const</span> *parent_end)<span class="keyword"> const override </span>{</div>
 <div class="line">    <span class="keywordflow">return</span> std::hash&lt;std::string_view&gt;()(</div>
@@ -248,8 +248,8 @@ Iteration</h3>
 <div class="line"> </div>
 <div class="line">    <span class="keywordtype">void</span> append(<span class="keywordtype">char</span> <span class="keyword">const</span> *object_begin_, <span class="keywordtype">char</span> <span class="keyword">const</span> *object_end_, std::complex&lt;PROBA_TYPE&gt; <span class="keyword">const</span> mag=1);</div>
 <div class="line">    <span class="keywordtype">void</span> pop(uint n=1, <span class="keywordtype">bool</span> normalize_=<span class="keyword">true</span>);</div>
-<div class="line">    <span class="keywordtype">void</span> get_object(<span class="keywordtype">size_t</span> <span class="keyword">const</span> object_id, <span class="keywordtype">char</span> *&amp; object_begin, <span class="keywordtype">size_t</span> &amp;object_size, std::complex&lt;PROBA_TYPE&gt; *&amp;mag);</div>
-<div class="line">    <span class="keywordtype">void</span> get_object(<span class="keywordtype">size_t</span> <span class="keyword">const</span> object_id, <span class="keywordtype">char</span> <span class="keyword">const</span> *&amp; object_begin, <span class="keywordtype">size_t</span> &amp;object_size, std::complex&lt;PROBA_TYPE&gt; &amp;mag) <span class="keyword">const</span>;</div>
+<div class="line">    <span class="keywordtype">void</span> get_object(<span class="keywordtype">size_t</span> <span class="keyword">const</span> object_id, <span class="keywordtype">char</span> *&amp; object_begin, uint &amp;object_size, std::complex&lt;PROBA_TYPE&gt; *&amp;mag);</div>
+<div class="line">    <span class="keywordtype">void</span> get_object(<span class="keywordtype">size_t</span> <span class="keyword">const</span> object_id, <span class="keywordtype">char</span> <span class="keyword">const</span> *&amp; object_begin, uint &amp;object_size, std::complex&lt;PROBA_TYPE&gt; &amp;mag) <span class="keyword">const</span>;</div>
 <div class="line"> </div>
 <div class="line">    <span class="keyword">template</span>&lt;<span class="keyword">class</span> T&gt;</div>
 <div class="line">    T average_value(std::function&lt;T(<span class="keywordtype">char</span> <span class="keyword">const</span> *object_begin, <span class="keywordtype">char</span> <span class="keyword">const</span> *object_end)&gt; <span class="keyword">const</span> &amp;observable) <span class="keyword">const</span>;</div>
@@ -281,7 +281,7 @@ MPI symbolic iteration</h3>
 <div class="line"><span class="keyword">private</span>:</div>
 <div class="line">    <span class="comment">/*...*/</span></div>
 <div class="line">};</div>
-<div class="ttc" id="aclassquids_1_1symbolic__iteration_html"><div class="ttname"><a href="classquids_1_1symbolic__iteration.html">quids::symbolic_iteration</a></div><div class="ttdoc">symbolic iteration (computation intermediary)</div><div class="ttdef"><b>Definition:</b> quids.hpp:307</div></div>
+<div class="ttc" id="aclassquids_1_1symbolic__iteration_html"><div class="ttname"><a href="classquids_1_1symbolic__iteration.html">quids::symbolic_iteration</a></div><div class="ttdoc">symbolic iteration (computation intermediary)</div><div class="ttdef"><b>Definition:</b> quids.hpp:331</div></div>
 </div><!-- fragment --><p >The <code>mpi_symbolic_iteration</code> class (or <code>mpi_sy_it_t</code> type) can be considered as exactly equivalent to the <code>symbolic_iteration</code> class (or <code>sy_it_t</code> type).</p>
 <p >The two added member functions are:</p><ul>
 <li><code>get_total_num_object(...)</code> : Get the total number of object at symbolic iteration accross all nodes.</li>
@@ -311,9 +311,9 @@ MPI iteration</h3>
 <div class="line"><span class="keyword">private</span>:</div>
 <div class="line">    <span class="comment">/*...*/</span></div>
 <div class="line">};</div>
-<div class="ttc" id="aclassquids_1_1iteration_html"><div class="ttname"><a href="classquids_1_1iteration.html">quids::iteration</a></div><div class="ttdoc">iteration (wave function) representation class</div><div class="ttdef"><b>Definition:</b> quids.hpp:122</div></div>
-<div class="ttc" id="aclassquids_1_1iteration_html_a605ea87c36fba513f9ced985a56a14f0"><div class="ttname"><a href="classquids_1_1iteration.html#a605ea87c36fba513f9ced985a56a14f0">quids::iteration::average_value</a></div><div class="ttdeci">PROBA_TYPE average_value(const observable_t observable) const</div><div class="ttdoc">function to get the average value of a custom observable</div><div class="ttdef"><b>Definition:</b> quids.hpp:179</div></div>
-<div class="ttc" id="anamespacequids_html"><div class="ttname"><a href="namespacequids.html">quids</a></div><div class="ttdoc">QuIDS namespace.</div><div class="ttdef"><b>Definition:</b> quids.hpp:47</div></div>
+<div class="ttc" id="aclassquids_1_1iteration_html"><div class="ttname"><a href="classquids_1_1iteration.html">quids::iteration</a></div><div class="ttdoc">iteration (wave function) representation class</div><div class="ttdef"><b>Definition:</b> quids.hpp:142</div></div>
+<div class="ttc" id="aclassquids_1_1iteration_html_a605ea87c36fba513f9ced985a56a14f0"><div class="ttname"><a href="classquids_1_1iteration.html#a605ea87c36fba513f9ced985a56a14f0">quids::iteration::average_value</a></div><div class="ttdeci">PROBA_TYPE average_value(const observable_t observable) const</div><div class="ttdoc">function to get the average value of a custom observable</div><div class="ttdef"><b>Definition:</b> quids.hpp:201</div></div>
+<div class="ttc" id="anamespacequids_html"><div class="ttname"><a href="namespacequids.html">quids</a></div><div class="ttdoc">QuIDS namespace.</div><div class="ttdef"><b>Definition:</b> quids.hpp:53</div></div>
 </div><!-- fragment --><p >The <code>mpi_iteration</code> class (or <code>mpi_it_t</code> type) inehrits all the public memeber functions and varibale of the <code>iteration</code> class (or <code>it_t</code> type), and shares similar constructors.</p>
 <p >The additional member functions are:</p><ul>
 <li><code>equalize(...)</code> : Does its best at equalizing the number of object on each node. Will only equalize among pair (in hopefully the optimal pair-arangment), so it's up to you to check if the objects are equally shared among nodes, as some spetial cases can't be equalized well by this algorithm. <code>normalize(MPI_Comm ...)</code> should be after <code>equalize(...)</code> at the end to compute <code>node_total_proba</code>.</li>
@@ -332,12 +332,13 @@ Global parameters and pre-processor flags</h2>
 <div class="line"><span class="preprocessor">    #define PROBA_TYPE double</span></div>
 <div class="line"><span class="preprocessor">#endif</span></div>
 <div class="line"><span class="preprocessor">#ifndef HASH_MAP_OVERHEAD</span></div>
-<div class="line"><span class="preprocessor">    #define HASH_MAP_OVERHEAD 1.5</span></div>
+<div class="line"><span class="preprocessor">    #define HASH_MAP_OVERHEAD 1.7</span></div>
 <div class="line"><span class="preprocessor">#endif</span></div>
 <div class="line"> </div>
 <div class="line"><span class="comment">/* other default-value flags */</span></div>
 <div class="line"> </div>
 <div class="line"><span class="keyword">namespace </span><a class="code hl_namespace" href="namespacequids.html">quids</a> {</div>
+<div class="line">    uint <a class="code hl_variable" href="namespacequids.html#ae8ca71b5e72f679e32a8b76f3c1280f3">align_byte_length</a> = alignMENT_BYTE_LENGTH;</div>
 <div class="line">    PROBA_TYPE <a class="code hl_variable" href="namespacequids.html#ae6148553f287fa7c670cc8d0a729fe8d">tolerance</a> = TOLERANCE;</div>
 <div class="line">    <span class="keywordtype">float</span> <a class="code hl_variable" href="namespacequids.html#acf286be928cefbb5ad9e672e1999de1b">safety_margin</a> = SAFETY_MARGIN;</div>
 <div class="line">    <span class="keywordtype">int</span> <a class="code hl_variable" href="namespacequids.html#a967bbc4ed348a75e24789554a64f8d62">load_balancing_bucket_per_thread</a> = LOAD_BALANCING_BUCKET_PER_THREAD;</div>
@@ -364,15 +365,16 @@ Global parameters and pre-processor flags</h2>
 <div class="line"> </div>
 <div class="line">    <span class="comment">/* ... */</span></div>
 <div class="line">}</div>
-<div class="ttc" id="anamespacequids_1_1mpi_html_a31fde7b46759670da2fe0f6b3731f5c0"><div class="ttname"><a href="namespacequids_1_1mpi.html#a31fde7b46759670da2fe0f6b3731f5c0">quids::mpi::min_equalize_size</a></div><div class="ttdeci">size_t min_equalize_size</div><div class="ttdoc">minimum number of object that should be attained (in at least one node) before equalizing (load-shari...</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:24</div></div>
-<div class="ttc" id="anamespacequids_1_1mpi_html_ab5de5240ccfc019063996bdc48e7a20b"><div class="ttname"><a href="namespacequids_1_1mpi.html#ab5de5240ccfc019063996bdc48e7a20b">quids::mpi::equalize_inbalance</a></div><div class="ttdeci">float equalize_inbalance</div><div class="ttdoc">maximum imbalance between nodes (max_obj - avg_obj)/max_obj allowed before equalizing.</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:26</div></div>
+<div class="ttc" id="anamespacequids_1_1mpi_html_a31fde7b46759670da2fe0f6b3731f5c0"><div class="ttname"><a href="namespacequids_1_1mpi.html#a31fde7b46759670da2fe0f6b3731f5c0">quids::mpi::min_equalize_size</a></div><div class="ttdeci">size_t min_equalize_size</div><div class="ttdoc">minimum number of object that should be attained (in at least one node) before equalizing (load-shari...</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:27</div></div>
+<div class="ttc" id="anamespacequids_1_1mpi_html_ab5de5240ccfc019063996bdc48e7a20b"><div class="ttname"><a href="namespacequids_1_1mpi.html#ab5de5240ccfc019063996bdc48e7a20b">quids::mpi::equalize_inbalance</a></div><div class="ttdeci">float equalize_inbalance</div><div class="ttdoc">maximum imbalance between nodes (max_obj - avg_obj)/max_obj allowed before equalizing.</div><div class="ttdef"><b>Definition:</b> quids_mpi.hpp:29</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html_a1030df3ee43b5a7caf2fcc8e4e68e281"><div class="ttname"><a href="namespacequids_1_1utils.html#a1030df3ee43b5a7caf2fcc8e4e68e281">quids::utils::downsize_policy</a></div><div class="ttdeci">float downsize_policy</div><div class="ttdoc">size multiplicator when downsize_policy, to avoid repeated upsizing. !!! upsize_policy*downsize_polic...</div><div class="ttdef"><b>Definition:</b> vector.hpp:28</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html_a90041f6130e71de649d376e77040893d"><div class="ttname"><a href="namespacequids_1_1utils.html#a90041f6130e71de649d376e77040893d">quids::utils::upsize_policy</a></div><div class="ttdeci">float upsize_policy</div><div class="ttdoc">size multiplicator when upsizing, to avoid repeated upsizing.</div><div class="ttdef"><b>Definition:</b> vector.hpp:26</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html_af6008a56b61821492cabc5d71d351938"><div class="ttname"><a href="namespacequids_1_1utils.html#af6008a56b61821492cabc5d71d351938">quids::utils::min_vector_size</a></div><div class="ttdeci">size_t min_vector_size</div><div class="ttdoc">minimum size a vector is allocated to (to avoid resizing at small sizes).</div><div class="ttdef"><b>Definition:</b> vector.hpp:30</div></div>
-<div class="ttc" id="anamespacequids_html_a967bbc4ed348a75e24789554a64f8d62"><div class="ttname"><a href="namespacequids.html#a967bbc4ed348a75e24789554a64f8d62">quids::load_balancing_bucket_per_thread</a></div><div class="ttdeci">int load_balancing_bucket_per_thread</div><div class="ttdoc">number of load balancing buckets per thread</div><div class="ttdef"><b>Definition:</b> quids.hpp:53</div></div>
-<div class="ttc" id="anamespacequids_html_acf286be928cefbb5ad9e672e1999de1b"><div class="ttname"><a href="namespacequids.html#acf286be928cefbb5ad9e672e1999de1b">quids::safety_margin</a></div><div class="ttdeci">float safety_margin</div><div class="ttdoc">memory safety margin (0.2 = 80% memory usage target)</div><div class="ttdef"><b>Definition:</b> quids.hpp:51</div></div>
-<div class="ttc" id="anamespacequids_html_ae6148553f287fa7c670cc8d0a729fe8d"><div class="ttname"><a href="namespacequids.html#ae6148553f287fa7c670cc8d0a729fe8d">quids::tolerance</a></div><div class="ttdeci">PROBA_TYPE tolerance</div><div class="ttdoc">tolerance for objects (remove objects with a smaller probability)</div><div class="ttdef"><b>Definition:</b> quids.hpp:49</div></div>
-<div class="ttc" id="anamespacequids_html_af08ec7fda63cfb6d458ad3bb10b31e4d"><div class="ttname"><a href="namespacequids.html#af08ec7fda63cfb6d458ad3bb10b31e4d">quids::simple_truncation</a></div><div class="ttdeci">bool simple_truncation</div><div class="ttdoc">simple truncation toggle - disable probabilistic truncation, increasing &quot;accuracy&quot; but reducing the r...</div><div class="ttdef"><b>Definition:</b> quids.hpp:59</div></div>
+<div class="ttc" id="anamespacequids_html_a967bbc4ed348a75e24789554a64f8d62"><div class="ttname"><a href="namespacequids.html#a967bbc4ed348a75e24789554a64f8d62">quids::load_balancing_bucket_per_thread</a></div><div class="ttdeci">int load_balancing_bucket_per_thread</div><div class="ttdoc">number of load balancing buckets per thread</div><div class="ttdef"><b>Definition:</b> quids.hpp:61</div></div>
+<div class="ttc" id="anamespacequids_html_acf286be928cefbb5ad9e672e1999de1b"><div class="ttname"><a href="namespacequids.html#acf286be928cefbb5ad9e672e1999de1b">quids::safety_margin</a></div><div class="ttdeci">float safety_margin</div><div class="ttdoc">memory safety margin (0.2 = 80% memory usage target)</div><div class="ttdef"><b>Definition:</b> quids.hpp:59</div></div>
+<div class="ttc" id="anamespacequids_html_ae6148553f287fa7c670cc8d0a729fe8d"><div class="ttname"><a href="namespacequids.html#ae6148553f287fa7c670cc8d0a729fe8d">quids::tolerance</a></div><div class="ttdeci">PROBA_TYPE tolerance</div><div class="ttdoc">tolerance for objects (remove objects with a smaller probability)</div><div class="ttdef"><b>Definition:</b> quids.hpp:57</div></div>
+<div class="ttc" id="anamespacequids_html_ae8ca71b5e72f679e32a8b76f3c1280f3"><div class="ttname"><a href="namespacequids.html#ae8ca71b5e72f679e32a8b76f3c1280f3">quids::align_byte_length</a></div><div class="ttdeci">uint align_byte_length</div><div class="ttdoc">amount of byte to align objects to</div><div class="ttdef"><b>Definition:</b> quids.hpp:55</div></div>
+<div class="ttc" id="anamespacequids_html_af08ec7fda63cfb6d458ad3bb10b31e4d"><div class="ttname"><a href="namespacequids.html#af08ec7fda63cfb6d458ad3bb10b31e4d">quids::simple_truncation</a></div><div class="ttdeci">bool simple_truncation</div><div class="ttdoc">simple truncation toggle - disable probabilistic truncation, increasing &quot;accuracy&quot; but reducing the r...</div><div class="ttdef"><b>Definition:</b> quids.hpp:67</div></div>
 </div><!-- fragment --><h2><a class="anchor" id="autotoc_md18"></a>
 Pre-processor flags</h2>
 <h3><a class="anchor" id="autotoc_md19"></a>
@@ -385,35 +387,38 @@ hash map overhead</h3>
 Global variables</h2>
 <p >The default value of any of those variable can be altered at compilation, by passing an uppercase flag with the same name as the desired variable.</p>
 <h3><a class="anchor" id="autotoc_md22"></a>
+align_byte_length</h3>
+<p ><code>align_byte_length</code> represents the amount of byte to align objects to (default is <code>8</code>), and should be set to avoid missaligned memory access for objects that are "packed".</p>
+<h3><a class="anchor" id="autotoc_md23"></a>
 tolerance</h3>
 <p ><code>tolerance</code> represents the minimum probability considered non-zero (default is <code>1e-30</code>, to compensate for numerical errors).</p>
-<h3><a class="anchor" id="autotoc_md23"></a>
+<h3><a class="anchor" id="autotoc_md24"></a>
 safety margin</h3>
 <p ><code>safety_margin</code> represents the target proportion of memory to keep free (default is <code>0.1</code> for 10%).</p>
-<h3><a class="anchor" id="autotoc_md24"></a>
+<h3><a class="anchor" id="autotoc_md25"></a>
 simple truncation</h3>
 <p ><code>simple_truncation</code> is a <code>bool</code> variable (default is <code>false</code>, but can be set to <code>true</code> by compilling with the <code>SIMPLE_TRUNCATION</code> flag). If <code>simple_truncation</code> is <code>true</code>, then truncation simply consist in selecting the n highest probability objects. Otherwise object are selected with some probabilistic aspect, with the probability of keeping an object being proportional to the probability of each object.</p>
 <p >Probabilistic selctions cost a bit of time and of accuracy, with some gain in representation through an analog sampling process to a quantum Monte-Carlo algorithm.</p>
-<h3><a class="anchor" id="autotoc_md25"></a>
+<h3><a class="anchor" id="autotoc_md26"></a>
 load balancing bucket per thread</h3>
 <p ><code>load_balancing_bucket_per_thread</code> represent the number of partition par thread (or MPI node), which allows load balancing by then having a variable number of partition per thread according to each partition's size.</p>
 <p ><code>load_balancing_bucket_per_thread</code> has a default of <code>8</code>.</p>
-<h2><a class="anchor" id="autotoc_md26"></a>
+<h2><a class="anchor" id="autotoc_md27"></a>
 MPI global variables</h2>
-<h3><a class="anchor" id="autotoc_md27"></a>
+<h3><a class="anchor" id="autotoc_md28"></a>
 minimum equalize size and equalize imbalance.</h3>
 <p ><code>mpi::min_equalize_size</code> represents the minimum per node average size required to automaticly call <code>equalize(...)</code> after a call to <code>quids::mpi::simulate(...)</code>.</p>
 <p >If this first condition is met, <code>equalize(...)</code> if the maximum relative imbalance in the number of object accross the nodes is greater than <code>mpi::equalize_imablance</code>.</p>
 <p ><code>mpi::min_equalize_size</code> is equal to <code>1000</code> by default, and <code>mpi::equalize_imablance</code> has a default of <code>0.2</code>.</p>
-<h2><a class="anchor" id="autotoc_md28"></a>
+<h2><a class="anchor" id="autotoc_md29"></a>
 Utils global variables</h2>
-<h3><a class="anchor" id="autotoc_md29"></a>
+<h3><a class="anchor" id="autotoc_md30"></a>
 min vector size</h3>
 <p ><code>utils::min_vector_size</code> represent the minimum size of any vector (the default is <code>100000</code>).</p>
-<h3><a class="anchor" id="autotoc_md30"></a>
+<h3><a class="anchor" id="autotoc_md31"></a>
 upsize policy</h3>
 <p ><code>utils::upsize_policy</code> represent the multiplier applied when upsizing a vector (the default is <code>1.1</code>). It avoid frequent upsizing by giving a small margin.</p>
-<h3><a class="anchor" id="autotoc_md31"></a>
+<h3><a class="anchor" id="autotoc_md32"></a>
 downsize policy</h3>
 <p ><code>utils::downsize_policy</code> reprensent the threshold multiplier to downsize a vector (the default is <code>0.85</code>). A vector won't be downsized until the requested size is smaller than this ultiplier times the capacity of the given vector.</p>
 <p ><b>!! this multiplier should always be smaller than the inverse of upsize_policy to avoid upsizing-downsizing loop !!</b> </p>

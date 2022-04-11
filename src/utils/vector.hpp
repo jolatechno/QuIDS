@@ -79,7 +79,8 @@ namespace quids::utils {
 			(to allow memory to be freed and given back to another vector).
 		"min_state_size" is the minimum size of a vector, to avoid small vectors which are bound to be resized frequently.
 		*/
-	    void resize(size_t n) const {
+		/// align_byte_length_ should be used to reallign the buffer, which is not yet implemented as realloc doesn't allocate.
+	    void resize(size_t n, uint align_byte_length_=0) const {
 	    	n = std::max(min_vector_size, n); // never resize under min_vector_size
 
 	    	if (size_ < n || // resize if we absolutely have to because the state won't fit

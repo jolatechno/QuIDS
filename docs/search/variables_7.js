@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['upsize_5fpolicy_0',['upsize_policy',['../namespacequids_1_1utils.html#a90041f6130e71de649d376e77040893d',1,'quids::utils']]]
+  ['tolerance_0',['tolerance',['../namespacequids.html#ae6148553f287fa7c670cc8d0a729fe8d',1,'quids']]],
+  ['total_5fproba_1',['total_proba',['../classquids_1_1iteration.html#ad330de0af20f855358d13da0cf55d014',1,'quids::iteration']]]
 ];

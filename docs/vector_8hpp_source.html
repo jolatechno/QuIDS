@@ -104,7 +104,7 @@ $(function() {
 <div class="line"><a id="l00038" name="l00038"></a><span class="lineno">   38</span>     </div>
 <div class="line"><a id="l00039" name="l00039"></a><span class="lineno">   39</span>    <span class="keyword">public</span>:</div>
 <div class="line"><a id="l00040" name="l00040"></a><span class="lineno">   40</span>        <span class="keyword">explicit</span> <a class="code hl_class" href="classquids_1_1utils_1_1fast__vector.html">fast_vector</a>(<span class="keywordtype">size_t</span> n = 0) {</div>
-<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>            resize(n);</div>
+<div class="line"><a id="l00041" name="l00041"></a><span class="lineno">   41</span>            <a class="code hl_function" href="classquids_1_1utils_1_1fast__vector.html#a7c146027f72e0a3d0d942496750b7a49">resize</a>(n);</div>
 <div class="line"><a id="l00042" name="l00042"></a><span class="lineno">   42</span>        }</div>
 <div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span> </div>
 <div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>        <a class="code hl_class" href="classquids_1_1utils_1_1fast__vector.html">~fast_vector</a>() {</div>
@@ -145,31 +145,32 @@ $(function() {
 <div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span><span class="comment">            (to allow memory to be freed and given back to another vector).</span></div>
 <div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span><span class="comment">        &quot;min_state_size&quot; is the minimum size of a vector, to avoid small vectors which are bound to be resized frequently.</span></div>
 <div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span><span class="comment">        */</span></div>
-<div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>        <span class="keywordtype">void</span> resize(<span class="keywordtype">size_t</span> n)<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>            n = std::max(<a class="code hl_variable" href="namespacequids_1_1utils.html#af6008a56b61821492cabc5d71d351938">min_vector_size</a>, n); <span class="comment">// never resize under min_vector_size</span></div>
-<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span> </div>
-<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>            <span class="keywordflow">if</span> (size_ &lt; n || <span class="comment">// resize if we absolutely have to because the state won&#39;t fit</span></div>
-<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>                n*<a class="code hl_variable" href="namespacequids_1_1utils.html#a90041f6130e71de649d376e77040893d">upsize_policy</a> &lt; size_*<a class="code hl_variable" href="namespacequids_1_1utils.html#a1030df3ee43b5a7caf2fcc8e4e68e281">downsize_policy</a>) { <span class="comment">// resize if the size we resize to is small enough (to free memory)</span></div>
-<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>                size_ = n*<a class="code hl_variable" href="namespacequids_1_1utils.html#a90041f6130e71de649d376e77040893d">upsize_policy</a>;</div>
-<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>                ptr = (value_type*)realloc(ptr, size_*<span class="keyword">sizeof</span>(value_type));</div>
-<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span> </div>
-<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span>                <span class="keywordflow">if</span> (ptr == NULL)</div>
-<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span>                    <span class="keywordflow">throw</span> std::runtime_error(<span class="stringliteral">&quot;bad allocation in fast_vector !!&quot;</span>);</div>
-<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>            }</div>
-<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>        }</div>
-<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>     </div>
-<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>        <span class="comment">// Begin iterator</span></div>
-<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>        <span class="keyword">inline</span> value_type* begin()<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>            <span class="keywordflow">return</span> ptr;</div>
-<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>        }</div>
-<div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span>     </div>
-<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>        <span class="comment">// End iterator</span></div>
-<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>        <span class="keyword">inline</span> value_type* end()<span class="keyword"> const </span>{</div>
-<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>            <span class="keywordflow">return</span> begin() + size_;</div>
-<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>        }</div>
-<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>    };</div>
-<div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span>}</div>
+<div class="line"><a id="l00083" name="l00083"></a><span class="lineno"><a class="line" href="classquids_1_1utils_1_1fast__vector.html#a7c146027f72e0a3d0d942496750b7a49">   83</a></span>        <span class="keywordtype">void</span> <a class="code hl_function" href="classquids_1_1utils_1_1fast__vector.html#a7c146027f72e0a3d0d942496750b7a49">resize</a>(<span class="keywordtype">size_t</span> n, uint align_byte_length_=0)<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span>            n = std::max(<a class="code hl_variable" href="namespacequids_1_1utils.html#af6008a56b61821492cabc5d71d351938">min_vector_size</a>, n); <span class="comment">// never resize under min_vector_size</span></div>
+<div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span> </div>
+<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>            <span class="keywordflow">if</span> (size_ &lt; n || <span class="comment">// resize if we absolutely have to because the state won&#39;t fit</span></div>
+<div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>                n*<a class="code hl_variable" href="namespacequids_1_1utils.html#a90041f6130e71de649d376e77040893d">upsize_policy</a> &lt; size_*<a class="code hl_variable" href="namespacequids_1_1utils.html#a1030df3ee43b5a7caf2fcc8e4e68e281">downsize_policy</a>) { <span class="comment">// resize if the size we resize to is small enough (to free memory)</span></div>
+<div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>                size_ = n*<a class="code hl_variable" href="namespacequids_1_1utils.html#a90041f6130e71de649d376e77040893d">upsize_policy</a>;</div>
+<div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>                ptr = (value_type*)realloc(ptr, size_*<span class="keyword">sizeof</span>(value_type));</div>
+<div class="line"><a id="l00090" name="l00090"></a><span class="lineno">   90</span> </div>
+<div class="line"><a id="l00091" name="l00091"></a><span class="lineno">   91</span>                <span class="keywordflow">if</span> (ptr == NULL)</div>
+<div class="line"><a id="l00092" name="l00092"></a><span class="lineno">   92</span>                    <span class="keywordflow">throw</span> std::runtime_error(<span class="stringliteral">&quot;bad allocation in fast_vector !!&quot;</span>);</div>
+<div class="line"><a id="l00093" name="l00093"></a><span class="lineno">   93</span>            }</div>
+<div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>        }</div>
+<div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>     </div>
+<div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>        <span class="comment">// Begin iterator</span></div>
+<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>        <span class="keyword">inline</span> value_type* begin()<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>            <span class="keywordflow">return</span> ptr;</div>
+<div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span>        }</div>
+<div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>     </div>
+<div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>        <span class="comment">// End iterator</span></div>
+<div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>        <span class="keyword">inline</span> value_type* end()<span class="keyword"> const </span>{</div>
+<div class="line"><a id="l00103" name="l00103"></a><span class="lineno">  103</span>            <span class="keywordflow">return</span> begin() + size_;</div>
+<div class="line"><a id="l00104" name="l00104"></a><span class="lineno">  104</span>        }</div>
+<div class="line"><a id="l00105" name="l00105"></a><span class="lineno">  105</span>    };</div>
+<div class="line"><a id="l00106" name="l00106"></a><span class="lineno">  106</span>}</div>
 <div class="ttc" id="aclassquids_1_1utils_1_1fast__vector_html"><div class="ttname"><a href="classquids_1_1utils_1_1fast__vector.html">quids::utils::fast_vector</a></div><div class="ttdoc">drop-in replacement for vectors, with more &quot;efficient&quot; memory usage and access.</div><div class="ttdef"><b>Definition:</b> vector.hpp:34</div></div>
+<div class="ttc" id="aclassquids_1_1utils_1_1fast__vector_html_a7c146027f72e0a3d0d942496750b7a49"><div class="ttname"><a href="classquids_1_1utils_1_1fast__vector.html#a7c146027f72e0a3d0d942496750b7a49">quids::utils::fast_vector::resize</a></div><div class="ttdeci">void resize(size_t n, uint align_byte_length_=0) const</div><div class="ttdoc">align_byte_length_ should be used to reallign the buffer, which is not yet implemented as realloc doe...</div><div class="ttdef"><b>Definition:</b> vector.hpp:83</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html"><div class="ttname"><a href="namespacequids_1_1utils.html">quids::utils</a></div><div class="ttdoc">QuIDS utility function and variable namespace.</div><div class="ttdef"><b>Definition:</b> algorithm.hpp:6</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html_a1030df3ee43b5a7caf2fcc8e4e68e281"><div class="ttname"><a href="namespacequids_1_1utils.html#a1030df3ee43b5a7caf2fcc8e4e68e281">quids::utils::downsize_policy</a></div><div class="ttdeci">float downsize_policy</div><div class="ttdoc">size multiplicator when downsize_policy, to avoid repeated upsizing. !!! upsize_policy*downsize_polic...</div><div class="ttdef"><b>Definition:</b> vector.hpp:28</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html_a90041f6130e71de649d376e77040893d"><div class="ttname"><a href="namespacequids_1_1utils.html#a90041f6130e71de649d376e77040893d">quids::utils::upsize_policy</a></div><div class="ttdeci">float upsize_policy</div><div class="ttdoc">size multiplicator when upsizing, to avoid repeated upsizing.</div><div class="ttdef"><b>Definition:</b> vector.hpp:26</div></div>

@@ -24,6 +24,7 @@ int main(int argc, char* argv[]) {
 	int master_node_id = 1;
 
 	quids::tolerance = 1e-8;
+	quids::align_byte_length = 0;
 
 	int size, rank, provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);

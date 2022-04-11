@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['load_5fbalancing_5fbucket_5fper_5fthread_0',['load_balancing_bucket_per_thread',['../namespacequids.html#a967bbc4ed348a75e24789554a64f8d62',1,'quids']]]
+  ['equalize_5finbalance_0',['equalize_inbalance',['../namespacequids_1_1mpi.html#ab5de5240ccfc019063996bdc48e7a20b',1,'quids::mpi']]]
 ];

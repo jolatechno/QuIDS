@@ -13,6 +13,9 @@
 	#define EQUALIZE_INBALANCE 0.05
 #endif
 
+#define MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE 1 + 2*sizeof(PROBA_TYPE) + sizeof(size_t)
+#define MPI_SYMBOLIC_ITERATION_MEMORY_SIZE 1 + 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(int)
+
 /// mpi implementation namespace
 namespace quids::mpi {
 	/// mpi datatype corresponding to probabilities.
@@ -116,6 +119,7 @@ namespace quids::mpi {
 				/* send properties */
 				MPI_Send(&magnitude[begin], num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator);
 				MPI_Send(&object_begin[begin + 1], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+				MPI_Send(&object_size[begin], num_object_sent, MPI_UNSIGNED, node, 0 /* tag */, communicator);
 
 				/* send objects */
 				size_t send_object_size = object_begin[num_object];
@@ -130,7 +134,7 @@ namespace quids::mpi {
 
 				if (send_num_child)
 					/* send num child */
-					MPI_Send(&num_childs[begin], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator);
+					MPI_Send(&num_childs[begin], num_object_sent, MPI_UNSIGNED, node, 0 /* tag */, communicator);
 
 				/* pop */
 				pop(num_object_sent, false);
@@ -154,7 +158,7 @@ namespace quids::mpi {
 			MPI_Recv(&send_object_size, 1, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 			/* verify memory limit */
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t)  + sizeof(float);
+			static const size_t iteration_memory_size = ITERATION_MEMORY_SIZE;
 			bool recv = num_object_sent*iteration_memory_size + send_object_size < max_mem;
 			MPI_Send(&recv, 1, MPI_CHAR, node, 0 /* tag*/, communicator);
 
@@ -167,6 +171,7 @@ namespace quids::mpi {
 				/* receive properties */
 				MPI_Recv(&magnitude[num_object], num_object_sent, mag_MPI_Datatype, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 				MPI_Recv(&object_begin[num_object + 1], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+				MPI_Recv(&object_size[num_object], num_object_sent, MPI_UNSIGNED, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 				/* receive objects */
 				size_t object_offset = send_object_begin;
@@ -186,7 +191,7 @@ namespace quids::mpi {
 
 				if (receive_num_child) {
 					/* receive num child */
-					MPI_Recv(&num_childs[num_object], num_object_sent, MPI_UNSIGNED_LONG_LONG, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+					MPI_Recv(&num_childs[num_object], num_object_sent, MPI_UNSIGNED, node, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 					/* partial sum */
 					num_childs[num_object] += child_begin[num_object];
@@ -229,7 +234,7 @@ namespace quids::mpi {
 		utils functions
 		*/
 		size_t inline get_mem_size(MPI_Comm communicator) const {
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
+			static const size_t iteration_memory_size = ITERATION_MEMORY_SIZE;
 
 			size_t total_size, local_size = iteration_memory_size*magnitude.size() + objects.size();
 			MPI_Allreduce(&local_size, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
@@ -353,16 +358,16 @@ namespace quids::mpi {
 		float inline get_average_object_size(MPI_Comm communicator) const {
 			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
 
-			static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
+			static const size_t symbolic_iteration_memory_size = SYMBOLIC_ITERATION_MEMORY_SIZE + MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE;
 
-			static const size_t mpi_symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 1*sizeof(size_t) + sizeof(int);
+			static const size_t mpi_symbolic_iteration_memory_size = MPI_SYMBOLIC_ITERATION_MEMORY_SIZE;
 			return (float)symbolic_iteration_memory_size + (float)mpi_symbolic_iteration_memory_size + hash_map_size;
 		}
 		size_t inline get_mem_size(MPI_Comm communicator) const {
-			static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
+			static const size_t symbolic_iteration_memory_size = SYMBOLIC_ITERATION_MEMORY_SIZE + MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE;
 			size_t memory_size = magnitude.size()*symbolic_iteration_memory_size;
 
-			static const size_t mpi_symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 1*sizeof(size_t) + sizeof(int);
+			static const size_t mpi_symbolic_iteration_memory_size = MPI_SYMBOLIC_ITERATION_MEMORY_SIZE;
 			memory_size += mag_buffer.size()*mpi_symbolic_iteration_memory_size;
 
 			size_t total_size = mpi_symbolic_iteration_memory_size*magnitude.size();
@@ -509,11 +514,11 @@ namespace quids::mpi {
 	get the truncated memory size
 	*/
 	size_t mpi_iteration::get_truncated_mem_size(size_t begin_num_object) const {
-		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
+		static const size_t iteration_memory_size = ITERATION_MEMORY_SIZE;
 
 		static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
-		static const size_t symbolic_iteration_memory_size = (1 + 1) + (2 + 2)*sizeof(PROBA_TYPE) + (5 + 1)*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
-		static const size_t mpi_symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 1*sizeof(size_t) + sizeof(int);
+		static const size_t symbolic_iteration_memory_size = SYMBOLIC_ITERATION_MEMORY_SIZE + MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE;
+		static const size_t mpi_symbolic_iteration_memory_size = MPI_SYMBOLIC_ITERATION_MEMORY_SIZE;
 
 		size_t mem_size = iteration_memory_size*(truncated_num_object - begin_num_object);
 		for (size_t i = begin_num_object; i < truncated_num_object; ++i) {
@@ -897,16 +902,16 @@ namespace quids::mpi {
 			return;
 
 		/* get the number of objects of the respective pairs */
-		size_t other_num_object;
-		size_t other_max_symbolic_object_size;
+		uint other_num_object;
+		uint other_ub_symbolic_object_size;
 		
 		MPI_Isend(&num_symbolic_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
-		MPI_Isend(&max_symbolic_object_size, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
+		MPI_Isend(&ub_symbolic_object_size, 1, MPI_UNSIGNED, this_pair_id, 0 /* tag */, communicator, &request);
 
 		MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-		MPI_Recv(&other_max_symbolic_object_size, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+		MPI_Recv(&other_ub_symbolic_object_size, 1, MPI_UNSIGNED, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
-		max_symbolic_object_size = std::max(max_symbolic_object_size, other_max_symbolic_object_size);
+		ub_symbolic_object_size = std::max(ub_symbolic_object_size, other_ub_symbolic_object_size);
 
 		/* equalize amoung pairs */
 		if (num_symbolic_object > other_num_object) {

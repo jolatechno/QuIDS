@@ -5,6 +5,8 @@
 #include <iostream>
 
 int main(int argc, char* argv[]) {
+	quids::align_byte_length = 0;
+	
 	quids::rule_t *H1 = new quids::rules::quantum_computer::hadamard(1);
 	quids::rule_t *H2 = new quids::rules::quantum_computer::hadamard(2);
 	quids::modifier_t CNOT = quids::rules::quantum_computer::cnot(1, 3);

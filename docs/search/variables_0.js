@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['downsize_5fpolicy_0',['downsize_policy',['../namespacequids_1_1utils.html#a1030df3ee43b5a7caf2fcc8e4e68e281',1,'quids::utils']]]
+  ['align_5fbyte_5flength_0',['align_byte_length',['../namespacequids.html#ae8ca71b5e72f679e32a8b76f3c1280f3',1,'quids']]]
 ];

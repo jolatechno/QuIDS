@@ -22,6 +22,9 @@
 #ifndef HASH_MAP_OVERHEAD
 	#define HASH_MAP_OVERHEAD 1.7 /// overhead per 64-bit key and value insertion in hashmap (robinhood)
 #endif
+#ifndef alignMENT_BYTE_LENGTH
+	#define alignMENT_BYTE_LENGTH 8
+#endif
 #ifndef TOLERANCE
 	#define TOLERANCE 1e-30;
 #endif
@@ -31,6 +34,9 @@
 #ifndef LOAD_BALANCING_BUCKET_PER_THREAD
 	#define LOAD_BALANCING_BUCKET_PER_THREAD 32
 #endif
+
+#define ITERATION_MEMORY_SIZE 2*sizeof(PROBA_TYPE) + 3*sizeof(size_t) + sizeof(float) + 2*sizeof(uint)
+#define SYMBOLIC_ITERATION_MEMORY_SIZE 1 + 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + 2*sizeof(uint) + sizeof(float)
 
 /*
 defining openmp function's return values if openmp isn't installed or loaded
@@ -45,6 +51,8 @@ defining openmp function's return values if openmp isn't installed or loaded
 
 /// QuIDS namespace
 namespace quids {
+	/// amount of byte to align objects to
+	uint align_byte_length = alignMENT_BYTE_LENGTH;
 	/// tolerance for objects (remove objects with a smaller probability)
 	PROBA_TYPE tolerance = TOLERANCE;
 	/// memory safety margin (0.2 = 80% memory usage target)
@@ -74,6 +82,18 @@ namespace quids {
 	/// debuging function type
 	typedef std::function<void(const char* step)> debug_t;
 
+	/// utility function to get the alignment offset to put at the end of an object of size "size"
+	uint inline get_alignment_offset(const uint size) {
+		if (align_byte_length <= 1)
+			return 0;
+
+		uint alignment_offset = align_byte_length - size%align_byte_length;
+		if (alignment_offset == align_byte_length)
+			alignment_offset = 0;
+
+		return alignment_offset;
+	}
+
 	/// class represneting a dynamic (or rule).
 	class rule {
 	public:
@@ -85,7 +105,7 @@ namespace quids {
 		 * @param[out] num_child number of children objects.
 		 * @param[out] max_child_size upper bound (can be unacurate) of the size of childrens.
 		 */
-		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, size_t &num_child, size_t &max_child_size) const = 0;
+		virtual inline void get_num_child(char const *parent_begin, char const *parent_end, uint &num_child, uint &max_child_size) const = 0;
 		/// function generating a child, and computing its magnitude and size.
 		/** 
 		 * @param[in] parent_begin,parent_end delimitation of the parent object memory representation.
@@ -94,15 +114,15 @@ namespace quids {
 		 * @param[out] size child object memory representation size.
 		 * @param[out] mag magnitude of the children object (input should be the parent magnitude).
 		 */
-		virtual inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id, size_t &size, mag_t &mag) const = 0;
+		virtual inline void populate_child(char const *parent_begin, char const *parent_end, char* const child_begin, uint const child_id, uint &size, mag_t &mag) const = 0;
 		/// function generating a child, without computing its magnitude and size.
 		/** 
 		 * @param[in] parent_begin,parent_end delimitation of the parent object memory representation.
 		 * @param[out] child_begin start of the memory representation of the child memory representation.
 		 * @param[in] child_id children identifier among its siblings.
 		 */
-		virtual inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint32_t const child_id) const { //can be overwritten
-			size_t size_placeholder;
+		virtual inline void populate_child_simple(char const *parent_begin, char const *parent_end, char* const child_begin, uint const child_id) const { //can be overwritten
+			uint size_placeholder;
 			mag_t mag_placeholder;
 			populate_child(parent_begin, parent_end, child_begin, child_id,
 				size_placeholder, mag_placeholder);
@@ -147,15 +167,17 @@ namespace quids {
 		void append(char const *object_begin_, char const *object_end_, mag_t const mag=1) {
 			size_t offset = object_begin[num_object];
 			size_t size = std::distance(object_begin_, object_end_);
+			uint alignment_offset = get_alignment_offset(size);
 
 			resize(++num_object);
-			allocate(offset + size);
+			allocate(offset + size + alignment_offset);
 
 			for (size_t i = 0; i < size; ++i)
 				objects[offset + i] = object_begin_[i];
 
 			magnitude[num_object - 1] = mag;
-			object_begin[num_object] = offset + size;
+			object_size[num_object - 1] = size;
+			object_begin[num_object] = offset + size + alignment_offset;
 		}
 		/// function that removes a given number of object from the "tail" of the memory representation
 		/**
@@ -187,7 +209,7 @@ namespace quids {
 				PROBA_TYPE local_avg = 0;
 				#pragma omp for 
 				for (size_t oid = 0; oid < num_object; ++oid) {
-					size_t size;
+					uint size;
 					std::complex<PROBA_TYPE> mag;
 
 					/* get object and accumulate */
@@ -210,11 +232,10 @@ namespace quids {
 		 * @param[out] object_size size of the memory representation of the object.
 		 * @param[out] mag magnitude of the object.
 		 */
-		void get_object(size_t const object_id, char *& object_begin_, size_t &object_size, mag_t *&mag) {
-			size_t this_object_begin = object_begin[object_id];
-			object_size = object_begin[object_id + 1] - this_object_begin;
+		void get_object(size_t const object_id, char *& object_begin_, uint &object_size_, mag_t *&mag) {
+			object_size_ = object_size[object_id];
 			mag = &magnitude[object_id];
-			object_begin_ = &objects[this_object_begin];
+			object_begin_ = &objects[object_begin[object_id]];
 		}
 		/// function to access a particular object (read-only access)
 		/**
@@ -223,11 +244,10 @@ namespace quids {
 		 * @param[out] object_size size of the memory representation of the object.
 		 * @param[out] mag magnitude of the object.
 		 */
-		void get_object(size_t const object_id, char const *& object_begin_, size_t &object_size, mag_t &mag) const {
-			size_t this_object_begin = object_begin[object_id];
-			object_size = object_begin[object_id + 1] - this_object_begin;
+		void get_object(size_t const object_id, char const *& object_begin_, uint &object_size_, mag_t &mag) const {
+			object_size_ = object_size[object_id];
 			mag = magnitude[object_id];
-			object_begin_ = &objects[this_object_begin];
+			object_begin_ = &objects[object_begin[object_id]];
 		}
 
 	private:
@@ -237,12 +257,13 @@ namespace quids {
 
 	protected:
 		mutable size_t truncated_num_object = 0;
-		mutable size_t max_symbolic_object_size = 0;
+		mutable uint ub_symbolic_object_size = 0;
 
 		mutable utils::fast_vector<mag_t> magnitude;
 		mutable utils::fast_vector<char> objects;
 		mutable utils::fast_vector<size_t> object_begin;
-		mutable utils::fast_vector<size_t> num_childs;
+		mutable utils::fast_vector<uint> object_size;
+		mutable utils::fast_vector<uint> num_childs;
 		mutable utils::fast_vector<size_t> child_begin;
 		mutable utils::fast_vector<size_t> truncated_oid;
 		mutable utils::fast_vector<float> random_selector;
@@ -256,6 +277,9 @@ namespace quids {
 
 				#pragma omp section
 				num_childs.resize(num_object);
+
+				#pragma omp section
+				object_size.resize(num_object);
 
 				#pragma omp section
 				object_begin.resize(num_object + 1);
@@ -274,7 +298,7 @@ namespace quids {
 			}
 		}
 		void inline allocate(size_t size) const {
-			objects.resize(size);
+			objects.resize(size, align_byte_length);
 		}
 
 
@@ -282,7 +306,7 @@ namespace quids {
 		utils functions
 		*/
 		size_t get_mem_size() const {
-			static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
+			static const size_t iteration_memory_size = ITERATION_MEMORY_SIZE;
 			return magnitude.size()*iteration_memory_size + objects.size();
 		}
 		size_t get_object_length() const {
@@ -326,10 +350,10 @@ namespace quids {
 		utils::fast_vector<mag_t> magnitude;
 		utils::fast_vector<size_t> next_oid;
 		utils::fast_vector<char /*bool*/> is_unique;
-		utils::fast_vector<size_t> size;
+		utils::fast_vector<uint> size;
 		utils::fast_vector<size_t> hash;
 		utils::fast_vector<size_t> parent_oid;
-		utils::fast_vector<uint32_t> child_id;
+		utils::fast_vector<uint> child_id;
 		utils::fast_vector<float> random_selector;
 		utils::fast_vector<size_t> next_oid_partitioner_buffer;
 
@@ -389,7 +413,7 @@ namespace quids {
 		utils functions
 		*/
 		size_t get_mem_size() const {
-			static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
+			static const size_t symbolic_iteration_memory_size = SYMBOLIC_ITERATION_MEMORY_SIZE;
 			return magnitude.size()*symbolic_iteration_memory_size;
 		}
 
@@ -515,15 +539,15 @@ namespace quids {
 		if (num_object == 0)
 			return;
 
-		max_symbolic_object_size = 0;
+		ub_symbolic_object_size = 0;
 
-		#pragma omp parallel for  reduction(max:max_symbolic_object_size)
+		#pragma omp parallel for  reduction(max:ub_symbolic_object_size)
 		for (size_t oid = 0; oid < num_object; ++oid) {
-			size_t size;
+			uint size;
 			rule->get_num_child(&objects[object_begin[oid]],
-				&objects[object_begin[oid + 1]],
+				&objects[object_begin[oid] + object_size[oid]],
 				num_childs[oid], size);
-			max_symbolic_object_size = std::max(max_symbolic_object_size, size);
+			ub_symbolic_object_size = std::max(ub_symbolic_object_size, size);
 		}
 
 		__gnu_parallel::partial_sum(num_childs.begin(), num_childs.begin() + num_object, child_begin.begin() + 1);
@@ -533,10 +557,10 @@ namespace quids {
 	get the truncated memory size
 	*/
 	size_t iteration::get_truncated_mem_size(size_t begin_num_object) const {
-		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
+		static const size_t iteration_memory_size = ITERATION_MEMORY_SIZE;
 
 		static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
-		static const size_t symbolic_iteration_memory_size = 1 + 2*sizeof(PROBA_TYPE) + 5*sizeof(size_t) + sizeof(uint32_t) + sizeof(float);
+		static const size_t symbolic_iteration_memory_size = SYMBOLIC_ITERATION_MEMORY_SIZE;
 
 		size_t mem_size = iteration_memory_size*(truncated_num_object - begin_num_object);
 		for (size_t i = begin_num_object; i < truncated_num_object; ++i) {
@@ -635,7 +659,7 @@ namespace quids {
 
 		/* resize symbolic iteration */
 		symbolic_iteration.resize(symbolic_iteration.num_object);
-		symbolic_iteration.reserve(max_symbolic_object_size);
+		symbolic_iteration.reserve(ub_symbolic_object_size);
 		
 		#pragma omp parallel
 		{
@@ -670,7 +694,7 @@ namespace quids {
 				/* generate graph */
 				symbolic_iteration.magnitude[oid] = magnitude[id];
 				rule->populate_child(&objects[object_begin[id]],
-					&objects[object_begin[id + 1]],
+					&objects[object_begin[id] + object_size[id]],
 					symbolic_iteration.placeholder[thread_id], symbolic_iteration.child_id[oid],
 					symbolic_iteration.size[oid], symbolic_iteration.magnitude[oid]);
 
@@ -805,11 +829,14 @@ namespace quids {
 	get the truncated memory size
 	*/
 	size_t symbolic_iteration::get_truncated_mem_size(size_t begin_num_object) const {
-		static const size_t iteration_memory_size = 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + sizeof(float);
+		static const size_t iteration_memory_size = ITERATION_MEMORY_SIZE;
 
 		size_t mem_size = iteration_memory_size*(next_iteration_num_object - begin_num_object);
-		for (size_t i = begin_num_object; i < next_iteration_num_object; ++i)
-			mem_size += size[next_oid[i]];
+		for (size_t i = begin_num_object; i < next_iteration_num_object; ++i) {
+			size_t this_mem_size = size[next_oid[i]];
+			uint alignment_offset = get_alignment_offset(this_mem_size);
+			mem_size += this_mem_size + alignment_offset;
+		}
 
 		return mem_size;
 	}
@@ -889,12 +916,14 @@ namespace quids {
 			auto id = next_oid[oid];
 
 			/* assign magnitude and size */
-			next_iteration.object_begin[oid + 1] = size[id];
+			uint alignment_offset = get_alignment_offset(size[id]);
+			next_iteration.object_size[oid] = size[id];
+			next_iteration.object_begin[oid + 1] = size[id] + alignment_offset;
 			next_iteration.magnitude[oid] = magnitude[id];
 		}
 
 		__gnu_parallel::partial_sum(&next_iteration.object_begin[1],
-			&next_iteration.object_begin[1] + next_iteration.num_object,
+			&next_iteration.object_begin[1] + next_iteration.num_object + 1,
 			&next_iteration.object_begin[1]);
 
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
@@ -913,7 +942,7 @@ namespace quids {
 			auto this_parent_oid = parent_oid[id];
 				
 			rule->populate_child_simple(&last_iteration.objects[last_iteration.object_begin[this_parent_oid]],
-				&last_iteration.objects[last_iteration.object_begin[this_parent_oid + 1]],
+				&last_iteration.objects[last_iteration.object_begin[this_parent_oid] + last_iteration.object_size[this_parent_oid]],
 				&next_iteration.objects[next_iteration.object_begin[oid]],
 				child_id[id]);
 		}
@@ -927,7 +956,7 @@ namespace quids {
 		for (size_t oid = 0; oid < num_object; ++oid)
 			/* generate graph */
 			rule(&objects[object_begin[oid]],
-				&objects[object_begin[oid + 1]],
+				&objects[object_begin[oid] + object_size[oid]],
 				magnitude[oid]);
 	}
 
