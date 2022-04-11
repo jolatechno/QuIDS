@@ -1,6 +1,9 @@
 var searchData=
 [
-  ['receive_5fobjects_0',['receive_objects',['../classquids_1_1mpi_1_1mpi__iteration.html#a30e7a9e5c0175fd1f3f274e104f12450',1,'quids::mpi::mpi_iteration']]],
-  ['resize_1',['resize',['../classquids_1_1utils_1_1fast__vector.html#a7c146027f72e0a3d0d942496750b7a49',1,'quids::utils::fast_vector']]],
-  ['rule_2',['rule',['../classquids_1_1rule.html#ab5963493c6aa55d4893460fd92a97c1c',1,'quids::rule']]]
+  ['parallel_5fgeneralized_5fpartition_0',['parallel_generalized_partition',['../namespacequids_1_1utils.html#aa588190a8281d59c7cef534470353bb0',1,'quids::utils']]],
+  ['parallel_5fgeneralized_5fpartition_5ffrom_5fiota_1',['parallel_generalized_partition_from_iota',['../namespacequids_1_1utils.html#afb255d10547e01152bfd963b92ddcc88',1,'quids::utils']]],
+  ['parallel_5fiota_2',['parallel_iota',['../namespacequids_1_1utils.html#ae865d1e8b2ff4018c77c5b8be1ca14a5',1,'quids::utils']]],
+  ['pop_3',['pop',['../classquids_1_1iteration.html#a7d940691bcce7bd1d14b32cbb0a91ffe',1,'quids::iteration']]],
+  ['populate_5fchild_4',['populate_child',['../classquids_1_1rule.html#a515c479601b8de30777bd2ab397a442d',1,'quids::rule']]],
+  ['populate_5fchild_5fsimple_5',['populate_child_simple',['../classquids_1_1rule.html#a4ea9f37187a55934d90f52215b32467e',1,'quids::rule']]]
 ];

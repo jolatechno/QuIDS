@@ -97,10 +97,10 @@ value_type &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator[
 <tr class="memitem:a409f55988604b7ce671eafdcc118f2b3"><td class="memItemLeft" align="right" valign="top"><a id="a409f55988604b7ce671eafdcc118f2b3" name="a409f55988604b7ce671eafdcc118f2b3"></a>
 value_type&#160;</td><td class="memItemRight" valign="bottom"><b>operator[]</b> (size_t index) const</td></tr>
 <tr class="separator:a409f55988604b7ce671eafdcc118f2b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7c146027f72e0a3d0d942496750b7a49"><td class="memItemLeft" align="right" valign="top"><a id="a7c146027f72e0a3d0d942496750b7a49" name="a7c146027f72e0a3d0d942496750b7a49"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>resize</b> (size_t n, uint align_byte_length_=0) const</td></tr>
-<tr class="memdesc:a7c146027f72e0a3d0d942496750b7a49"><td class="mdescLeft">&#160;</td><td class="mdescRight">align_byte_length_ should be used to reallign the buffer, which is not yet implemented as realloc doesn't allocate. <br /></td></tr>
-<tr class="separator:a7c146027f72e0a3d0d942496750b7a49"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6c981139e6aa925b275718ce194c014f"><td class="memItemLeft" align="right" valign="top"><a id="a6c981139e6aa925b275718ce194c014f" name="a6c981139e6aa925b275718ce194c014f"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>resize</b> (size_t n, const uint align_byte_length_=std::alignment_of&lt; value_type &gt;()) const</td></tr>
+<tr class="memdesc:a6c981139e6aa925b275718ce194c014f"><td class="mdescLeft">&#160;</td><td class="mdescRight">align_byte_length_ should be used to reallign the buffer, which is not yet implemented as realloc doesn't allocate. <br /></td></tr>
+<tr class="separator:a6c981139e6aa925b275718ce194c014f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad4d8760096ac222fb1dd82a434310578"><td class="memItemLeft" align="right" valign="top"><a id="ad4d8760096ac222fb1dd82a434310578" name="ad4d8760096ac222fb1dd82a434310578"></a>
 value_type *&#160;</td><td class="memItemRight" valign="bottom"><b>begin</b> () const</td></tr>
 <tr class="separator:ad4d8760096ac222fb1dd82a434310578"><td class="memSeparator" colspan="2">&#160;</td></tr>

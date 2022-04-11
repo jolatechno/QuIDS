@@ -65,7 +65,9 @@ $(function() {
   <div class="headertitle"><div class="title"><a href="https://github.com/jolatechno/QuIDS">QuIDS</a>: Quantum Irregular Dynamic Simulator </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p ><a class="anchor" id="md_README"></a> <em><b>For now the implementation of alignment doesn't align the first object ! this should be fixed by modifying the resize function in <a href="./src/utils/vector.hpp">./src/utils/vector.hpp</a></b></em> <em><b>Alignemnt of the following objects is relative to the first object, so for now the maximum exact alignment supported is 8 (which is also the default)</b></em></p>
+<div class="textblock"><p ><a class="anchor" id="md_README"></a> <em><b>For now the implementation of alignment align the first object using std::align via the resize function in <a href="./src/utils/vector.hpp">./src/utils/vector.hpp</a>.</b></em></p>
+<p ><em><b>This means that alignment of the first object only hapens if align_byte_length is a power of two</b></em></p>
+<p ><em><b>Alignemnt of the following objects is relative to the first object, so for now the alignment of all objects only happens if align_byte_length is a power of two</b></em></p>
 <h1><a class="anchor" id="autotoc_md1"></a>
 Installation</h1>
 <p >This library is header-only, so you can simply link files in <a href="./src">src</a>.</p>

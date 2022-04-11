@@ -90,29 +90,36 @@ Data Structures</h2></td></tr>
 Functions</h2></td></tr>
 <tr class="memitem:a56580077932fd0c71cdcbbe6f0a3685a"><td class="memItemLeft" align="right" valign="top"><a id="a56580077932fd0c71cdcbbe6f0a3685a" name="a56580077932fd0c71cdcbbe6f0a3685a"></a>
 int&#160;</td><td class="memItemRight" valign="bottom"><b>nearest_power_of_two</b> (int n)</td></tr>
+<tr class="memdesc:a56580077932fd0c71cdcbbe6f0a3685a"><td class="mdescLeft">&#160;</td><td class="mdescRight">returns the upper bound as a power of two <br /></td></tr>
 <tr class="separator:a56580077932fd0c71cdcbbe6f0a3685a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a17af89b5a6c5a9ead5ec1246362ac522"><td class="memItemLeft" align="right" valign="top"><a id="a17af89b5a6c5a9ead5ec1246362ac522" name="a17af89b5a6c5a9ead5ec1246362ac522"></a>
 int&#160;</td><td class="memItemRight" valign="bottom"><b>log_2_upper_bound</b> (int n)</td></tr>
+<tr class="memdesc:a17af89b5a6c5a9ead5ec1246362ac522"><td class="mdescLeft">&#160;</td><td class="mdescRight">returns the upperbound bound of the log2 <br /></td></tr>
 <tr class="separator:a17af89b5a6c5a9ead5ec1246362ac522"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae865d1e8b2ff4018c77c5b8be1ca14a5"><td class="memTemplParams" colspan="2"><a id="ae865d1e8b2ff4018c77c5b8be1ca14a5" name="ae865d1e8b2ff4018c77c5b8be1ca14a5"></a>
 template&lt;class iteratorType , class valueType &gt; </td></tr>
 <tr class="memitem:ae865d1e8b2ff4018c77c5b8be1ca14a5"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>parallel_iota</b> (iteratorType begin, iteratorType end, const valueType value_begin)</td></tr>
+<tr class="memdesc:ae865d1e8b2ff4018c77c5b8be1ca14a5"><td class="mdescLeft">&#160;</td><td class="mdescRight">parallel iota <br /></td></tr>
 <tr class="separator:ae865d1e8b2ff4018c77c5b8be1ca14a5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a04766ef14b0af35520ea9bf386c68a79"><td class="memTemplParams" colspan="2"><a id="a04766ef14b0af35520ea9bf386c68a79" name="a04766ef14b0af35520ea9bf386c68a79"></a>
 template&lt;class idIteratorType , class countIteratorType , class functionType &gt; </td></tr>
 <tr class="memitem:a04766ef14b0af35520ea9bf386c68a79"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>generalized_partition</b> (idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer, countIteratorType offset, countIteratorType offset_end, functionType const partitioner)</td></tr>
+<tr class="memdesc:a04766ef14b0af35520ea9bf386c68a79"><td class="mdescLeft">&#160;</td><td class="mdescRight">linear partitioning algorithm into n partitions <br /></td></tr>
 <tr class="separator:a04766ef14b0af35520ea9bf386c68a79"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7312c706cd76f90dab115b88ae62b76f"><td class="memTemplParams" colspan="2"><a id="a7312c706cd76f90dab115b88ae62b76f" name="a7312c706cd76f90dab115b88ae62b76f"></a>
 template&lt;class idIteratorType , class idType , class countIteratorType , class functionType &gt; </td></tr>
 <tr class="memitem:a7312c706cd76f90dab115b88ae62b76f"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>generalized_partition_from_iota</b> (idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset, countIteratorType offset, countIteratorType offset_end, functionType const partitioner)</td></tr>
+<tr class="memdesc:a7312c706cd76f90dab115b88ae62b76f"><td class="mdescLeft">&#160;</td><td class="mdescRight">linear partitioning algorithm into n partitions without an initialized index list <br /></td></tr>
 <tr class="separator:a7312c706cd76f90dab115b88ae62b76f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa588190a8281d59c7cef534470353bb0"><td class="memTemplParams" colspan="2"><a id="aa588190a8281d59c7cef534470353bb0" name="aa588190a8281d59c7cef534470353bb0"></a>
 template&lt;class idIteratorType , class countIteratorType , class functionType &gt; </td></tr>
 <tr class="memitem:aa588190a8281d59c7cef534470353bb0"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>parallel_generalized_partition</b> (idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer, countIteratorType offset, countIteratorType offset_end, functionType const partitioner)</td></tr>
+<tr class="memdesc:aa588190a8281d59c7cef534470353bb0"><td class="mdescLeft">&#160;</td><td class="mdescRight">linear partitioning algorithm into n partitions in parallel <br /></td></tr>
 <tr class="separator:aa588190a8281d59c7cef534470353bb0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afb255d10547e01152bfd963b92ddcc88"><td class="memTemplParams" colspan="2"><a id="afb255d10547e01152bfd963b92ddcc88" name="afb255d10547e01152bfd963b92ddcc88"></a>
 template&lt;class idIteratorType , class idType , class countIteratorType , class functionType &gt; </td></tr>
 <tr class="memitem:afb255d10547e01152bfd963b92ddcc88"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>parallel_generalized_partition_from_iota</b> (idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset, countIteratorType offset, countIteratorType offset_end, functionType const partitioner)</td></tr>
+<tr class="memdesc:afb255d10547e01152bfd963b92ddcc88"><td class="mdescLeft">&#160;</td><td class="mdescRight">linear partitioning algorithm into n partitions without an initialized index list in parallel <br /></td></tr>
 <tr class="separator:afb255d10547e01152bfd963b92ddcc88"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a26acad53fb0779fa4d590533dbf48d7b"><td class="memTemplParams" colspan="2"><a id="a26acad53fb0779fa4d590533dbf48d7b" name="a26acad53fb0779fa4d590533dbf48d7b"></a>
 template&lt;class UnsignedIntIterator1 , class UnsignedIntIterator2 &gt; </td></tr>
