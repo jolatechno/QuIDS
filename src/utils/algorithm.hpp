@@ -5,24 +5,21 @@
 /// QuIDS utility function and variable namespace
 namespace quids::utils {
 	
-	/*
-	closest power of two
-	*/
+	/// returns the upper bound as a power of two
 	int nearest_power_of_two(int n) {
 		for (int i = 1;; i *= 2)
 			if (i >= n)
 				return i;
 	}
 
+	/// returns the upperbound bound of the log2
 	int log_2_upper_bound(int n) {
 		for (int i = 1;; ++i)
 			if (n >> i == 0)
 				return i - 1;
 	}
 
-	/* 
-	parallel iota
-	*/
+	/// parallel iota
 	template <class iteratorType, class valueType>
 	void parallel_iota(iteratorType begin, iteratorType end, const valueType value_begin) {
 		size_t distance = std::distance(begin, end);
@@ -37,9 +34,7 @@ namespace quids::utils {
 				begin[i] = value_begin + i;
 	}
 
-	/*
-	function to partition into n section
-	*/
+	/// linear partitioning algorithm into n partitions
 	template <class idIteratorType, class countIteratorType, class functionType>
 	void generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
 		countIteratorType offset, countIteratorType offset_end,
@@ -73,9 +68,7 @@ namespace quids::utils {
 		std::copy(idx_buffer, idx_buffer + id_end, idx_in);
 	}
 
-	/*
-	function to partition into n section
-	*/
+	/// linear partitioning algorithm into n partitions without an initialized index list
 	template <class idIteratorType, class idType, class countIteratorType, class functionType>
 	void generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset,
 		countIteratorType offset, countIteratorType offset_end,
@@ -110,9 +103,7 @@ namespace quids::utils {
 	}
 
 
-	/*
-	function to partition into n section
-	*/
+	/// linear partitioning algorithm into n partitions in parallel
 	template <class idIteratorType, class countIteratorType, class functionType>
 	void parallel_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer,
 		countIteratorType offset, countIteratorType offset_end,
@@ -172,9 +163,7 @@ namespace quids::utils {
 		std::copy(idx_buffer, idx_buffer + id_end, idx_in);
 	}
 
-	/*
-	function to partition into n section
-	*/
+	/// linear partitioning algorithm into n partitions without an initialized index list in parallel
 	template <class idIteratorType, class idType, class countIteratorType, class functionType>
 	void parallel_generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset,
 		countIteratorType offset, countIteratorType offset_end,

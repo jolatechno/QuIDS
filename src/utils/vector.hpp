@@ -85,11 +85,18 @@ namespace quids::utils {
 
 	    	if (size_ < n || // resize if we absolutely have to because the state won't fit
 	    		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
-	    		size_ = n*upsize_policy;
-	    		ptr = (value_type*)realloc(ptr, size_*sizeof(value_type));
+	    		size_ = n*upsize_policy + align_byte_length_;
+	    		ptr = (value_type*)realloc(ptr, (size_ + align_byte_length_)*sizeof(value_type));
 
 	    		if (ptr == NULL)
 	    			throw std::runtime_error("bad allocation in fast_vector !!");
+
+	    		if (align_byte_length_ > 8) {
+	    			ptr = (value_type*)std::align(align_byte_length_, size_ - align_byte_length_, (void*&)ptr, size_);
+
+	    			if (ptr == NULL)
+	    				throw std::runtime_error("bad alignment in fast_vector, check that align_byte_length is a power of two !!");
+	    		}
 	    	}
 	    }
 	 

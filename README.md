@@ -1,7 +1,10 @@
 # [QuIDS](https://github.com/jolatechno/QuIDS): Quantum Irregular Dynamic Simulator 
 
-_**For now the implementation of alignment doesn't align the first object ! this should be fixed by modifying the resize function in [./src/utils/vector.hpp](./src/utils/vector.hpp)**_
-_**Alignemnt of the following objects is relative to the first object, so for now the maximum exact alignment supported is 8 (which is also the default)**_
+_**For now the implementation of alignment align the first object using std::align via the resize function in [./src/utils/vector.hpp](./src/utils/vector.hpp).**_
+
+_**This means that alignment of the first object only hapens if align\_byte\_length is a power of two**_
+
+_**Alignemnt of the following objects is relative to the first object, so for now the alignment of all objects only happens if align\_byte\_length is a power of two**_
 
 ## Installation
 
