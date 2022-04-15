@@ -1,4 +1,7 @@
 #pragma once
+#ifndef uint
+	#define uint unsigned int
+#endif
 
 #include <stdexcept>
 #include <iterator>     // std::iterator, std::input_iterator_tag

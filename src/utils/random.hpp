@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 /// QuIDS utility function and variable namespace
 namespace quids::utils {
 	/// simple random generator
