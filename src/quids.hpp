@@ -1,7 +1,6 @@
 #pragma once
-#ifndef uint
-	#define uint unsigned int
-#endif
+
+typedef unsigned uint;
 
 #include <parallel/algorithm>
 #include <parallel/numeric>
