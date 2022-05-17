@@ -687,7 +687,10 @@ namespace quids::mpi {
 			elimination_map.reserve(total_size);
 
 			/* insert into hashmap */
-			for (int node_id = 0; node_id < size; ++node_id) {
+			for (int node_id_ = 0; node_id_ < size; ++node_id_) {
+				// to pre-implement some mixing if SKIP_LB_ELIM
+				const int node_id = rank > size/2 ? (rank + node_id_)%size : (rank + size - node_id_)%size;
+
 				size_t begin = global_disp[node_id*num_threads + thread_id], end = global_disp[node_id*num_threads + thread_id + 1];
 				for (size_t oid = begin; oid < end; ++oid) {
 
@@ -698,17 +701,15 @@ namespace quids::mpi {
 						++global_num_object_after_interferences[node_id];
 						is_unique_buffer[oid] = true;
 					} else {
-						auto other_oid = it->second;
 #ifndef SKIP_LB_ELIM
+						auto other_oid = it->second;
 						auto other_node_id = node_id_buffer[other_oid];
 
 						bool is_greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
 						if (is_greater) {
-#endif
 							/* if it exist add the probabilities */
 							mag_buffer[other_oid] += mag_buffer[oid];
 							is_unique_buffer[oid] = false;
-#ifndef SKIP_LB_ELIM
 						} else {
 							/* keep this graph */
 							it->second = oid;
@@ -722,6 +723,10 @@ namespace quids::mpi {
 							++global_num_object_after_interferences[node_id];
 							--global_num_object_after_interferences[other_node_id];
 						}
+#else
+						/* if it exist add the probabilities */
+						mag_buffer[other_oid] += mag_buffer[oid];
+						is_unique_buffer[oid] = false;
 #endif
 					}
 				}
