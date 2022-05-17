@@ -606,8 +606,13 @@ namespace quids::mpi {
 			num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 
 		mid_step_function("compute_collisions - prepare");
+#ifndef SKIP_CCP
+		for (size_t i = 0; i <= n_segment; ++i)
+			load_balancing_begin[i] = i*num_bucket/n_segment;
+#else
 		quids::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
 			load_balancing_begin.begin(), load_balancing_begin.end());
+#endif
 
 		/* recompute local count and disp */
 		local_disp[0] = 0;
@@ -694,13 +699,16 @@ namespace quids::mpi {
 						is_unique_buffer[oid] = true;
 					} else {
 						auto other_oid = it->second;
+#ifndef SKIP_LB_ELIM
 						auto other_node_id = node_id_buffer[other_oid];
 
 						bool is_greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
 						if (is_greater) {
+#endif
 							/* if it exist add the probabilities */
 							mag_buffer[other_oid] += mag_buffer[oid];
 							is_unique_buffer[oid] = false;
+#ifndef SKIP_LB_ELIM
 						} else {
 							/* keep this graph */
 							it->second = oid;
@@ -714,6 +722,7 @@ namespace quids::mpi {
 							++global_num_object_after_interferences[node_id];
 							--global_num_object_after_interferences[other_node_id];
 						}
+#endif
 					}
 				}
 			}

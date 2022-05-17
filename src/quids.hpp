@@ -752,8 +752,13 @@ namespace quids {
 		/* !!!!!!!!!!!!!!!!
 		load-balance
 		!!!!!!!!!!!!!!!! */
-		utils::load_balancing_from_prefix_sum(partition_begin.begin(), partition_begin.end(),
+#ifndef SKIP_CCP
+		for (size_t i = 0; i <= num_threads; ++i)
+			load_balancing_begin[i] = i*num_bucket/num_threads;
+#else
+		quids::utils::load_balancing_from_prefix_sum(partition_begin.begin(), partition_begin.end(),
 			load_balancing_begin.begin(), load_balancing_begin.end());
+#endif
 
 
 
