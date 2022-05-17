@@ -705,7 +705,7 @@ namespace quids::mpi {
 #ifndef SKIP_LB_ELIM
 						auto other_node_id = node_id_buffer[other_oid];
 
-						bool is_greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
+						bool is_greater = global_num_object_after_interferences[node_id]*(end - begin)/(oid - begin) >= global_num_object_after_interferences[other_node_id];
 						if (is_greater) {
 							/* if it exist add the probabilities */
 							mag_buffer[other_oid] += mag_buffer[oid];
