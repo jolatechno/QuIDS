@@ -701,8 +701,8 @@ namespace quids::mpi {
 						++global_num_object_after_interferences[node_id];
 						is_unique_buffer[oid] = true;
 					} else {
-#ifndef SKIP_LB_ELIM
 						auto other_oid = it->second;
+#ifndef SKIP_LB_ELIM
 						auto other_node_id = node_id_buffer[other_oid];
 
 						bool is_greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
