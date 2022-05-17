@@ -607,11 +607,11 @@ namespace quids::mpi {
 
 		mid_step_function("compute_collisions - prepare");
 #ifndef SKIP_CCP
-		for (size_t i = 0; i <= n_segment; ++i)
-			load_balancing_begin[i] = i*num_bucket/n_segment;
-#else
 		quids::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
 			load_balancing_begin.begin(), load_balancing_begin.end());
+#else
+		for (size_t i = 0; i <= n_segment; ++i)
+			load_balancing_begin[i] = i*num_bucket/n_segment;
 #endif
 
 		/* recompute local count and disp */
