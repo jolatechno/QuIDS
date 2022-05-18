@@ -745,9 +745,10 @@ namespace quids::mpi {
 				max_count = std::max(max_count, (size_t)global_count[node_id*num_threads + thread_id]);
 
 			/* insert into hashmap */
-			for (size_t i = 0; GRANULARITY*i < max_count; ++i)
+			const int sign = 1 - 2*(rank%2);
+			for (size_t i = 0; GRANULARITY*i < max_count; ++i) {
 				for (int j = 0; j < size; ++j) {
-					const int node_id = (j + i + rank)%size;
+					const int node_id = (rank + sign*j)%size;
 					const size_t begin = global_disp[node_id*num_threads + thread_id] + i*GRANULARITY;
 					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
 
@@ -781,10 +782,11 @@ namespace quids::mpi {
 						}
 					}
 				}
+			}
 #else
-			for (int node_id_ = 0; node_id_ < size; ++node_id_) {
-				// to pre-implement some mixing if SKIP_ELIM_LB
-				const int node_id = rank > size/2 ? (rank + node_id_)%size : (rank + size - node_id_)%size;
+			const int sign = 1 - 2*(rank%2);
+			for (int j = 0; j < size; ++j) {
+				const int node_id = (rank + sign*j)%size;
 
 				size_t begin = global_disp[node_id*num_threads + thread_id], end = global_disp[node_id*num_threads + thread_id + 1];
 				for (size_t oid = begin; oid < end; ++oid) {
