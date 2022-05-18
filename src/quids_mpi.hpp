@@ -11,6 +11,9 @@ typedef unsigned uint;
 #ifndef MIN_EQUALIZE_SIZE
 	#define MIN_EQUALIZE_SIZE 100
 #endif
+#ifndef GRANULARITY
+	#define GRANULARITY 64
+#endif
 #ifndef EQUALIZE_INBALANCE
 	#define EQUALIZE_INBALANCE 0.05
 #endif
@@ -733,37 +736,34 @@ namespace quids::mpi {
 		mid_step_function("compute_collisions - insert");
 		#pragma omp parallel
 		{
-#ifndef SKIP_ELIM_LB
-			std::vector<float> global_num_object_after_interferences(size, 0.);
-			std::vector<float> node_size(size, 0);
-			size_t max_count = 0;
-#endif
-
 			int const thread_id = omp_get_thread_num();
 			robin_hood::unordered_map<size_t, size_t> elimination_map;
 
 			/* compute total_size */
 			size_t total_size = 0;
-			for (int node_id = 0; node_id < size; ++node_id) {
-				size_t this_node_size = global_count[node_id*num_threads + thread_id];
-				total_size        +=        this_node_size;
-
-#ifndef SKIP_ELIM_LB
-				node_size[node_id] = (float)this_node_size;
-
-				max_count          = std::max(max_count, this_node_size);
-#endif
-			}
+			for (int node_id = 0; node_id < size; ++node_id)
+				total_size += global_count[node_id*num_threads + thread_id];
 			elimination_map.reserve(total_size);
 
 #ifndef SKIP_ELIM_LB
-			/* insert into hashmap */
-			for (size_t i = 0; i < max_count; ++i)
-				for (int node_id = 0; node_id < size; ++node_id)
-					if (i < global_count[node_id*num_threads + thread_id]) {
-						const size_t oid = global_disp[node_id*num_threads + thread_id] + i;
+			std::vector<float> global_num_object_after_interferences(size, 0.);
+			std::vector<float> node_size(size, 0);
+			size_t max_count = 0;
 
-						/* accessing key */
+			/* compute total_size */
+			for (int node_id = 0; node_id < size; ++node_id) {
+				size_t this_node_size = global_count[node_id*num_threads + thread_id];
+				node_size[node_id]    = (float)this_node_size;
+				max_count             = std::max(max_count, this_node_size);
+			}
+
+			/* insert into hashmap */
+			for (size_t i = 0; i < max_count; i += GRANULARITY)
+				for (int node_id = 0; node_id < size; ++node_id) {
+					size_t begin = global_disp[node_id*num_threads + thread_id] + i;
+					size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
+
+					for (size_t oid = begin; oid < end; ++oid) {
 						auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
 						if (unique) {
 							/* keep this object */
@@ -796,6 +796,7 @@ namespace quids::mpi {
 							}
 						}
 					}
+				}
 #else
 			for (int node_id_ = 0; node_id_ < size; ++node_id_) {
 				// to pre-implement some mixing if SKIP_ELIM_LB
