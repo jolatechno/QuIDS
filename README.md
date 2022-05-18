@@ -327,7 +327,7 @@ In addition to classes, some global parameters are used to modify the behaviour 
 /* other default-value flags */
 
 namespace quids {
-	uint align_byte_length = alignMENT_BYTE_LENGTH;
+	uint align_byte_length = ALIGNMENT_BYTE_LENGTH;
 	PROBA_TYPE tolerance = TOLERANCE;
 	float safety_margin = SAFETY_MARGIN;
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;

@@ -107,19 +107,32 @@ namespace quids::utils {
 
 	    	if (size_ < n || // resize if we absolutely have to because the state won't fit
 	    		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
+	    		// for later allignment
+	    		size_t old_size_ = size_;
+
 	    		size_ = n*upsize_policy;
 	    		int offset = std::distance(unaligned_ptr, ptr);
-	    		unaligned_ptr = (T*)realloc(unaligned_ptr, (size_ + offset + align_byte_length_)*sizeof(T));
+	    		unaligned_ptr = (T*)realloc(unaligned_ptr, (size_ + align_byte_length_)*sizeof(T));
 
 	    		if (unaligned_ptr == NULL)
 	    			throw std::runtime_error("bad allocation in fast_vector !!");
 
 	    		ptr = unaligned_ptr + offset;
 	    		if (align_byte_length_ > 1) {
-	    			size_t target_size = size_*sizeof(T);
-	    			size_t space = (size_ + align_byte_length_)*sizeof(T);
-		    		if (NULL == std::align(align_byte_length_, target_size, (void*&)ptr, space))
-		    			throw std::runtime_error("bad alignment in fast_vector !!");
+	    			// manual allignment:
+	    			size_t allign_offset = ((size_t)ptr)%align_byte_length_;
+
+	    			if (allign_offset != 0)
+		    			// allign by rotating to the left:
+		    			if (allign_offset <= offset) {
+		    				std::rotate<char*>(((char*)ptr) - allign_offset, (char*)ptr, ((char*)ptr) + old_size_*sizeof(T));
+		    				ptr -= allign_offset;
+		    			} else {
+		    				// allign by rotating to the right
+		    				allign_offset = align_byte_length_ - allign_offset;
+		    				std::rotate<char*>((char*)ptr, ((char*)ptr) + old_size_*sizeof(T), ((char*)ptr) + old_size_*sizeof(T) + allign_offset);
+		    				ptr += allign_offset;
+		    			}
 	    		}
 	    	}
 	    }

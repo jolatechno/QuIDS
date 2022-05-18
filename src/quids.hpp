@@ -24,8 +24,8 @@ typedef unsigned uint;
 #ifndef HASH_MAP_OVERHEAD
 	#define HASH_MAP_OVERHEAD 1.7 /// overhead per 64-bit key and value insertion in hashmap (robinhood)
 #endif
-#ifndef alignMENT_BYTE_LENGTH
-	#define alignMENT_BYTE_LENGTH 8
+#ifndef ALIGNMENT_BYTE_LENGTH
+	#define ALIGNMENT_BYTE_LENGTH 8
 #endif
 #ifndef TOLERANCE
 	#define TOLERANCE 1e-30;
@@ -54,7 +54,7 @@ defining openmp function's return values if openmp isn't installed or loaded
 /// QuIDS namespace
 namespace quids {
 	/// amount of byte to align objects to
-	uint align_byte_length = alignMENT_BYTE_LENGTH;
+	uint align_byte_length = ALIGNMENT_BYTE_LENGTH;
 	/// tolerance for objects (remove objects with a smaller probability)
 	PROBA_TYPE tolerance = TOLERANCE;
 	/// memory safety margin (0.2 = 80% memory usage target)
