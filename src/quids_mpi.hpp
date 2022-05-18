@@ -18,8 +18,8 @@ typedef unsigned uint;
 	#define EQUALIZE_INBALANCE 0.05
 #endif
 
-#define MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE 1 + 2*sizeof(PROBA_TYPE) + sizeof(size_t)
-#define MPI_SYMBOLIC_ITERATION_MEMORY_SIZE 1 + 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(int)
+#define MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE 2*sizeof(PROBA_TYPE) + sizeof(size_t)
+#define MPI_SYMBOLIC_ITERATION_MEMORY_SIZE 2*sizeof(PROBA_TYPE) + sizeof(size_t) + sizeof(int)
 
 /// mpi implementation namespace
 namespace quids::mpi {
@@ -328,12 +328,10 @@ namespace quids::mpi {
 
 		quids::utils::fast_vector<mag_t> partitioned_mag;
 		quids::utils::fast_vector<size_t> partitioned_hash;
-		quids::utils::fast_vector<char /*bool*/> partitioned_is_unique;
 
 		quids::utils::fast_vector<mag_t> mag_buffer;
 		quids::utils::fast_vector<size_t> hash_buffer;
 		quids::utils::fast_vector<int> node_id_buffer;
-		quids::utils::fast_vector<char /*bool*/> is_unique_buffer;
 
 		void compute_collisions(MPI_Comm communicator, quids::debug_t mid_step_function=[](const char*){});
 		void mpi_resize(size_t size) {
@@ -344,9 +342,6 @@ namespace quids::mpi {
 
 				#pragma omp section
 				partitioned_hash.resize(size);
-
-				#pragma omp section
-				partitioned_is_unique.resize(size);
 			}
 		}
 		void buffer_resize(size_t size) {
@@ -360,9 +355,6 @@ namespace quids::mpi {
 
 				#pragma omp section
 				node_id_buffer.resize(size);
-
-				#pragma omp section
-				is_unique_buffer.resize(size);
 
 				#pragma omp section
 				if (size > next_oid_partitioner_buffer.size())
@@ -747,7 +739,7 @@ namespace quids::mpi {
 			elimination_map.reserve(total_size);
 
 #ifndef SKIP_ELIM_LB
-			std::vector<size_t> global_num_object_after_interferences(size, 0.);
+			std::vector<size_t> global_num_object_after_interferences(size, 0);
 
 			/* compute max size */
 			size_t max_count = 0;
@@ -763,9 +755,6 @@ namespace quids::mpi {
 					for (size_t oid = begin; oid < end; ++oid) {
 						auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
 						if (unique) {
-							/* keep this object */
-							is_unique_buffer[oid] = true;
-
 							/* increment values */
 							global_num_object_after_interferences[node_id] += 1;
 
@@ -776,15 +765,13 @@ namespace quids::mpi {
 							if (global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id]) {
 								/* if it exist add the probabilities */
 								mag_buffer[other_oid] += mag_buffer[oid];
-								is_unique_buffer[oid]  = false;
+								mag_buffer[oid]        = 0;
+
 							} else {
 								/* switch objects */
-								it->second                  = oid;
-								is_unique_buffer[oid]       = true;
-								is_unique_buffer[other_oid] = false;
-
-								/* add the probabilities */
-								mag_buffer[oid]            += mag_buffer[other_oid];
+								it->second            = oid;
+								mag_buffer[oid]      += mag_buffer[other_oid];
+								mag_buffer[other_oid] = 0;
 
 								/* increment values */
 								global_num_object_after_interferences[node_id]       += 1;
@@ -802,16 +789,12 @@ namespace quids::mpi {
 				for (size_t oid = begin; oid < end; ++oid) {
 					/* accessing key */
 					auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
-					if (unique) {
-						/* keep this object */
-						is_unique_buffer[oid] = true;
-
-					} else {
+					if (!unique) {
 						const size_t other_oid = it->second;
 
 						/* if it exist add the probabilities */
 						mag_buffer[other_oid] += mag_buffer[oid];
-						is_unique_buffer[oid]  = false;
+						mag_buffer[oid]        = 0;
 					}
 				}
 			}
@@ -830,18 +813,12 @@ namespace quids::mpi {
 		mid_step_function("compute_collisions - com");
 		MPI_Alltoallv(&mag_buffer[0],            &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
 			          &partitioned_mag[0],       &send_count[0],    &send_disp[0],    mag_MPI_Datatype, communicator);
-		MPI_Alltoallv(&is_unique_buffer[0],      &receive_count[0], &receive_disp[0], MPI_CHAR,
-			          &partitioned_is_unique[0], &send_count[0],    &send_disp[0],    MPI_CHAR,         communicator);
 
 		/* un-partition magnitude */
 		mid_step_function("compute_collisions - finalize");
 		#pragma omp parallel for
-		for (size_t id = 0; id < num_object; ++id) {
-			size_t oid = next_oid[id];
-
-			is_unique[oid] = partitioned_is_unique[id];
-			magnitude[oid] = partitioned_mag[id];
-		}
+		for (size_t id = 0; id < num_object; ++id)
+			magnitude[next_oid[id]] = partitioned_mag[id];
 
 
 
@@ -854,9 +831,6 @@ namespace quids::mpi {
 		!!!!!!!!!!!!!!!! */
 		size_t* partitioned_it = __gnu_parallel::partition(&next_oid[0], &next_oid[0] + num_object,
 			[&](size_t const &oid) {
-				if (!is_unique[oid])
-					return false;
-
 				return std::norm(magnitude[oid]) > tolerance;
 			});
 		num_object_after_interferences = std::distance(&next_oid[0], partitioned_it);

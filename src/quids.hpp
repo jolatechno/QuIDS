@@ -38,7 +38,7 @@ typedef unsigned uint;
 #endif
 
 #define ITERATION_MEMORY_SIZE 2*sizeof(PROBA_TYPE) + 3*sizeof(size_t) + sizeof(float) + 2*sizeof(uint)
-#define SYMBOLIC_ITERATION_MEMORY_SIZE 1 + 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + 2*sizeof(uint) + sizeof(float)
+#define SYMBOLIC_ITERATION_MEMORY_SIZE 2*sizeof(PROBA_TYPE) + 4*sizeof(size_t) + 2*sizeof(uint) + sizeof(float)
 
 /*
 defining openmp function's return values if openmp isn't installed or loaded
@@ -351,7 +351,6 @@ namespace quids {
 
 		utils::fast_vector<mag_t> magnitude;
 		utils::fast_vector<size_t> next_oid;
-		utils::fast_vector<char /*bool*/> is_unique;
 		utils::fast_vector<uint> size;
 		utils::fast_vector<size_t> hash;
 		utils::fast_vector<size_t> parent_oid;
@@ -368,9 +367,6 @@ namespace quids {
 
 				#pragma omp section
 				next_oid.resize(num_object);
-
-				#pragma omp section
-				is_unique.resize(num_object);
 
 				#pragma omp section
 				size.resize(num_object);
@@ -784,11 +780,13 @@ namespace quids {
 
 					/* accessing key */
 					auto [it, unique] = elimination_map.insert({hash[oid], oid});
-					if (!unique)
+					if (!unique) {
+						const size_t other_oid = it->second;
+
 						/* if it exist add the probabilities */
-						magnitude[it->second] += magnitude[oid];
-					/* keep the object if it is unique */
-					is_unique[oid] = unique;
+						magnitude[other_oid] += magnitude[oid];
+						magnitude[oid]        = 0;
+					}
 				}
 			}
 		}
@@ -803,9 +801,6 @@ namespace quids {
 		!!!!!!!!!!!!!!!! */
 		size_t* partitioned_it = __gnu_parallel::partition(&next_oid[0], &next_oid[0] + num_object,
 			[&](size_t const &oid) {
-				if (!is_unique[oid])
-					return false;
-
 				return std::norm(magnitude[oid]) > tolerance;
 			});
 		num_object_after_interferences = std::distance(&next_oid[0], partitioned_it);
