@@ -707,7 +707,7 @@ namespace quids::mpi {
 
 						float this_node_size = oid - begin;
 						float other_node_size = global_disp[other_node_id*num_threads + thread_id], end = global_disp[other_node_id*num_threads + thread_id + 1];
-						bool is_greater = oid == begin ? false : (float)global_num_object_after_interferences[node_id]/this_node_size >= global_num_object_after_interferences[other_node_id]/other_node_size;
+						bool is_greater = this_node_size == 0 ? false : (float)global_num_object_after_interferences[node_id]/this_node_size >= (float)global_num_object_after_interferences[other_node_id]/other_node_size;
 						if (is_greater) {
 							/* if it exist add the probabilities */
 							mag_buffer[other_oid] += mag_buffer[oid];
