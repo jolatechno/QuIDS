@@ -762,7 +762,11 @@ namespace quids::mpi {
 							const size_t other_oid = it->second;
 							const int other_node_id = node_id_buffer[other_oid];
 
-							if (global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id]) {
+							bool greater;
+							//greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
+							//greater = true;
+							greater = oid % 2;
+							if (greater) {
 								/* if it exist add the probabilities */
 								mag_buffer[other_oid] += mag_buffer[oid];
 								mag_buffer[oid]        = 0;
@@ -811,8 +815,8 @@ namespace quids::mpi {
 		share-back
 		!!!!!!!!!!!!!!!! */
 		mid_step_function("compute_collisions - com");
-		MPI_Alltoallv(&mag_buffer[0],            &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
-			          &partitioned_mag[0],       &send_count[0],    &send_disp[0],    mag_MPI_Datatype, communicator);
+		MPI_Alltoallv(&mag_buffer[0],      &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
+			          &partitioned_mag[0], &send_count[0],    &send_disp[0],    mag_MPI_Datatype, communicator);
 
 		/* un-partition magnitude */
 		mid_step_function("compute_collisions - finalize");
