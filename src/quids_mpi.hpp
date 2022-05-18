@@ -472,7 +472,7 @@ namespace quids::mpi {
 
 				// debug: 
 				if (rank == 0)
-					std::cerr << "\tmax=" << max_n_object << ", avg=" << avg_n_child << ", inbalance=" << inbalance << "\n";
+					std::cerr << "\tmax=" << max_n_child << ", avg=" << avg_n_child << ", inbalance=" << inbalance << "\n";
 
 				if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
 					break;
@@ -746,16 +746,12 @@ namespace quids::mpi {
 			elimination_map.reserve(total_size);
 
 #ifndef SKIP_ELIM_LB
-			std::vector<float> global_num_object_after_interferences(size, 0.);
-			std::vector<float> node_size(size, 0);
-			size_t max_count = 0;
+			std::vector<size_t> global_num_object_after_interferences(size, 0.);
 
-			/* compute total_size */
-			for (int node_id = 0; node_id < size; ++node_id) {
-				size_t this_node_size = global_count[node_id*num_threads + thread_id];
-				node_size[node_id]    = (float)this_node_size;
-				max_count             = std::max(max_count, this_node_size);
-			}
+			/* compute max size */
+			size_t max_count = 0;
+			for (int node_id = 0; node_id < size; ++node_id)
+				max_count = std::max(max_count, (size_t)global_count[node_id*num_threads + thread_id]);
 
 			/* insert into hashmap */
 			for (size_t i = 0; i < max_count; i += GRANULARITY)
@@ -772,12 +768,11 @@ namespace quids::mpi {
 							/* increment values */
 							global_num_object_after_interferences[node_id] += 1;
 
-
 						} else {
 							const size_t other_oid = it->second;
 							const int other_node_id = node_id_buffer[other_oid];
 
-							if (global_num_object_after_interferences[node_id]/node_size[node_id] >= global_num_object_after_interferences[other_node_id]/node_size[other_node_id]) {
+							if (global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id]) {
 								/* if it exist add the probabilities */
 								mag_buffer[other_oid] += mag_buffer[oid];
 								is_unique_buffer[oid]  = false;
