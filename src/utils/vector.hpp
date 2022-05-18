@@ -76,6 +76,24 @@ namespace quids::utils {
 		    return *(ptr + index);
 		}
 
+		value_type& at(size_t index) {
+			if (index > size_) {
+				std::cerr << "index out of bound in fast vector !\n";
+				throw;
+			}
+
+		    return *(ptr + index);
+		}
+
+		value_type at(size_t index) const {
+			if (index > size_) {
+				std::cerr << "index out of bound in fast vector !\n";
+				throw;
+			}
+			
+		    return *(ptr + index);
+		}
+
 		/*
 		"upsize_policy" is a multiplier (>1) that forces any upsize to add a margin to avoid frequent resize.
 		"downsize_policy" is a multiplier (<1) that forces a down_size to free memory only if the freed memory exceed the downsize_policy

@@ -733,7 +733,7 @@ namespace quids::mpi {
 			/* compute total_size */
 			size_t total_size = 0;
 			for (int node_id = 0; node_id < size; ++node_id)
-				total_size += global_count[node_id*num_threads + thread_id];
+				total_size += global_count.at(node_id*num_threads + thread_id) /* [node_id*num_threads + thread_id] */ ;
 			elimination_map.reserve(total_size);
 
 #ifndef SKIP_ELIM_LB
@@ -742,42 +742,49 @@ namespace quids::mpi {
 			/* compute max size */
 			size_t max_count = 0;
 			for (int node_id = 0; node_id < size; ++node_id)
-				max_count = std::max(max_count, (size_t)global_count[node_id*num_threads + thread_id]);
+				max_count = std::max(max_count, (size_t)global_count.at(node_id*num_threads + thread_id) /* [node_id*num_threads + thread_id] */ );
 
 			/* insert into hashmap */
 			const int sign = 1 - 2*(rank%2);
 			for (size_t i = 0; GRANULARITY*i < max_count; ++i) {
 				for (int j = 0; j < size; ++j) {
 					const int node_id = (size + rank + sign*j)%size;
-					const size_t begin = global_disp[node_id*num_threads + thread_id] + i*GRANULARITY;
-					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
+					const size_t begin =                i*GRANULARITY        + global_disp.at(node_id*num_threads + thread_id    ) /* [node_id*num_threads + thread_id    ] */ ;
+					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp.at(node_id*num_threads + thread_id + 1) /* [node_id*num_threads + thread_id + 1] */ );
 
 					for (size_t oid = begin; oid < end; ++oid) {
 						auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
 						if (unique) {
 							/* increment values */
-							++global_num_object_after_interferences[node_id];
+							++global_num_object_after_interferences.at(node_id) /* [node_id] */ ;
 
 						} else {
 							const size_t other_oid  = it->second;
-							const int other_node_id = node_id_buffer[other_oid];
+							const int other_node_id = node_id_buffer.at(other_oid) /* [other_oid] */ ;
 
-							if (global_num_object_after_interferences[node_id      ]*global_count[other_node_id*num_threads + thread_id] >
-								global_num_object_after_interferences[other_node_id]*global_count[node_id      *num_threads + thread_id]) {
+
+							if (oid == other_oid) {
+								std::cerr << "encountered an object id twice !\n";
+								throw;
+							}
+
+
+							if (global_num_object_after_interferences.at(node_id      ) /* [node_id      ] */  /* *global_count[other_node_id*num_threads + thread_id] */  >=
+								global_num_object_after_interferences.at(other_node_id) /* [other_node_id] */  /* *global_count[node_id      *num_threads + thread_id] */) {
 
 								/* if it exist add the probabilities */
-								mag_buffer[other_oid] += mag_buffer[oid];
-								mag_buffer[oid]        = 0;
+								mag_buffer.at(other_oid) /* [other_oid] */  += mag_buffer.at(oid) /* [oid] */ ;
+								mag_buffer.at(oid) /* [oid] */         = 0;
 
 							} else {
 								/* switch objects */
 								it->second            = oid;
-								mag_buffer[oid]      += mag_buffer[other_oid];
-								mag_buffer[other_oid] = 0;
+								mag_buffer.at(oid) /* [oid] */       += mag_buffer.at(other_oid) /* [other_oid] */ ;
+								mag_buffer.at(other_oid) /* [other_oid] */  = 0;
 
 								/* increment values */
-								++global_num_object_after_interferences[node_id];
-								--global_num_object_after_interferences[other_node_id];
+								++global_num_object_after_interferences.at(node_id) /* [node_id] */ ;
+								--global_num_object_after_interferences.at(other_node_id) /* [other_node_id] */ ;
 							}
 						}
 					}
