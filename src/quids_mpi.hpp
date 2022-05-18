@@ -719,14 +719,10 @@ namespace quids::mpi {
 		!!!!!!!!!!!!!!!! */
 		mid_step_function("compute_collisions - prepare");
 		/* prepare node_id buffer */
-		for (int node = 0; node < size; ++node) {
-			size_t begin = receive_disp[node], end = receive_disp[node + 1];
-
-			const int node_ = node;
-			#pragma omp parallel for
-			for (size_t i = begin; i < end; ++i)
-				node_id_buffer[i] = node_;
-		}
+		for (int node = 0; node < size; ++node)
+			std::fill(&node_id_buffer[0] + receive_disp[node],
+					  &node_id_buffer[0] + receive_disp[node + 1],
+					  node);
 
 		mid_step_function("compute_collisions - insert");
 		#pragma omp parallel
@@ -750,8 +746,8 @@ namespace quids::mpi {
 
 			/* insert into hashmap */
 			for (size_t i = 0; GRANULARITY*i < max_count; ++i)
-				for (int node_id_ = 0; node_id_ < size; ++node_id_) {
-					const int node_id = (node_id_ + i + rank)%size;
+				for (int j = 0; j < size; ++j) {
+					const int node_id = (j + i + rank)%size;
 					const size_t begin = global_disp[node_id*num_threads + thread_id] + i*GRANULARITY;
 					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
 
@@ -759,13 +755,13 @@ namespace quids::mpi {
 						auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
 						if (unique) {
 							/* increment values */
-							global_num_object_after_interferences[node_id] += 1;
+							++global_num_object_after_interferences[node_id];
 
 						} else {
 							const size_t other_oid  = it->second;
 							const int other_node_id = node_id_buffer[other_oid];
 
-							if (global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id]) {
+							if (global_num_object_after_interferences[node_id]*global_count[other_node_id*num_threads + thread_id] > global_num_object_after_interferences[other_node_id]*global_count[node_id*num_threads + thread_id]) {
 								/* if it exist add the probabilities */
 								mag_buffer[other_oid] += mag_buffer[oid];
 								mag_buffer[oid]        = 0;
@@ -777,8 +773,8 @@ namespace quids::mpi {
 								mag_buffer[other_oid] = 0;
 
 								/* increment values */
-								global_num_object_after_interferences[node_id]       += 1;
-								global_num_object_after_interferences[other_node_id] -= 1;
+								++global_num_object_after_interferences[node_id];
+								--global_num_object_after_interferences[other_node_id];
 							}
 						}
 					}
