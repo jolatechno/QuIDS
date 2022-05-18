@@ -721,9 +721,11 @@ namespace quids::mpi {
 		/* prepare node_id buffer */
 		for (int node = 0; node < size; ++node) {
 			size_t begin = receive_disp[node], end = receive_disp[node + 1];
+
+			const int node_ = node;
 			#pragma omp parallel for
 			for (size_t i = begin; i < end; ++i)
-				node_id_buffer[i] = node;
+				node_id_buffer[i] = node_;
 		}
 
 		mid_step_function("compute_collisions - insert");
@@ -760,7 +762,7 @@ namespace quids::mpi {
 							global_num_object_after_interferences[node_id] += 1;
 
 						} else {
-							const size_t other_oid = it->second;
+							const size_t other_oid  = it->second;
 							const int other_node_id = node_id_buffer[other_oid];
 
 							if (global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id]) {
