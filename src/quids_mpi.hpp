@@ -747,9 +747,10 @@ namespace quids::mpi {
 				max_count = std::max(max_count, (size_t)global_count[node_id*num_threads + thread_id]);
 
 			/* insert into hashmap */
-			for (size_t i = 0; i < max_count; i += GRANULARITY)
-				for (int node_id = 0; node_id < size; ++node_id) {
-					const size_t begin = global_disp[node_id*num_threads + thread_id] + i;
+			for (size_t i = 0; GRANULARITY*i < max_count; ++i)
+				for (int node_id_ = 0; node_id_ < size; ++node_id_) {
+					const int node_id = (node_id_ + i + rank)%size;
+					const size_t begin = global_disp[node_id*num_threads + thread_id] + i*GRANULARITY;
 					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
 
 					for (size_t oid = begin; oid < end; ++oid) {
@@ -762,11 +763,7 @@ namespace quids::mpi {
 							const size_t other_oid = it->second;
 							const int other_node_id = node_id_buffer[other_oid];
 
-							bool greater;
-							//greater = global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id];
-							//greater = true;
-							greater = oid % 2;
-							if (greater) {
+							if (global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id]) {
 								/* if it exist add the probabilities */
 								mag_buffer[other_oid] += mag_buffer[oid];
 								mag_buffer[oid]        = 0;
