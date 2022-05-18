@@ -404,6 +404,10 @@ If this first condition is met, `equalize(...)` if the maximum relative imbalanc
 
 `mpi::min_equalize_size` is equal to `1000` by default, and `mpi::equalize_imablance` has a default of `0.2`.
 
+#### equalize children
+
+If `mpi::equalize_children` is `true` (default), equalizing is done by communicating objects to equalize the number of children. Otherwise if `false` the actual number of objects is balanced.
+
 ### Utils global variables
 
 #### min vector size

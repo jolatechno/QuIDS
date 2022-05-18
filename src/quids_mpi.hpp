@@ -29,6 +29,12 @@ namespace quids::mpi {
 	size_t min_equalize_size = MIN_EQUALIZE_SIZE;
 	/// maximum imbalance between nodes (max_obj - avg_obj)/max_obj allowed before equalizing.
 	float equalize_inbalance = EQUALIZE_INBALANCE;
+	/// if true, equalize the number of children. Otherwise equalize the number of objects.
+#ifdef EQUALIZE_OBJECTS
+	bool equalize_children = false;
+#else
+	bool equalize_children = true;
+#endif
 
 	/// mpi iteration type
 	typedef class mpi_iteration mpi_it_t;
@@ -260,6 +266,15 @@ namespace quids::mpi {
 
 			return (float)total_num_object_per_node/size;
 		}
+		float get_avg_num_object_per_task(MPI_Comm communicator) const {
+			size_t max_num_object_per_node;
+			MPI_Allreduce(&num_object, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
+
+			int size;
+			MPI_Comm_size(communicator, &size);
+
+			return (float)max_num_object_per_node/size;
+		}
 		size_t get_max_num_symbolic_object_per_task(MPI_Comm communicator) const {
 			size_t max_num_object_per_node = get_num_symbolic_object();
 			MPI_Allreduce(MPI_IN_PLACE, &max_num_object_per_node, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, communicator);
@@ -357,7 +372,7 @@ namespace quids::mpi {
 		/*
 		utils functions
 		*/
-		float inline get_average_object_size(MPI_Comm communicator) const {
+		float inline get_avg_object_size(MPI_Comm communicator) const {
 			static const float hash_map_size = HASH_MAP_OVERHEAD*2*sizeof(size_t);
 
 			static const size_t symbolic_iteration_memory_size = SYMBOLIC_ITERATION_MEMORY_SIZE + MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE;
@@ -410,33 +425,70 @@ namespace quids::mpi {
 		if (size == 1)
 			return quids::simulate(iteration, rule, next_iteration, symbolic_iteration, max_num_object, mid_step_function);
 
+
+		/* equalize objects */
+		if (!equalize_children) {
+			mid_step_function("equalize_object");
+			for (int max_equalize = std::log2(size); max_equalize >= 0; --max_equalize) {
+				/* check for condition */
+				size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
+				float avg_n_object = iteration.get_avg_num_object_per_task(communicator);
+				float inbalance = ((float)max_n_object - avg_n_object)/max_n_object;
+
+				// debug: 
+				if (rank == 0)
+					std::cerr << "\tmax=" << max_n_object << ", avg=" << avg_n_object << ", inbalance=" << inbalance << "\n";
+
+				if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
+					break;
+
+				// debug: 
+				if (rank == 0)
+					std::cerr << "\tequalize\n";
+
+				/* actually equalize */
+				iteration.equalize(communicator);
+			}
+		}
+
+
 		/* start actual simulation */
 		iteration.compute_num_child(rule, mid_step_function);
 		iteration.truncated_num_object = iteration.num_object;
 
+
 		/* equalize symbolic objects */
-		mid_step_function("equalize_child");
-		for (int max_equalize = std::log2(size); max_equalize >= 0; --max_equalize) {
-			/* check for condition */
-			size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
-			size_t max_n_child = iteration.get_max_num_symbolic_object_per_task(communicator);
-			float inbalance = ((float)max_n_child - iteration.get_avg_num_symbolic_object_per_task(communicator))/max_n_child;
+		if (equalize_children) {
+			mid_step_function("equalize_child");
+			for (int max_equalize = std::log2(size); max_equalize >= 0; --max_equalize) {
+				/* check for condition */
+				size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
+				size_t max_n_child = iteration.get_max_num_symbolic_object_per_task(communicator);
+				float avg_n_child = iteration.get_avg_num_symbolic_object_per_task(communicator);
+				float inbalance = ((float)max_n_child - avg_n_child)/max_n_child;
 
-			if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
-				break;
+				// debug: 
+				if (rank == 0)
+					std::cerr << "\tmax=" << max_n_object << ", avg=" << avg_n_child << ", inbalance=" << inbalance << "\n";
 
-			// debug: 
-			if (rank == 0)
-				std::cerr << "equalize:\n";
+				if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
+					break;
 
-			/* actually equalize */
-			iteration.equalize_symbolic(communicator);
-			iteration.truncated_num_object = iteration.num_object;
+				// debug: 
+				if (rank == 0)
+					std::cerr << "\tequalize\n";
+
+				/* actually equalize */
+				iteration.equalize_symbolic(communicator);
+				iteration.truncated_num_object = iteration.num_object;
+			}
 		}
+		
 
 		/* prepare truncate */
 		mid_step_function("truncate_symbolic - prepare");
 		iteration.prepare_truncate(mid_step_function);
+
 
 		/* max_num_object */
 		mid_step_function("truncate_symbolic");
@@ -463,6 +515,7 @@ namespace quids::mpi {
 		} else
 			iteration.truncate(0, max_num_object/local_size, mid_step_function);
 
+
 		/* downsize if needed */
 		if (iteration.num_object > 0) {
 			if (iteration.truncated_num_object < next_iteration.num_object)
@@ -472,16 +525,17 @@ namespace quids::mpi {
 				next_iteration.allocate(next_object_size);
 		}
 
+
 		/* rest of the simulation */
 		iteration.generate_symbolic_iteration(rule, symbolic_iteration, mid_step_function);
 		symbolic_iteration.compute_collisions(communicator, mid_step_function);
 		symbolic_iteration.next_iteration_num_object = symbolic_iteration.num_object_after_interferences;
 
 
-
 		/* prepare truncate */
 		mid_step_function("truncate - prepare");
 		symbolic_iteration.prepare_truncate(mid_step_function);
+
 
 		/* second max_num_object */
 		mid_step_function("truncate");
@@ -508,6 +562,7 @@ namespace quids::mpi {
 			}
 		} else
 			symbolic_iteration.truncate(0, max_num_object/local_size, mid_step_function);
+
 
 		/* finalize simulation */
 		symbolic_iteration.finalize(rule, iteration, next_iteration, mid_step_function);
