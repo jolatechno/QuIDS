@@ -540,7 +540,6 @@ namespace quids::mpi {
 		/* second max_num_object */
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
-
 			/* available memory */
 			size_t avail_memory = next_iteration.get_mem_size(localComm) + quids::utils::get_free_mem();
 			size_t target_memory = avail_memory/local_size*(1 - quids::safety_margin);
@@ -734,8 +733,11 @@ namespace quids::mpi {
 		mid_step_function("compute_collisions - insert");
 		#pragma omp parallel
 		{
+#ifndef SKIP_ELIM_LB
 			std::vector<float> global_num_object_after_interferences(size, 0.);
 			std::vector<float> node_size(size, 0);
+			size_t max_count = 0;
+#endif
 
 			int const thread_id = omp_get_thread_num();
 			robin_hood::unordered_map<size_t, size_t> elimination_map;
@@ -743,59 +745,80 @@ namespace quids::mpi {
 			/* compute total_size */
 			size_t total_size = 0;
 			for (int node_id = 0; node_id < size; ++node_id) {
-				total_size += global_count[node_id*num_threads + thread_id];
-				node_size[node_id] = (float)global_count[node_id*num_threads + thread_id];
+				size_t this_node_size = global_count[node_id*num_threads + thread_id];
+				total_size        +=        this_node_size;
+
+#ifndef SKIP_ELIM_LB
+				node_size[node_id] = (float)this_node_size;
+
+				max_count          = std::max(max_count, this_node_size);
+#endif
 			}
 			elimination_map.reserve(total_size);
 
+#ifndef SKIP_ELIM_LB
 			/* insert into hashmap */
+			for (size_t i = 0; i < max_count; ++i)
+				for (int node_id = 0; node_id < size; ++node_id)
+					if (i < global_count[node_id*num_threads + thread_id]) {
+						const size_t oid = global_disp[node_id*num_threads + thread_id] + i;
+
+						/* accessing key */
+						auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
+						if (unique) {
+							/* keep this object */
+							is_unique_buffer[oid]                           = true;
+
+							/* increment values */
+							global_num_object_after_interferences[node_id] += 1;
+
+
+						} else {
+							const size_t other_oid = it->second;
+							const int other_node_id = node_id_buffer[other_oid];
+
+							if (global_num_object_after_interferences[node_id]/node_size[node_id] >= global_num_object_after_interferences[other_node_id]/node_size[other_node_id]) {
+								/* if it exist add the probabilities */
+								mag_buffer[other_oid] += mag_buffer[oid];
+								is_unique_buffer[oid]  = false;
+							} else {
+								/* switch objects */
+								it->second                  = oid;
+								is_unique_buffer[oid]       = true;
+								is_unique_buffer[other_oid] = false;
+
+								/* add the probabilities */
+								mag_buffer[oid]            += mag_buffer[other_oid];
+
+								/* increment values */
+								global_num_object_after_interferences[node_id]       += 1;
+								global_num_object_after_interferences[other_node_id] -= 1;
+							}
+						}
+					}
+#else
 			for (int node_id_ = 0; node_id_ < size; ++node_id_) {
-				// to pre-implement some mixing if SKIP_LB_ELIM
+				// to pre-implement some mixing if SKIP_ELIM_LB
 				const int node_id = rank > size/2 ? (rank + node_id_)%size : (rank + size - node_id_)%size;
 
 				size_t begin = global_disp[node_id*num_threads + thread_id], end = global_disp[node_id*num_threads + thread_id + 1];
 				for (size_t oid = begin; oid < end; ++oid) {
-
 					/* accessing key */
 					auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
 					if (unique) {
-						/* increment values */
-						++global_num_object_after_interferences[node_id];
+						/* keep this object */
 						is_unique_buffer[oid] = true;
+
 					} else {
-						auto other_oid = it->second;
-#ifndef SKIP_LB_ELIM
-						auto other_node_id = node_id_buffer[other_oid];
+						const size_t other_oid = it->second;
 
-						float this_node_size = oid - begin;
-						bool is_greater = this_node_size != 0 ? 
-							global_num_object_after_interferences[node_id]/this_node_size >= global_num_object_after_interferences[other_node_id]/node_size[other_node_id] :
-							false;
-						if (is_greater) {
-							/* if it exist add the probabilities */
-							mag_buffer[other_oid] += mag_buffer[oid];
-							is_unique_buffer[oid] = false;
-						} else {
-							/* keep this graph */
-							it->second = oid;
-
-							/* if the size aren't balanced, add the probabilities */
-							mag_buffer[oid] += mag_buffer[other_oid];
-							is_unique_buffer[oid] = true;
-							is_unique_buffer[other_oid] = false;
-
-							/* increment values */
-							++global_num_object_after_interferences[node_id];
-							--global_num_object_after_interferences[other_node_id];
-						}
-#else
 						/* if it exist add the probabilities */
 						mag_buffer[other_oid] += mag_buffer[oid];
-						is_unique_buffer[oid] = false;
-#endif
+						is_unique_buffer[oid]  = false;
 					}
 				}
 			}
+#endif
 		}
 
 
