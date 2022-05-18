@@ -691,13 +691,14 @@ namespace quids::mpi {
 		share
 		!!!!!!!!!!!!!!!! */
 		mid_step_function("compute_collisions - com");
-		MPI_Alltoall(&local_count[0], num_threads, MPI_INT, &global_count[0], num_threads, MPI_INT, communicator);
+		MPI_Alltoall(&local_count[0],  num_threads, MPI_INT, 
+					 &global_count[0], num_threads, MPI_INT, communicator);
 
 		mid_step_function("compute_collisions - prepare");
 		std::partial_sum(&global_count[0], &global_count[0] + n_segment, &global_disp[1]);
 
 		/* recompute send and receive count and disp */
-		send_disp[0] = 0; receive_count[0] = 0;
+		send_disp[0] = 0; receive_disp[0] = 0;
 		for (int i = 1; i <= size; ++i) {
 			send_disp[i] = local_disp[i*num_threads];
 			send_count[i - 1] = send_disp[i] - send_disp[i - 1];
@@ -711,10 +712,10 @@ namespace quids::mpi {
 
 		/* actualy share partition */
 		mid_step_function("compute_collisions - com");
-		MPI_Alltoallv(&partitioned_hash[0], &send_count[0], &send_disp[0], MPI_UNSIGNED_LONG_LONG,
-			&hash_buffer[0], &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
-		MPI_Alltoallv(&partitioned_mag[0], &send_count[0], &send_disp[0], mag_MPI_Datatype,
-			&mag_buffer[0], &receive_count[0], &receive_disp[0], mag_MPI_Datatype, communicator);
+		MPI_Alltoallv(&partitioned_hash[0], &send_count[0],    &send_disp[0],    MPI_UNSIGNED_LONG_LONG,
+			          &hash_buffer[0],      &receive_count[0], &receive_disp[0], MPI_UNSIGNED_LONG_LONG, communicator);
+		MPI_Alltoallv(&partitioned_mag[0],  &send_count[0],    &send_disp[0],    mag_MPI_Datatype,
+			          &mag_buffer[0],       &receive_count[0], &receive_disp[0], mag_MPI_Datatype,       communicator);
 
 
 
@@ -756,14 +757,14 @@ namespace quids::mpi {
 			/* insert into hashmap */
 			for (size_t i = 0; i < max_count; i += GRANULARITY)
 				for (int node_id = 0; node_id < size; ++node_id) {
-					size_t begin = global_disp[node_id*num_threads + thread_id] + i;
-					size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
+					const size_t begin = global_disp[node_id*num_threads + thread_id] + i;
+					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
 
 					for (size_t oid = begin; oid < end; ++oid) {
 						auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
 						if (unique) {
 							/* keep this object */
-							is_unique_buffer[oid]                           = true;
+							is_unique_buffer[oid] = true;
 
 							/* increment values */
 							global_num_object_after_interferences[node_id] += 1;
@@ -827,10 +828,10 @@ namespace quids::mpi {
 		share-back
 		!!!!!!!!!!!!!!!! */
 		mid_step_function("compute_collisions - com");
-		MPI_Alltoallv(&mag_buffer[0], &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
-			&partitioned_mag[0], &send_count[0], &send_disp[0], mag_MPI_Datatype, communicator);
-		MPI_Alltoallv(&is_unique_buffer[0], &receive_count[0], &receive_disp[0], MPI_CHAR,
-			&partitioned_is_unique[0], &send_count[0], &send_disp[0], MPI_CHAR, communicator);
+		MPI_Alltoallv(&mag_buffer[0],            &receive_count[0], &receive_disp[0], mag_MPI_Datatype,
+			          &partitioned_mag[0],       &send_count[0],    &send_disp[0],    mag_MPI_Datatype, communicator);
+		MPI_Alltoallv(&is_unique_buffer[0],      &receive_count[0], &receive_disp[0], MPI_CHAR,
+			          &partitioned_is_unique[0], &send_count[0],    &send_disp[0],    MPI_CHAR,         communicator);
 
 		/* un-partition magnitude */
 		mid_step_function("compute_collisions - finalize");
