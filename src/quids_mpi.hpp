@@ -425,6 +425,10 @@ namespace quids::mpi {
 			if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
 				break;
 
+			// debug: 
+			if (rank == 0)
+				std::cerr << "equalize:\n";
+
 			/* actually equalize */
 			iteration.equalize_symbolic(communicator);
 			iteration.truncated_num_object = iteration.num_object;
@@ -675,15 +679,18 @@ namespace quids::mpi {
 		mid_step_function("compute_collisions - insert");
 		#pragma omp parallel
 		{
-			std::vector<int> global_num_object_after_interferences(size, 0);
+			std::vector<float> global_num_object_after_interferences(size, 0.);
+			std::vector<float> node_size(size, 0);
 
 			int const thread_id = omp_get_thread_num();
 			robin_hood::unordered_map<size_t, size_t> elimination_map;
 
 			/* compute total_size */
 			size_t total_size = 0;
-			for (int node_id = 0; node_id < size; ++node_id)
+			for (int node_id = 0; node_id < size; ++node_id) {
 				total_size += global_count[node_id*num_threads + thread_id];
+				node_size[node_id] = (float)global_count[node_id*num_threads + thread_id];
+			}
 			elimination_map.reserve(total_size);
 
 			/* insert into hashmap */
@@ -706,8 +713,9 @@ namespace quids::mpi {
 						auto other_node_id = node_id_buffer[other_oid];
 
 						float this_node_size = oid - begin;
-						float other_node_size = global_disp[other_node_id*num_threads + thread_id + 1] - global_disp[other_node_id*num_threads + thread_id];
-						bool is_greater = this_node_size == 0 ? false : (float)global_num_object_after_interferences[node_id]/this_node_size >= (float)global_num_object_after_interferences[other_node_id]/other_node_size;
+						bool is_greater = this_node_size != 0 ? 
+							global_num_object_after_interferences[node_id]/this_node_size >= global_num_object_after_interferences[other_node_id]/node_size[other_node_id] :
+							false;
 						if (is_greater) {
 							/* if it exist add the probabilities */
 							mag_buffer[other_oid] += mag_buffer[oid];
