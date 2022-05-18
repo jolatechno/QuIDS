@@ -109,7 +109,7 @@ $(function() {
 <div class="line"><a id="l00043" name="l00043"></a><span class="lineno">   43</span>        <span class="keywordtype">int</span> <span class="keyword">const</span> n_segment = std::distance(offset, offset_end) - 1;</div>
 <div class="line"><a id="l00044" name="l00044"></a><span class="lineno">   44</span>        <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> <span class="keyword">const</span> id_end = std::distance(idx_in, idx_in_end);</div>
 <div class="line"><a id="l00045" name="l00045"></a><span class="lineno">   45</span> </div>
-<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>        <span class="comment">/* limit values */</span></div>
+<div class="line"><a id="l00046" name="l00046"></a><span class="lineno">   46</span>        <span class="comment">// limit values</span></div>
 <div class="line"><a id="l00047" name="l00047"></a><span class="lineno">   47</span>        std::fill(offset, offset_end - 1, 0);</div>
 <div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>        offset[n_segment] = id_end;</div>
 <div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span> </div>
@@ -125,7 +125,7 @@ $(function() {
 <div class="line"><a id="l00059" name="l00059"></a><span class="lineno">   59</span>        </div>
 <div class="line"><a id="l00060" name="l00060"></a><span class="lineno">   60</span>        std::partial_sum(offset, offset + n_segment, offset);</div>
 <div class="line"><a id="l00061" name="l00061"></a><span class="lineno">   61</span> </div>
-<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>        <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = id_end - 1; i &gt;= 0; --i) {</div>
+<div class="line"><a id="l00062" name="l00062"></a><span class="lineno">   62</span>        <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = 0; i &lt; id_end; ++i) {</div>
 <div class="line"><a id="l00063" name="l00063"></a><span class="lineno">   63</span>            <span class="keyword">auto</span> idx = idx_in[i];</div>
 <div class="line"><a id="l00064" name="l00064"></a><span class="lineno">   64</span>            <span class="keyword">auto</span> key = partitioner(idx);</div>
 <div class="line"><a id="l00065" name="l00065"></a><span class="lineno">   65</span>            idx_buffer[--offset[key]] = idx;</div>
@@ -143,12 +143,12 @@ $(function() {
 <div class="line"><a id="l00078" name="l00078"></a><span class="lineno">   78</span>        <span class="keywordtype">int</span> <span class="keyword">const</span> n_segment = std::distance(offset, offset_end) - 1;</div>
 <div class="line"><a id="l00079" name="l00079"></a><span class="lineno">   79</span>        <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> <span class="keyword">const</span> id_end = std::distance(idx_in, idx_in_end);</div>
 <div class="line"><a id="l00080" name="l00080"></a><span class="lineno">   80</span> </div>
-<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>        <span class="comment">/* limit values */</span></div>
+<div class="line"><a id="l00081" name="l00081"></a><span class="lineno">   81</span>        <span class="comment">// limit values</span></div>
 <div class="line"><a id="l00082" name="l00082"></a><span class="lineno">   82</span>        std::fill(offset, offset_end - 1, 0);</div>
 <div class="line"><a id="l00083" name="l00083"></a><span class="lineno">   83</span>        offset[n_segment] = id_end;</div>
 <div class="line"><a id="l00084" name="l00084"></a><span class="lineno">   84</span> </div>
 <div class="line"><a id="l00085" name="l00085"></a><span class="lineno">   85</span>        <span class="keywordflow">if</span> (n_segment == 1) {</div>
-<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>            <a class="code hl_function" href="namespacequids_1_1utils.html#ae865d1e8b2ff4018c77c5b8be1ca14a5">parallel_iota</a>(idx_in, idx_in_end, iota_offset);</div>
+<div class="line"><a id="l00086" name="l00086"></a><span class="lineno">   86</span>            std::iota(idx_in, idx_in_end, iota_offset);</div>
 <div class="line"><a id="l00087" name="l00087"></a><span class="lineno">   87</span>            <span class="keywordflow">return</span>;</div>
 <div class="line"><a id="l00088" name="l00088"></a><span class="lineno">   88</span>        }</div>
 <div class="line"><a id="l00089" name="l00089"></a><span class="lineno">   89</span>        <span class="keywordflow">if</span> (id_end == 0)</div>
@@ -161,7 +161,7 @@ $(function() {
 <div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>        </div>
 <div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>        std::partial_sum(offset, offset + n_segment, offset);</div>
 <div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span> </div>
-<div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span>        <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = id_end + iota_offset - 1; i &gt;= iota_offset; --i) {</div>
+<div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span>        <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = iota_offset; i &lt; id_end + iota_offset; +i) {</div>
 <div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>            <span class="keyword">auto</span> key = partitioner(i);</div>
 <div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span>            idx_in[--offset[key]] = i;</div>
 <div class="line"><a id="l00102" name="l00102"></a><span class="lineno">  102</span>        }</div>
@@ -176,7 +176,7 @@ $(function() {
 <div class="line"><a id="l00112" name="l00112"></a><span class="lineno">  112</span>        <span class="keywordtype">int</span> <span class="keyword">const</span> n_segment = std::distance(offset, offset_end) - 1;</div>
 <div class="line"><a id="l00113" name="l00113"></a><span class="lineno">  113</span>        <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> <span class="keyword">const</span> id_end = std::distance(idx_in, idx_in_end);</div>
 <div class="line"><a id="l00114" name="l00114"></a><span class="lineno">  114</span> </div>
-<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>        <span class="comment">/* limit values */</span></div>
+<div class="line"><a id="l00115" name="l00115"></a><span class="lineno">  115</span>        <span class="comment">// limit values</span></div>
 <div class="line"><a id="l00116" name="l00116"></a><span class="lineno">  116</span>        offset[0] = 0;</div>
 <div class="line"><a id="l00117" name="l00117"></a><span class="lineno">  117</span>        offset[n_segment] = id_end;</div>
 <div class="line"><a id="l00118" name="l00118"></a><span class="lineno">  118</span> </div>
@@ -187,7 +187,7 @@ $(function() {
 <div class="line"><a id="l00123" name="l00123"></a><span class="lineno">  123</span>            <span class="keywordflow">return</span>;</div>
 <div class="line"><a id="l00124" name="l00124"></a><span class="lineno">  124</span>        }</div>
 <div class="line"><a id="l00125" name="l00125"></a><span class="lineno">  125</span> </div>
-<div class="line"><a id="l00126" name="l00126"></a><span class="lineno">  126</span>        <span class="comment">/* number of threads */</span></div>
+<div class="line"><a id="l00126" name="l00126"></a><span class="lineno">  126</span>        <span class="comment">// number of threads</span></div>
 <div class="line"><a id="l00127" name="l00127"></a><span class="lineno">  127</span>        <span class="keywordtype">int</span> num_threads;</div>
 <div class="line"><a id="l00128" name="l00128"></a><span class="lineno">  128</span><span class="preprocessor">        #pragma omp parallel</span></div>
 <div class="line"><a id="l00129" name="l00129"></a><span class="lineno">  129</span><span class="preprocessor">        #pragma omp single</span></div>
@@ -199,90 +199,96 @@ $(function() {
 <div class="line"><a id="l00135" name="l00135"></a><span class="lineno">  135</span>        {</div>
 <div class="line"><a id="l00136" name="l00136"></a><span class="lineno">  136</span>            <span class="keywordtype">int</span> thread_id = omp_get_thread_num();</div>
 <div class="line"><a id="l00137" name="l00137"></a><span class="lineno">  137</span> </div>
-<div class="line"><a id="l00138" name="l00138"></a><span class="lineno">  138</span><span class="preprocessor">            #pragma omp for </span></div>
-<div class="line"><a id="l00139" name="l00139"></a><span class="lineno">  139</span>            <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = id_end - 1; i &gt;= 0; --i) {</div>
-<div class="line"><a id="l00140" name="l00140"></a><span class="lineno">  140</span>                <span class="keyword">auto</span> key = partitioner(idx_in[i]);</div>
-<div class="line"><a id="l00141" name="l00141"></a><span class="lineno">  141</span>                ++count[key*num_threads + thread_id];</div>
-<div class="line"><a id="l00142" name="l00142"></a><span class="lineno">  142</span>            }</div>
-<div class="line"><a id="l00143" name="l00143"></a><span class="lineno">  143</span>        }</div>
-<div class="line"><a id="l00144" name="l00144"></a><span class="lineno">  144</span>        </div>
-<div class="line"><a id="l00145" name="l00145"></a><span class="lineno">  145</span>        __gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment*num_threads, count.begin());</div>
-<div class="line"><a id="l00146" name="l00146"></a><span class="lineno">  146</span> </div>
-<div class="line"><a id="l00147" name="l00147"></a><span class="lineno">  147</span><span class="preprocessor">        #pragma omp parallel</span></div>
-<div class="line"><a id="l00148" name="l00148"></a><span class="lineno">  148</span>        {</div>
-<div class="line"><a id="l00149" name="l00149"></a><span class="lineno">  149</span>            <span class="keywordtype">int</span> thread_id = omp_get_thread_num();</div>
-<div class="line"><a id="l00150" name="l00150"></a><span class="lineno">  150</span>            </div>
-<div class="line"><a id="l00151" name="l00151"></a><span class="lineno">  151</span><span class="preprocessor">            #pragma omp for </span></div>
-<div class="line"><a id="l00152" name="l00152"></a><span class="lineno">  152</span>            <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = id_end - 1; i &gt;= 0; --i) {</div>
-<div class="line"><a id="l00153" name="l00153"></a><span class="lineno">  153</span>                <span class="keyword">auto</span> idx = idx_in[i];</div>
-<div class="line"><a id="l00154" name="l00154"></a><span class="lineno">  154</span>                <span class="keyword">auto</span> key = partitioner(idx);</div>
-<div class="line"><a id="l00155" name="l00155"></a><span class="lineno">  155</span>                idx_buffer[--count[key*num_threads + thread_id]] = idx;</div>
-<div class="line"><a id="l00156" name="l00156"></a><span class="lineno">  156</span>            }</div>
-<div class="line"><a id="l00157" name="l00157"></a><span class="lineno">  157</span>        }</div>
-<div class="line"><a id="l00158" name="l00158"></a><span class="lineno">  158</span> </div>
-<div class="line"><a id="l00159" name="l00159"></a><span class="lineno">  159</span><span class="preprocessor">        #pragma omp parallel for </span></div>
-<div class="line"><a id="l00160" name="l00160"></a><span class="lineno">  160</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n_segment; ++i)</div>
-<div class="line"><a id="l00161" name="l00161"></a><span class="lineno">  161</span>            offset[i] = count[i*num_threads];</div>
-<div class="line"><a id="l00162" name="l00162"></a><span class="lineno">  162</span> </div>
-<div class="line"><a id="l00163" name="l00163"></a><span class="lineno">  163</span>        std::copy(idx_buffer, idx_buffer + id_end, idx_in);</div>
-<div class="line"><a id="l00164" name="l00164"></a><span class="lineno">  164</span>    }</div>
-<div class="line"><a id="l00165" name="l00165"></a><span class="lineno">  165</span> </div>
-<div class="line"><a id="l00167" name="l00167"></a><span class="lineno">  167</span>    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="keywordtype">id</span>IteratorType, <span class="keyword">class</span> <span class="keywordtype">id</span>Type, <span class="keyword">class</span> countIteratorType, <span class="keyword">class</span> functionType&gt;</div>
-<div class="line"><a id="l00168" name="l00168"></a><span class="lineno"><a class="line" href="namespacequids_1_1utils.html#afb255d10547e01152bfd963b92ddcc88">  168</a></span>    <span class="keywordtype">void</span> <a class="code hl_function" href="namespacequids_1_1utils.html#afb255d10547e01152bfd963b92ddcc88">parallel_generalized_partition_from_iota</a>(idIteratorType idx_in, idIteratorType idx_in_end, idType <span class="keyword">const</span> iotaOffset,</div>
-<div class="line"><a id="l00169" name="l00169"></a><span class="lineno">  169</span>        countIteratorType offset, countIteratorType offset_end,</div>
-<div class="line"><a id="l00170" name="l00170"></a><span class="lineno">  170</span>        functionType <span class="keyword">const</span> partitioner) {</div>
-<div class="line"><a id="l00171" name="l00171"></a><span class="lineno">  171</span> </div>
-<div class="line"><a id="l00172" name="l00172"></a><span class="lineno">  172</span>        <span class="keywordtype">int</span> <span class="keyword">const</span> n_segment = std::distance(offset, offset_end) - 1;</div>
-<div class="line"><a id="l00173" name="l00173"></a><span class="lineno">  173</span>        <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> <span class="keyword">const</span> id_end = std::distance(idx_in, idx_in_end);</div>
-<div class="line"><a id="l00174" name="l00174"></a><span class="lineno">  174</span> </div>
-<div class="line"><a id="l00175" name="l00175"></a><span class="lineno">  175</span>        <span class="comment">/* limit values */</span></div>
-<div class="line"><a id="l00176" name="l00176"></a><span class="lineno">  176</span>        offset[0] = 0;</div>
-<div class="line"><a id="l00177" name="l00177"></a><span class="lineno">  177</span>        offset[n_segment] = id_end;</div>
-<div class="line"><a id="l00178" name="l00178"></a><span class="lineno">  178</span> </div>
-<div class="line"><a id="l00179" name="l00179"></a><span class="lineno">  179</span>        <span class="keywordflow">if</span> (n_segment == 1)</div>
-<div class="line"><a id="l00180" name="l00180"></a><span class="lineno">  180</span>            <span class="keywordflow">return</span>;</div>
-<div class="line"><a id="l00181" name="l00181"></a><span class="lineno">  181</span>        <span class="keywordflow">if</span> (id_end == 0) {</div>
-<div class="line"><a id="l00182" name="l00182"></a><span class="lineno">  182</span>            std::fill(offset, offset_end, 0);</div>
+<div class="line"><a id="l00138" name="l00138"></a><span class="lineno">  138</span>            <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> begin = id_end*thread_id/num_threads;</div>
+<div class="line"><a id="l00139" name="l00139"></a><span class="lineno">  139</span>            <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> end = id_end*(thread_id + 1)/num_threads;</div>
+<div class="line"><a id="l00140" name="l00140"></a><span class="lineno">  140</span>            <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = end - 1; i &gt;= begin; --i) {</div>
+<div class="line"><a id="l00141" name="l00141"></a><span class="lineno">  141</span>                <span class="keyword">auto</span> key = partitioner(idx_in[i]);</div>
+<div class="line"><a id="l00142" name="l00142"></a><span class="lineno">  142</span>                ++count[key*num_threads + thread_id];</div>
+<div class="line"><a id="l00143" name="l00143"></a><span class="lineno">  143</span>            }</div>
+<div class="line"><a id="l00144" name="l00144"></a><span class="lineno">  144</span>        }</div>
+<div class="line"><a id="l00145" name="l00145"></a><span class="lineno">  145</span>        </div>
+<div class="line"><a id="l00146" name="l00146"></a><span class="lineno">  146</span>        __gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment*num_threads, count.begin());</div>
+<div class="line"><a id="l00147" name="l00147"></a><span class="lineno">  147</span> </div>
+<div class="line"><a id="l00148" name="l00148"></a><span class="lineno">  148</span><span class="preprocessor">        #pragma omp parallel</span></div>
+<div class="line"><a id="l00149" name="l00149"></a><span class="lineno">  149</span>        {</div>
+<div class="line"><a id="l00150" name="l00150"></a><span class="lineno">  150</span>            <span class="keywordtype">int</span> thread_id = omp_get_thread_num();</div>
+<div class="line"><a id="l00151" name="l00151"></a><span class="lineno">  151</span>            </div>
+<div class="line"><a id="l00152" name="l00152"></a><span class="lineno">  152</span>            <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> begin = id_end*thread_id/num_threads;</div>
+<div class="line"><a id="l00153" name="l00153"></a><span class="lineno">  153</span>            <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> end = id_end*(thread_id + 1)/num_threads;</div>
+<div class="line"><a id="l00154" name="l00154"></a><span class="lineno">  154</span>            <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = begin; i &lt; end; ++i) {</div>
+<div class="line"><a id="l00155" name="l00155"></a><span class="lineno">  155</span>                <span class="keyword">auto</span> idx = idx_in[i];</div>
+<div class="line"><a id="l00156" name="l00156"></a><span class="lineno">  156</span>                <span class="keyword">auto</span> key = partitioner(idx);</div>
+<div class="line"><a id="l00157" name="l00157"></a><span class="lineno">  157</span>                idx_buffer[--count[key*num_threads + thread_id]] = idx;</div>
+<div class="line"><a id="l00158" name="l00158"></a><span class="lineno">  158</span>            }</div>
+<div class="line"><a id="l00159" name="l00159"></a><span class="lineno">  159</span>        }</div>
+<div class="line"><a id="l00160" name="l00160"></a><span class="lineno">  160</span> </div>
+<div class="line"><a id="l00161" name="l00161"></a><span class="lineno">  161</span><span class="preprocessor">        #pragma omp parallel for </span></div>
+<div class="line"><a id="l00162" name="l00162"></a><span class="lineno">  162</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n_segment; ++i)</div>
+<div class="line"><a id="l00163" name="l00163"></a><span class="lineno">  163</span>            offset[i] = count[i*num_threads];</div>
+<div class="line"><a id="l00164" name="l00164"></a><span class="lineno">  164</span> </div>
+<div class="line"><a id="l00165" name="l00165"></a><span class="lineno">  165</span>        std::copy(idx_buffer, idx_buffer + id_end, idx_in);</div>
+<div class="line"><a id="l00166" name="l00166"></a><span class="lineno">  166</span>    }</div>
+<div class="line"><a id="l00167" name="l00167"></a><span class="lineno">  167</span> </div>
+<div class="line"><a id="l00169" name="l00169"></a><span class="lineno">  169</span>    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="keywordtype">id</span>IteratorType, <span class="keyword">class</span> <span class="keywordtype">id</span>Type, <span class="keyword">class</span> countIteratorType, <span class="keyword">class</span> functionType&gt;</div>
+<div class="line"><a id="l00170" name="l00170"></a><span class="lineno"><a class="line" href="namespacequids_1_1utils.html#afb255d10547e01152bfd963b92ddcc88">  170</a></span>    <span class="keywordtype">void</span> <a class="code hl_function" href="namespacequids_1_1utils.html#afb255d10547e01152bfd963b92ddcc88">parallel_generalized_partition_from_iota</a>(idIteratorType idx_in, idIteratorType idx_in_end, idType <span class="keyword">const</span> iotaOffset,</div>
+<div class="line"><a id="l00171" name="l00171"></a><span class="lineno">  171</span>        countIteratorType offset, countIteratorType offset_end,</div>
+<div class="line"><a id="l00172" name="l00172"></a><span class="lineno">  172</span>        functionType <span class="keyword">const</span> partitioner) {</div>
+<div class="line"><a id="l00173" name="l00173"></a><span class="lineno">  173</span> </div>
+<div class="line"><a id="l00174" name="l00174"></a><span class="lineno">  174</span>        <span class="keywordtype">int</span> <span class="keyword">const</span> n_segment = std::distance(offset, offset_end) - 1;</div>
+<div class="line"><a id="l00175" name="l00175"></a><span class="lineno">  175</span>        <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> <span class="keyword">const</span> id_end = std::distance(idx_in, idx_in_end);</div>
+<div class="line"><a id="l00176" name="l00176"></a><span class="lineno">  176</span> </div>
+<div class="line"><a id="l00177" name="l00177"></a><span class="lineno">  177</span>        <span class="comment">// limit values</span></div>
+<div class="line"><a id="l00178" name="l00178"></a><span class="lineno">  178</span>        offset[0] = 0;</div>
+<div class="line"><a id="l00179" name="l00179"></a><span class="lineno">  179</span>        offset[n_segment] = id_end;</div>
+<div class="line"><a id="l00180" name="l00180"></a><span class="lineno">  180</span> </div>
+<div class="line"><a id="l00181" name="l00181"></a><span class="lineno">  181</span>        <span class="keywordflow">if</span> (n_segment == 1) {</div>
+<div class="line"><a id="l00182" name="l00182"></a><span class="lineno">  182</span>            <a class="code hl_function" href="namespacequids_1_1utils.html#ae865d1e8b2ff4018c77c5b8be1ca14a5">parallel_iota</a>(idx_in, idx_in_end, iotaOffset);</div>
 <div class="line"><a id="l00183" name="l00183"></a><span class="lineno">  183</span>            <span class="keywordflow">return</span>;</div>
 <div class="line"><a id="l00184" name="l00184"></a><span class="lineno">  184</span>        }</div>
-<div class="line"><a id="l00185" name="l00185"></a><span class="lineno">  185</span> </div>
-<div class="line"><a id="l00186" name="l00186"></a><span class="lineno">  186</span>        <span class="comment">/* number of threads */</span></div>
-<div class="line"><a id="l00187" name="l00187"></a><span class="lineno">  187</span>        <span class="keywordtype">int</span> num_threads;</div>
-<div class="line"><a id="l00188" name="l00188"></a><span class="lineno">  188</span><span class="preprocessor">        #pragma omp parallel</span></div>
-<div class="line"><a id="l00189" name="l00189"></a><span class="lineno">  189</span><span class="preprocessor">        #pragma omp single</span></div>
-<div class="line"><a id="l00190" name="l00190"></a><span class="lineno">  190</span>        num_threads = omp_get_num_threads();</div>
-<div class="line"><a id="l00191" name="l00191"></a><span class="lineno">  191</span> </div>
-<div class="line"><a id="l00192" name="l00192"></a><span class="lineno">  192</span>        std::vector&lt;size_t&gt; count(n_segment*num_threads, 0);</div>
-<div class="line"><a id="l00193" name="l00193"></a><span class="lineno">  193</span> </div>
-<div class="line"><a id="l00194" name="l00194"></a><span class="lineno">  194</span><span class="preprocessor">        #pragma omp parallel</span></div>
-<div class="line"><a id="l00195" name="l00195"></a><span class="lineno">  195</span>        {</div>
-<div class="line"><a id="l00196" name="l00196"></a><span class="lineno">  196</span>            <span class="keywordtype">int</span> thread_id = omp_get_thread_num();</div>
+<div class="line"><a id="l00185" name="l00185"></a><span class="lineno">  185</span>        <span class="keywordflow">if</span> (id_end == 0) {</div>
+<div class="line"><a id="l00186" name="l00186"></a><span class="lineno">  186</span>            std::fill(offset, offset_end, 0);</div>
+<div class="line"><a id="l00187" name="l00187"></a><span class="lineno">  187</span>            <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00188" name="l00188"></a><span class="lineno">  188</span>        }</div>
+<div class="line"><a id="l00189" name="l00189"></a><span class="lineno">  189</span> </div>
+<div class="line"><a id="l00190" name="l00190"></a><span class="lineno">  190</span>        <span class="comment">// number of threads</span></div>
+<div class="line"><a id="l00191" name="l00191"></a><span class="lineno">  191</span>        <span class="keywordtype">int</span> num_threads;</div>
+<div class="line"><a id="l00192" name="l00192"></a><span class="lineno">  192</span><span class="preprocessor">        #pragma omp parallel</span></div>
+<div class="line"><a id="l00193" name="l00193"></a><span class="lineno">  193</span><span class="preprocessor">        #pragma omp single</span></div>
+<div class="line"><a id="l00194" name="l00194"></a><span class="lineno">  194</span>        num_threads = omp_get_num_threads();</div>
+<div class="line"><a id="l00195" name="l00195"></a><span class="lineno">  195</span> </div>
+<div class="line"><a id="l00196" name="l00196"></a><span class="lineno">  196</span>        std::vector&lt;size_t&gt; count(n_segment*num_threads, 0);</div>
 <div class="line"><a id="l00197" name="l00197"></a><span class="lineno">  197</span> </div>
-<div class="line"><a id="l00198" name="l00198"></a><span class="lineno">  198</span><span class="preprocessor">            #pragma omp for </span></div>
-<div class="line"><a id="l00199" name="l00199"></a><span class="lineno">  199</span>            <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = id_end + iotaOffset - 1; i &gt;= iotaOffset; --i) {</div>
-<div class="line"><a id="l00200" name="l00200"></a><span class="lineno">  200</span>                <span class="keyword">auto</span> key = partitioner(i);</div>
-<div class="line"><a id="l00201" name="l00201"></a><span class="lineno">  201</span>                ++count[key*num_threads + thread_id];</div>
-<div class="line"><a id="l00202" name="l00202"></a><span class="lineno">  202</span>            }</div>
-<div class="line"><a id="l00203" name="l00203"></a><span class="lineno">  203</span>        }</div>
-<div class="line"><a id="l00204" name="l00204"></a><span class="lineno">  204</span>        </div>
-<div class="line"><a id="l00205" name="l00205"></a><span class="lineno">  205</span>        __gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment*num_threads, count.begin());</div>
-<div class="line"><a id="l00206" name="l00206"></a><span class="lineno">  206</span> </div>
-<div class="line"><a id="l00207" name="l00207"></a><span class="lineno">  207</span><span class="preprocessor">        #pragma omp parallel</span></div>
-<div class="line"><a id="l00208" name="l00208"></a><span class="lineno">  208</span>        {</div>
-<div class="line"><a id="l00209" name="l00209"></a><span class="lineno">  209</span>            <span class="keywordtype">int</span> thread_id = omp_get_thread_num();</div>
-<div class="line"><a id="l00210" name="l00210"></a><span class="lineno">  210</span>            </div>
-<div class="line"><a id="l00211" name="l00211"></a><span class="lineno">  211</span><span class="preprocessor">            #pragma omp for </span></div>
-<div class="line"><a id="l00212" name="l00212"></a><span class="lineno">  212</span>            <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = id_end + iotaOffset - 1; i &gt;= iotaOffset; --i) {</div>
-<div class="line"><a id="l00213" name="l00213"></a><span class="lineno">  213</span>                <span class="keyword">auto</span> key = partitioner(i);</div>
-<div class="line"><a id="l00214" name="l00214"></a><span class="lineno">  214</span>                idx_in[--count[key*num_threads + thread_id]] = i;</div>
-<div class="line"><a id="l00215" name="l00215"></a><span class="lineno">  215</span>            }</div>
-<div class="line"><a id="l00216" name="l00216"></a><span class="lineno">  216</span>        }</div>
-<div class="line"><a id="l00217" name="l00217"></a><span class="lineno">  217</span> </div>
-<div class="line"><a id="l00218" name="l00218"></a><span class="lineno">  218</span><span class="preprocessor">        #pragma omp parallel for </span></div>
-<div class="line"><a id="l00219" name="l00219"></a><span class="lineno">  219</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n_segment; ++i)</div>
-<div class="line"><a id="l00220" name="l00220"></a><span class="lineno">  220</span>            offset[i] = count[i*num_threads];</div>
-<div class="line"><a id="l00221" name="l00221"></a><span class="lineno">  221</span>    }</div>
-<div class="line"><a id="l00222" name="l00222"></a><span class="lineno">  222</span>}</div>
+<div class="line"><a id="l00198" name="l00198"></a><span class="lineno">  198</span><span class="preprocessor">        #pragma omp parallel</span></div>
+<div class="line"><a id="l00199" name="l00199"></a><span class="lineno">  199</span>        {</div>
+<div class="line"><a id="l00200" name="l00200"></a><span class="lineno">  200</span>            <span class="keywordtype">int</span> thread_id = omp_get_thread_num();</div>
+<div class="line"><a id="l00201" name="l00201"></a><span class="lineno">  201</span> </div>
+<div class="line"><a id="l00202" name="l00202"></a><span class="lineno">  202</span>            <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> begin = id_end*thread_id/num_threads;</div>
+<div class="line"><a id="l00203" name="l00203"></a><span class="lineno">  203</span>            <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> end = id_end*(thread_id + 1)/num_threads;</div>
+<div class="line"><a id="l00204" name="l00204"></a><span class="lineno">  204</span>            <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = end + iotaOffset - 1; i &gt;= begin + iotaOffset; --i) {</div>
+<div class="line"><a id="l00205" name="l00205"></a><span class="lineno">  205</span>                <span class="keyword">auto</span> key = partitioner(i);</div>
+<div class="line"><a id="l00206" name="l00206"></a><span class="lineno">  206</span>                ++count[key*num_threads + thread_id];</div>
+<div class="line"><a id="l00207" name="l00207"></a><span class="lineno">  207</span>            }</div>
+<div class="line"><a id="l00208" name="l00208"></a><span class="lineno">  208</span>        }</div>
+<div class="line"><a id="l00209" name="l00209"></a><span class="lineno">  209</span>        </div>
+<div class="line"><a id="l00210" name="l00210"></a><span class="lineno">  210</span>        __gnu_parallel::partial_sum(count.begin(), count.begin() + n_segment*num_threads, count.begin());</div>
+<div class="line"><a id="l00211" name="l00211"></a><span class="lineno">  211</span> </div>
+<div class="line"><a id="l00212" name="l00212"></a><span class="lineno">  212</span><span class="preprocessor">        #pragma omp parallel</span></div>
+<div class="line"><a id="l00213" name="l00213"></a><span class="lineno">  213</span>        {</div>
+<div class="line"><a id="l00214" name="l00214"></a><span class="lineno">  214</span>            <span class="keywordtype">int</span> thread_id = omp_get_thread_num();</div>
+<div class="line"><a id="l00215" name="l00215"></a><span class="lineno">  215</span>            </div>
+<div class="line"><a id="l00216" name="l00216"></a><span class="lineno">  216</span>            <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> begin = id_end*thread_id/num_threads;</div>
+<div class="line"><a id="l00217" name="l00217"></a><span class="lineno">  217</span>            <span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> end = id_end*(thread_id + 1)/num_threads;</div>
+<div class="line"><a id="l00218" name="l00218"></a><span class="lineno">  218</span>            <span class="keywordflow">for</span> (<span class="keywordtype">long</span> <span class="keywordtype">long</span> <span class="keywordtype">int</span> i = begin + iotaOffset; i &lt; end + iotaOffset; ++i) {</div>
+<div class="line"><a id="l00219" name="l00219"></a><span class="lineno">  219</span>                <span class="keyword">auto</span> key = partitioner(i);</div>
+<div class="line"><a id="l00220" name="l00220"></a><span class="lineno">  220</span>                idx_in[--count[key*num_threads + thread_id]] = i;</div>
+<div class="line"><a id="l00221" name="l00221"></a><span class="lineno">  221</span>            }</div>
+<div class="line"><a id="l00222" name="l00222"></a><span class="lineno">  222</span>        }</div>
+<div class="line"><a id="l00223" name="l00223"></a><span class="lineno">  223</span> </div>
+<div class="line"><a id="l00224" name="l00224"></a><span class="lineno">  224</span><span class="preprocessor">        #pragma omp parallel for </span></div>
+<div class="line"><a id="l00225" name="l00225"></a><span class="lineno">  225</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 1; i &lt; n_segment; ++i)</div>
+<div class="line"><a id="l00226" name="l00226"></a><span class="lineno">  226</span>            offset[i] = count[i*num_threads];</div>
+<div class="line"><a id="l00227" name="l00227"></a><span class="lineno">  227</span>    }</div>
+<div class="line"><a id="l00228" name="l00228"></a><span class="lineno">  228</span>}</div>
 <div class="ttc" id="anamespacequids_1_1utils_html"><div class="ttname"><a href="namespacequids_1_1utils.html">quids::utils</a></div><div class="ttdoc">QuIDS utility function and variable namespace.</div><div class="ttdef"><b>Definition:</b> algorithm.hpp:6</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html_a04766ef14b0af35520ea9bf386c68a79"><div class="ttname"><a href="namespacequids_1_1utils.html#a04766ef14b0af35520ea9bf386c68a79">quids::utils::generalized_partition</a></div><div class="ttdeci">void generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer, countIteratorType offset, countIteratorType offset_end, functionType const partitioner)</div><div class="ttdoc">linear partitioning algorithm into n partitions</div><div class="ttdef"><b>Definition:</b> algorithm.hpp:39</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html_a17af89b5a6c5a9ead5ec1246362ac522"><div class="ttname"><a href="namespacequids_1_1utils.html#a17af89b5a6c5a9ead5ec1246362ac522">quids::utils::log_2_upper_bound</a></div><div class="ttdeci">int log_2_upper_bound(int n)</div><div class="ttdoc">returns the upperbound bound of the log2</div><div class="ttdef"><b>Definition:</b> algorithm.hpp:16</div></div>
@@ -290,7 +296,7 @@ $(function() {
 <div class="ttc" id="anamespacequids_1_1utils_html_a7312c706cd76f90dab115b88ae62b76f"><div class="ttname"><a href="namespacequids_1_1utils.html#a7312c706cd76f90dab115b88ae62b76f">quids::utils::generalized_partition_from_iota</a></div><div class="ttdeci">void generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset, countIteratorType offset, countIteratorType offset_end, functionType const partitioner)</div><div class="ttdoc">linear partitioning algorithm into n partitions without an initialized index list</div><div class="ttdef"><b>Definition:</b> algorithm.hpp:73</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html_aa588190a8281d59c7cef534470353bb0"><div class="ttname"><a href="namespacequids_1_1utils.html#aa588190a8281d59c7cef534470353bb0">quids::utils::parallel_generalized_partition</a></div><div class="ttdeci">void parallel_generalized_partition(idIteratorType idx_in, idIteratorType idx_in_end, idIteratorType idx_buffer, countIteratorType offset, countIteratorType offset_end, functionType const partitioner)</div><div class="ttdoc">linear partitioning algorithm into n partitions in parallel</div><div class="ttdef"><b>Definition:</b> algorithm.hpp:108</div></div>
 <div class="ttc" id="anamespacequids_1_1utils_html_ae865d1e8b2ff4018c77c5b8be1ca14a5"><div class="ttname"><a href="namespacequids_1_1utils.html#ae865d1e8b2ff4018c77c5b8be1ca14a5">quids::utils::parallel_iota</a></div><div class="ttdeci">void parallel_iota(iteratorType begin, iteratorType end, const valueType value_begin)</div><div class="ttdoc">parallel iota</div><div class="ttdef"><b>Definition:</b> algorithm.hpp:24</div></div>
-<div class="ttc" id="anamespacequids_1_1utils_html_afb255d10547e01152bfd963b92ddcc88"><div class="ttname"><a href="namespacequids_1_1utils.html#afb255d10547e01152bfd963b92ddcc88">quids::utils::parallel_generalized_partition_from_iota</a></div><div class="ttdeci">void parallel_generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset, countIteratorType offset, countIteratorType offset_end, functionType const partitioner)</div><div class="ttdoc">linear partitioning algorithm into n partitions without an initialized index list in parallel</div><div class="ttdef"><b>Definition:</b> algorithm.hpp:168</div></div>
+<div class="ttc" id="anamespacequids_1_1utils_html_afb255d10547e01152bfd963b92ddcc88"><div class="ttname"><a href="namespacequids_1_1utils.html#afb255d10547e01152bfd963b92ddcc88">quids::utils::parallel_generalized_partition_from_iota</a></div><div class="ttdeci">void parallel_generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset, countIteratorType offset, countIteratorType offset_end, functionType const partitioner)</div><div class="ttdoc">linear partitioning algorithm into n partitions without an initialized index list in parallel</div><div class="ttdef"><b>Definition:</b> algorithm.hpp:170</div></div>
 </div><!-- fragment --></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
