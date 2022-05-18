@@ -761,7 +761,9 @@ namespace quids::mpi {
 							const size_t other_oid  = it->second;
 							const int other_node_id = node_id_buffer[other_oid];
 
-							if (global_num_object_after_interferences[node_id] > global_num_object_after_interferences[other_node_id]) {
+							if (global_num_object_after_interferences[node_id      ]*global_count[other_node_id*num_threads + thread_id] >=
+								global_num_object_after_interferences[other_node_id]*global_count[node_id      *num_threads + thread_id]) {
+
 								/* if it exist add the probabilities */
 								mag_buffer[other_oid] += mag_buffer[oid];
 								mag_buffer[oid]        = 0;
