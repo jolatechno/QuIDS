@@ -669,17 +669,6 @@ namespace quids::mpi {
 			load_balancing_begin[i] = i*num_bucket/n_segment;
 #endif
 
-		// debug:
-		if (rank == 0) {
-			std::cerr << "\tdisplacment:\t";
-			for (int i = 0; i <= n_segment; ++i)
-				std::cerr << total_partition_begin[load_balancing_begin[i]] << "[" << load_balancing_begin[i] << "], ";
-			std::cerr << "\n\tcount:\t";
-			for (int i = 0; i < n_segment; ++i)
-				std::cerr << (total_partition_begin[load_balancing_begin[i + 1]] - total_partition_begin[load_balancing_begin[i]]) << ", ";
-			std::cerr << "\n";
-		}
-
 		/* recompute local count and disp */
 		local_disp[0] = 0;
 		for (int i = 1; i <= n_segment; ++i) {
@@ -744,73 +733,36 @@ namespace quids::mpi {
 			robin_hood::unordered_map<size_t, size_t> elimination_map;
 
 			/* compute total_size */
-			size_t total_size = 0;
-			for (int node_id = 0; node_id < size; ++node_id)
-				total_size += global_count[node_id*num_threads + thread_id];
+			size_t total_size = 0, max_count = 0;
+			for (int node_id = 0; node_id < size; ++node_id) {
+				size_t this_size = global_count[node_id*num_threads + thread_id];
+
+				total_size +=          this_size;
+				max_count   = std::max(this_size, max_count);
+			}
 			elimination_map.reserve(total_size);
 
-#ifndef SKIP_ELIM_LB
-			std::vector<size_t> global_num_object_after_interferences(size, 0);
-
-			/* compute max size */
-			size_t max_count = 0;
-			for (int node_id = 0; node_id < size; ++node_id)
-				max_count = std::max(max_count, (size_t)global_count[node_id*num_threads + thread_id]);
-
 			/* insert into hashmap */
-			for (size_t i = 0; GRANULARITY*i < max_count; ++i) {
-				for (int node_id = 0; node_id < size; ++node_id) {
+			for (size_t i = 0; GRANULARITY*i < max_count; ++i)
+				for (int j = 0; j < size; ++j) {
+					const int node_id = (rank + j)%size;
+					
 					const size_t begin =                i*GRANULARITY        + global_disp[node_id*num_threads + thread_id    ];
 					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
 
 					for (size_t oid = begin; oid < end; ++oid) {
+
+						/* accessing key */
 						auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
-						if (unique) {
-							/* increment values */
-							++global_num_object_after_interferences[node_id];
+						if (!unique) {
+							const size_t other_oid = it->second;
 
-						} else {
-							const size_t other_oid  = it->second;
-							const int other_node_id = node_id_buffer[other_oid];
-
-							if (global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id]) {
-								/* if it exist add the probabilities */
-								mag_buffer[other_oid]  += mag_buffer[oid];
-								mag_buffer[oid]         = 0;
-
-							} else {
-								/* switch objects */
-								it->second            = oid;
-								mag_buffer[oid]       += mag_buffer[other_oid];
-								mag_buffer[other_oid]  = 0;
-
-								/* increment values */
-								++global_num_object_after_interferences[node_id];
-								--global_num_object_after_interferences[other_node_id];
-							}
+							/* if it exist add the probabilities */
+							mag_buffer[other_oid] += mag_buffer[oid];
+							mag_buffer[oid]        = 0;
 						}
 					}
 				}
-			}
-#else
-			const int sign = 1 - 2*(rank%2);
-			for (int j = 0; j < size; ++j) {
-				const int node_id = (size + rank + sign*j)%size;
-
-				size_t begin = global_disp[node_id*num_threads + thread_id], end = global_disp[node_id*num_threads + thread_id + 1];
-				for (size_t oid = begin; oid < end; ++oid) {
-					/* accessing key */
-					auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
-					if (!unique) {
-						const size_t other_oid = it->second;
-
-						/* if it exist add the probabilities */
-						mag_buffer[other_oid] += mag_buffer[oid];
-						mag_buffer[oid]        = 0;
-					}
-				}
-			}
-#endif
 		}
 
 
