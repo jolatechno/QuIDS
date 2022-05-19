@@ -1,3 +1,5 @@
+/** @file */
+
 #pragma once
 
 typedef unsigned uint;
@@ -12,6 +14,15 @@ typedef unsigned uint;
 	#define MIN_EQUALIZE_SIZE 100
 #endif
 #ifndef GRANULARITY
+	/// granularity, i.e. the typical loop size we consider when doing a 2d loop.
+	/**
+	 * The idea is that GRANULARITY should be large  enough for the loop to gain from cache optimization,
+	 * while being small enough to be considered "small" compared to the number of object per thread.
+	 * 
+	 * This is used to introduce some "implicite work stealing" without killing performance,
+	 * by inserting "GRANULARITY" object from each node into the hashmap when computing collisions,
+	 * before moving to the next node.
+	 */
 	#define GRANULARITY 64
 #endif
 #ifndef EQUALIZE_INBALANCE
@@ -746,7 +757,7 @@ namespace quids::mpi {
 			for (size_t i = 0; GRANULARITY*i < max_count; ++i)
 				for (int j = 0; j < size; ++j) {
 					const int node_id = (rank + j)%size;
-					
+
 					const size_t begin =                i*GRANULARITY        + global_disp[node_id*num_threads + thread_id    ];
 					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
 

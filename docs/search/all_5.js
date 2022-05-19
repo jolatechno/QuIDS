@@ -10,5 +10,6 @@ var searchData=
   ['get_5fobject_7',['get_object',['../classquids_1_1iteration.html#a31804b11ba8daa2ba094d6858571b57b',1,'quids::iteration::get_object(size_t const object_id, char *&amp;object_begin_, uint &amp;object_size_, mag_t *&amp;mag)'],['../classquids_1_1iteration.html#a4e520a07bdb47d609cdb868d8dfa20b0',1,'quids::iteration::get_object(size_t const object_id, char const *&amp;object_begin_, uint &amp;object_size_, mag_t &amp;mag) const']]],
   ['get_5ftotal_5fnum_5fobject_8',['get_total_num_object',['../classquids_1_1mpi_1_1mpi__iteration.html#a02ec85e300629005ca50614f0eed752a',1,'quids::mpi::mpi_iteration::get_total_num_object()'],['../classquids_1_1mpi_1_1mpi__symbolic__iteration.html#a5936605d2f46fdc8f35d96586559975d',1,'quids::mpi::mpi_symbolic_iteration::get_total_num_object(MPI_Comm communicator) const']]],
   ['get_5ftotal_5fnum_5fobject_5fafter_5finterferences_9',['get_total_num_object_after_interferences',['../classquids_1_1mpi_1_1mpi__symbolic__iteration.html#acb37b890bbb9883c8c9550ff8e429e55',1,'quids::mpi::mpi_symbolic_iteration']]],
-  ['get_5ftotal_5fnum_5fsymbolic_5fobject_10',['get_total_num_symbolic_object',['../classquids_1_1mpi_1_1mpi__iteration.html#a4d653ffa3fd47132b57d5f0d74e65a92',1,'quids::mpi::mpi_iteration']]]
+  ['get_5ftotal_5fnum_5fsymbolic_5fobject_10',['get_total_num_symbolic_object',['../classquids_1_1mpi_1_1mpi__iteration.html#a4d653ffa3fd47132b57d5f0d74e65a92',1,'quids::mpi::mpi_iteration']]],
+  ['granularity_11',['GRANULARITY',['../quids__mpi_8hpp.html#ab5e6c9297c3ac08786f8224dfa2e06c8',1,'quids_mpi.hpp']]]
 ];
