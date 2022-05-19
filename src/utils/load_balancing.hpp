@@ -2,6 +2,10 @@
 
 #include <iterator>
 
+#ifdef VALIDATE_CCP
+#include <iostream>
+#endif
+
 /// QuIDS utility function and variable namespace
 namespace quids::utils {
 
@@ -20,6 +24,32 @@ namespace quids::utils {
 		size_t w_max = 2*w_min + 1;
 
 		std::vector<size_t> separators(num_segments - 1, 0);
+
+#ifdef VALIDATE_CCP
+		const auto check_partition = [&](size_t wprobe) {
+			const auto print_debug = [&]() {
+				std::cerr << "\t";
+				for (int i = 0; i <= num_segments; ++i)
+					std::cerr << prefixSumLoadBegin[workSharingIndexesBegin[i]] << "[" << workSharingIndexesBegin[i] << "], ";
+				std::cerr << "\n";
+			};
+
+
+			for (int i = 0; i < num_segments; ++i) {
+				if (prefixSumLoadBegin[workSharingIndexesBegin[i + 1]] - prefixSumLoadBegin[workSharingIndexesBegin[i]] > wprobe) {
+					std::cerr << "CCP failed (too big of a gap) at " << i << "/" << num_segments << "\n";
+					print_debug();
+					throw;
+				}
+				if (workSharingIndexesBegin[i + 1] + 1 < num_buckets)
+					if (prefixSumLoadBegin[workSharingIndexesBegin[i + 1] + 1] - prefixSumLoadBegin[workSharingIndexesBegin[i]] < wprobe) {
+						std::cerr << "CCP failed (too small of a gap) at " << i << "/" << num_segments << "\n";
+						print_debug();
+						throw;
+					}
+			}
+		};
+#endif
 
 		/* probe function */
 		auto probe_load_sharing = [&](size_t wprobe) {
@@ -49,21 +79,6 @@ namespace quids::utils {
 			/* copy separators over */
 			for (size_t i = 0; i < num_segments - 1; ++i)
 				workSharingIndexesBegin[i + 1] = separators[i];
-
-			// check the validity of 
-#ifdef VALIDATE_CCP
-			for (int i = 0; i < num_segments; ++i) {
-				if (prefixSumLoadBegin[workSharingIndexesBegin[i + 1]] - prefixSumLoadBegin[workSharingIndexesBegin[i]] > wprobe) {
-					std::cerr << "CCP failed (too big of a gap) at " << i << "/" << num_segments << "\n";
-					throw;
-				}
-				if (workSharingIndexesBegin[i + 1] + 1 < num_buckets)
-					if (prefixSumLoadBegin[workSharingIndexesBegin[i + 1] + 1] - prefixSumLoadBegin[workSharingIndexesBegin[i]] < wprobe) {
-						std::cerr << "CCP failed (too small of a gap) at " << i << "/" << num_segments << "\n";
-						throw;
-					}
-			}
-#endif
 
 			return true;
 		};

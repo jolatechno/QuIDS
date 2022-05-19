@@ -606,9 +606,9 @@ namespace quids::mpi {
 		int const num_bucket = quids::utils::nearest_power_of_two(load_balancing_bucket_per_thread*n_segment);
 		size_t const offset = 8*sizeof(size_t) - quids::utils::log_2_upper_bound(num_bucket);
 
-		std::vector<int> load_balancing_begin(n_segment + 1, 0);
-		std::vector<size_t> partition_begin(num_bucket + 1, 0);
-		std::vector<size_t> total_partition_begin(num_bucket + 1, 0);
+		std::vector<int> load_balancing_begin(n_segment + 1);
+		std::vector<size_t> partition_begin(num_bucket + 1);
+		std::vector<size_t> total_partition_begin(num_bucket + 1);
 
 		std::vector<int> local_disp(n_segment + 1);
 		std::vector<int> local_count(n_segment);
@@ -654,18 +654,31 @@ namespace quids::mpi {
 		/* !!!!!!!!!!!!!!!!
 		load-balance
 		!!!!!!!!!!!!!!!! */
+		
+#ifndef SKIP_CCP
 		mid_step_function("compute_collisions - com");
 		MPI_Allreduce(&partition_begin[1], &total_partition_begin[1],
 			num_bucket, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
 
 		mid_step_function("compute_collisions - prepare");
-#ifndef SKIP_CCP
+		total_partition_begin[0] = 0;
 		quids::utils::load_balancing_from_prefix_sum(total_partition_begin.begin(), total_partition_begin.end(),
 			load_balancing_begin.begin(), load_balancing_begin.end());
 #else
 		for (size_t i = 0; i <= n_segment; ++i)
 			load_balancing_begin[i] = i*num_bucket/n_segment;
 #endif
+
+		// debug:
+		if (rank == 0) {
+			std::cerr << "\tdisplacment:\t";
+			for (int i = 0; i <= n_segment; ++i)
+				std::cerr << total_partition_begin[load_balancing_begin[i]] << "[" << load_balancing_begin[i] << "], ";
+			std::cerr << "\n\tcount:\t";
+			for (int i = 0; i < n_segment; ++i)
+				std::cerr << (total_partition_begin[load_balancing_begin[i + 1]] - total_partition_begin[load_balancing_begin[i]]) << ", ";
+			std::cerr << "\n";
+		}
 
 		/* recompute local count and disp */
 		local_disp[0] = 0;
@@ -683,7 +696,7 @@ namespace quids::mpi {
 		share
 		!!!!!!!!!!!!!!!! */
 		mid_step_function("compute_collisions - com");
-		MPI_Alltoall(&local_count[0],  num_threads, MPI_INT, 
+		MPI_Alltoall(&local_count [0], num_threads, MPI_INT, 
 					 &global_count[0], num_threads, MPI_INT, communicator);
 
 		mid_step_function("compute_collisions - prepare");
