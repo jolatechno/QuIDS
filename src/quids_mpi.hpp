@@ -758,10 +758,8 @@ namespace quids::mpi {
 				max_count = std::max(max_count, (size_t)global_count[node_id*num_threads + thread_id]);
 
 			/* insert into hashmap */
-			const int sign = 1 - 2*(rank%2);
 			for (size_t i = 0; GRANULARITY*i < max_count; ++i) {
-				for (int j = 0; j < size; ++j) {
-					const int node_id = (size + rank + sign*j)%size;
+				for (int node_id = 0; node_id < size; ++node_id) {
 					const size_t begin =                i*GRANULARITY        + global_disp[node_id*num_threads + thread_id    ];
 					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
 
@@ -775,15 +773,7 @@ namespace quids::mpi {
 							const size_t other_oid  = it->second;
 							const int other_node_id = node_id_buffer[other_oid];
 
-
-							if (oid == other_oid) {
-								std::cerr << "encountered an object id twice !\n";
-								throw;
-							}
-
-
 							if (global_num_object_after_interferences[node_id] >= global_num_object_after_interferences[other_node_id]) {
-
 								/* if it exist add the probabilities */
 								mag_buffer[other_oid]  += mag_buffer[oid];
 								mag_buffer[oid]         = 0;
