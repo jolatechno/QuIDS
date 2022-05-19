@@ -449,10 +449,6 @@ namespace quids::mpi {
 				if (max_n_object < min_equalize_size || inbalance < equalize_inbalance || previous_max_n_object == max_n_object)
 					break;
 
-				// debug: 
-				if (rank == 0)
-					std::cerr << "\tequalize\n";
-
 				/* actually equalize */
 				iteration.equalize(communicator);
 
@@ -483,10 +479,6 @@ namespace quids::mpi {
 
 				if (max_n_object < min_equalize_size || inbalance < equalize_inbalance || previous_max_n_child == max_n_child)
 					break;
-
-				// debug: 
-				if (rank == 0)
-					std::cerr << "\tequalize\n";
 
 				/* actually equalize */
 				iteration.equalize_symbolic(communicator);
