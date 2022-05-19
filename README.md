@@ -396,13 +396,15 @@ Probabilistic selctions cost a bit of time and of accuracy, with some gain in re
 
 ### MPI global variables
 
-#### minimum equalize size and equalize imbalance.
+#### minimum equalize size, minimum equalize step and equalize imbalance.
 
 `mpi::min_equalize_size` represents the minimum per node average size required to automaticly call `equalize(...)` after a call to `quids::mpi::simulate(...)`.
 
 If this first condition is met, `equalize(...)` if the maximum relative imbalance in the number of object accross the nodes is greater than `mpi::equalize_imablance`.
 
-`mpi::min_equalize_size` is equal to `1000` by default, and `mpi::equalize_imablance` has a default of `0.2`.
+This loop will also stop if the improvment of inbalance was less the `mpi::min_equalize_step`, for which the default is `0.3`.
+
+`mpi::min_equalize_size` is equal to `1000` by default, and `mpi::equalize_imablance` has a default of `0.1`.
 
 #### equalize children
 

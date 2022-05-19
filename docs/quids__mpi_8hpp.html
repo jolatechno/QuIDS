@@ -105,6 +105,9 @@ Macros</h2></td></tr>
 <tr class="memitem:ab5e6c9297c3ac08786f8224dfa2e06c8"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="quids__mpi_8hpp.html#ab5e6c9297c3ac08786f8224dfa2e06c8">GRANULARITY</a>&#160;&#160;&#160;64</td></tr>
 <tr class="memdesc:ab5e6c9297c3ac08786f8224dfa2e06c8"><td class="mdescLeft">&#160;</td><td class="mdescRight">granularity, i.e. the typical loop size we consider when doing a 2d loop.  <a href="quids__mpi_8hpp.html#ab5e6c9297c3ac08786f8224dfa2e06c8">More...</a><br /></td></tr>
 <tr class="separator:ab5e6c9297c3ac08786f8224dfa2e06c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a70a4244ba4b6eec6a90786e35b57231a"><td class="memItemLeft" align="right" valign="top"><a id="a70a4244ba4b6eec6a90786e35b57231a" name="a70a4244ba4b6eec6a90786e35b57231a"></a>
+#define&#160;</td><td class="memItemRight" valign="bottom"><b>MIN_INBALANCE_STEP</b>&#160;&#160;&#160;0.3</td></tr>
+<tr class="separator:a70a4244ba4b6eec6a90786e35b57231a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="typedef-members" name="typedef-members"></a>
 Typedefs</h2></td></tr>
@@ -136,6 +139,10 @@ size_t&#160;</td><td class="memItemRight" valign="bottom"><b>quids::mpi::min_equ
 float&#160;</td><td class="memItemRight" valign="bottom"><b>quids::mpi::equalize_inbalance</b> = EQUALIZE_INBALANCE</td></tr>
 <tr class="memdesc:ab5de5240ccfc019063996bdc48e7a20b"><td class="mdescLeft">&#160;</td><td class="mdescRight">maximum imbalance between nodes (max_obj - avg_obj)/max_obj allowed before equalizing. <br /></td></tr>
 <tr class="separator:ab5de5240ccfc019063996bdc48e7a20b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1ffa810978a75f3abd67e48a8d7dabb1"><td class="memItemLeft" align="right" valign="top"><a id="a1ffa810978a75f3abd67e48a8d7dabb1" name="a1ffa810978a75f3abd67e48a8d7dabb1"></a>
+float&#160;</td><td class="memItemRight" valign="bottom"><b>quids::mpi::min_equalize_step</b> = MIN_INBALANCE_STEP</td></tr>
+<tr class="memdesc:a1ffa810978a75f3abd67e48a8d7dabb1"><td class="mdescLeft">&#160;</td><td class="mdescRight">minimum jump in equalize before breaking <br /></td></tr>
+<tr class="separator:a1ffa810978a75f3abd67e48a8d7dabb1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a20bc2eedd44dbcc296f16bcdd33ccec9"><td class="memItemLeft" align="right" valign="top"><a id="a20bc2eedd44dbcc296f16bcdd33ccec9" name="a20bc2eedd44dbcc296f16bcdd33ccec9"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>quids::mpi::equalize_children</b> = true</td></tr>
 <tr class="memdesc:a20bc2eedd44dbcc296f16bcdd33ccec9"><td class="mdescLeft">&#160;</td><td class="mdescRight">if true, equalize the number of children. Otherwise equalize the number of objects. <br /></td></tr>
