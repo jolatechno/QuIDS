@@ -402,7 +402,7 @@ Probabilistic selctions cost a bit of time and of accuracy, with some gain in re
 
 If this first condition is met, `equalize(...)` if the maximum relative imbalance in the number of object accross the nodes is greater than `mpi::equalize_imablance`.
 
-This loop will also stop if the improvment of inbalance was less the `mpi::min_equalize_step`, for which the default is `0.3`.
+This loop will also stop if the improvment of inbalance was less the `mpi::min_equalize_step`, for which the default is `0.2`.
 
 `mpi::min_equalize_size` is equal to `1000` by default, and `mpi::equalize_imablance` has a default of `0.1`.
 

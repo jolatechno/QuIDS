@@ -15,8 +15,8 @@ namespace quids::utils {
 	/// returns the upperbound bound of the log2
 	int log_2_upper_bound(int n) {
 		for (int i = 1;; ++i)
-			if (n >> i == 0)
-				return i - 1;
+			if (1 << i >= n)
+				return i;
 	}
 
 	/// parallel iota

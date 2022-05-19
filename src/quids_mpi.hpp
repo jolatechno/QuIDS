@@ -29,7 +29,7 @@ typedef unsigned uint;
 	#define EQUALIZE_INBALANCE 0.1
 #endif
 #ifndef MIN_INBALANCE_STEP
-	#define MIN_INBALANCE_STEP 0.3
+	#define MIN_INBALANCE_STEP 0.2
 #endif
 
 #define MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE 2*sizeof(PROBA_TYPE) + sizeof(size_t)
@@ -428,7 +428,7 @@ namespace quids::mpi {
 		MPI_Comm_split_type(communicator, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &localComm);
 		MPI_Comm_size(localComm, &local_size);
 
-		const int max_equalize = std::log2(size);
+		const int max_equalize = quids::utils::log_2_upper_bound(size);
 
 
 
@@ -442,25 +442,26 @@ namespace quids::mpi {
 		/* equalize objects */
 		if (!equalize_children) {
 			mid_step_function("equalize_object");
-			float previous_inbalance, avg_n_object = iteration.get_avg_num_object_per_task(communicator);
+			float previous_diff, avg_n_object = iteration.get_avg_num_object_per_task(communicator);
 			for (int i = 0; i < max_equalize; ++i) {
 				/* check for condition */
 				size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
-				float inbalance = ((float)max_n_object - avg_n_object)/max_n_object;
+				float diff = (float)max_n_object - avg_n_object;
+				float inbalance = diff/max_n_object;
 
 				// debug: 
 				if (rank == 0)
-					std::cerr << "\tmax=" << max_n_object << ", avg=" << avg_n_object << ", inbalance=" << inbalance << "\n";
+					std::cerr << "\ti=" << i << "/" << max_equalize << "\tmax=" << max_n_object << ", avg=" << avg_n_object << ", inbalance=" << inbalance << "\n";
 
 				if (max_n_object < min_equalize_size ||
 					inbalance < equalize_inbalance ||
-					(inbalance > previous_inbalance*(1 - min_equalize_step)) && i > 0)
+					(diff > previous_diff*(1 - min_equalize_step)) && i > 0)
 					break;
 
 				/* actually equalize */
 				iteration.equalize(communicator);
 
-				previous_inbalance = inbalance;
+				previous_diff = diff;
 			}
 		}
 
@@ -473,27 +474,28 @@ namespace quids::mpi {
 		/* equalize symbolic objects */
 		if (equalize_children) {
 			mid_step_function("equalize_child");
-			float previous_inbalance, avg_n_child = iteration.get_avg_num_symbolic_object_per_task(communicator);
+			float previous_diff, avg_n_child = iteration.get_avg_num_symbolic_object_per_task(communicator);
 			for (int i = 0; i < max_equalize; ++i) {
 				/* check for condition */
 				size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
 				size_t max_n_child = iteration.get_max_num_symbolic_object_per_task(communicator);
-				float inbalance = ((float)max_n_child - avg_n_child)/max_n_child;
+				float diff = (float)max_n_child - avg_n_child;
+				float inbalance = diff/max_n_child;
 
 				// debug: 
 				if (rank == 0)
-					std::cerr << "\tmax=" << max_n_child << ", avg=" << avg_n_child << ", inbalance=" << inbalance << "\n";
+					std::cerr << "\ti=" << i << "/" << max_equalize << "\tmax=" << max_n_child << ", avg=" << avg_n_child << ", inbalance=" << inbalance << "\n";
 
 				if (max_n_object < min_equalize_size ||
 					inbalance < equalize_inbalance ||
-					(inbalance > previous_inbalance*(1 - min_equalize_step)) && i > 0)
+					(diff > previous_diff*(1 - min_equalize_step)) && i > 0)
 					break;
 
 				/* actually equalize */
 				iteration.equalize_symbolic(communicator);
 				iteration.truncated_num_object = iteration.num_object;
 
-				previous_inbalance = inbalance;
+				previous_diff = diff;
 			}
 		}
 		
