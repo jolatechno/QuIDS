@@ -435,17 +435,18 @@ namespace quids::mpi {
 		/* equalize objects */
 		if (!equalize_children) {
 			mid_step_function("equalize_object");
+			float avg_n_object = iteration.get_avg_num_object_per_task(communicator);
+			size_t previous_max_n_object;
 			for (int max_equalize = std::log2(size); max_equalize >= 0; --max_equalize) {
 				/* check for condition */
 				size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
-				float avg_n_object = iteration.get_avg_num_object_per_task(communicator);
 				float inbalance = ((float)max_n_object - avg_n_object)/max_n_object;
 
 				// debug: 
 				if (rank == 0)
 					std::cerr << "\tmax=" << max_n_object << ", avg=" << avg_n_object << ", inbalance=" << inbalance << "\n";
 
-				if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
+				if (max_n_object < min_equalize_size || inbalance < equalize_inbalance || previous_max_n_object == max_n_object)
 					break;
 
 				// debug: 
@@ -454,6 +455,8 @@ namespace quids::mpi {
 
 				/* actually equalize */
 				iteration.equalize(communicator);
+
+				previous_max_n_object = max_n_object;
 			}
 		}
 
@@ -466,18 +469,19 @@ namespace quids::mpi {
 		/* equalize symbolic objects */
 		if (equalize_children) {
 			mid_step_function("equalize_child");
+			float avg_n_child = iteration.get_avg_num_symbolic_object_per_task(communicator);
+			size_t previous_max_n_child;
 			for (int max_equalize = std::log2(size); max_equalize >= 0; --max_equalize) {
 				/* check for condition */
 				size_t max_n_object = iteration.get_max_num_object_per_task(communicator);
 				size_t max_n_child = iteration.get_max_num_symbolic_object_per_task(communicator);
-				float avg_n_child = iteration.get_avg_num_symbolic_object_per_task(communicator);
 				float inbalance = ((float)max_n_child - avg_n_child)/max_n_child;
 
 				// debug: 
 				if (rank == 0)
 					std::cerr << "\tmax=" << max_n_child << ", avg=" << avg_n_child << ", inbalance=" << inbalance << "\n";
 
-				if (max_n_object < min_equalize_size || inbalance < equalize_inbalance)
+				if (max_n_object < min_equalize_size || inbalance < equalize_inbalance || previous_max_n_child == max_n_child)
 					break;
 
 				// debug: 
@@ -487,6 +491,8 @@ namespace quids::mpi {
 				/* actually equalize */
 				iteration.equalize_symbolic(communicator);
 				iteration.truncated_num_object = iteration.num_object;
+
+				previous_max_n_child = max_n_child;
 			}
 		}
 		
@@ -955,11 +961,11 @@ namespace quids::mpi {
 		uint other_num_object;
 		uint other_ub_symbolic_object_size;
 		
-		MPI_Isend(&num_symbolic_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
-		MPI_Isend(&ub_symbolic_object_size, 1, MPI_UNSIGNED, this_pair_id, 0 /* tag */, communicator, &request);
+		MPI_Isend(&num_symbolic_object,          1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, &request);
+		MPI_Isend(&ub_symbolic_object_size,      1, MPI_UNSIGNED,           this_pair_id, 0 /* tag */, communicator, &request);
 
-		MPI_Recv(&other_num_object, 1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
-		MPI_Recv(&other_ub_symbolic_object_size, 1, MPI_UNSIGNED, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+		MPI_Recv(&other_num_object,              1, MPI_UNSIGNED_LONG_LONG, this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
+		MPI_Recv(&other_ub_symbolic_object_size, 1, MPI_UNSIGNED,           this_pair_id, 0 /* tag */, communicator, MPI_STATUS_IGNORE);
 
 		ub_symbolic_object_size = std::max(ub_symbolic_object_size, other_ub_symbolic_object_size);
 
@@ -968,7 +974,7 @@ namespace quids::mpi {
 			size_t num_symbolic_object_to_send = (num_symbolic_object - other_num_object) / 2;
 
 			/* find the actual number of object to send */
-			auto limit_it = std::lower_bound(child_begin.begin(), child_begin.begin() + num_object, num_symbolic_object - num_symbolic_object_to_send);
+			auto limit_it = std::lower_bound(child_begin.begin(), child_begin.begin() + num_object, num_symbolic_object - num_symbolic_object_to_send) - 1;
 			size_t num_object_sent = std::distance(limit_it, child_begin.begin() + num_object);
 
 			send_objects(num_object_sent, this_pair_id, communicator, true);
