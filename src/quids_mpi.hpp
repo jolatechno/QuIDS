@@ -746,9 +746,26 @@ namespace quids::mpi {
 					  &node_id_buffer[0] + receive_disp[node + 1],
 					  node);
 
+		if (rank == 0)
+			std::cerr << size << "=size\n";
+
 		mid_step_function("compute_collisions - insert");
 		#pragma omp parallel
 		{
+			// work stealing oracle
+			std::vector<size_t> global_num_object_after_interferences(size, 0);
+			const auto work_steal = [&](int const node_id, int const other_node_id) {
+				bool steal = global_num_object_after_interferences[other_node_id] >= global_num_object_after_interferences[node_id];
+
+				// update counts
+				if (steal) {
+					--global_num_object_after_interferences[other_node_id];
+				} else
+					--global_num_object_after_interferences[node_id];
+
+				return steal;
+			};
+
 			int const thread_id = omp_get_thread_num();
 			robin_hood::unordered_map<size_t, size_t> elimination_map;
 
@@ -767,19 +784,33 @@ namespace quids::mpi {
 				for (int j = 0; j < size; ++j) {
 					const int node_id = (rank + j)%size;
 
+					if (node_id >= size)
+						throw;
+
 					const size_t begin =                i*GRANULARITY        + global_disp[node_id*num_threads + thread_id    ];
 					const size_t end   = std::min(begin + GRANULARITY, (size_t)global_disp[node_id*num_threads + thread_id + 1]);
 
 					for (size_t oid = begin; oid < end; ++oid) {
+						++global_num_object_after_interferences[node_id];
 
 						/* accessing key */
 						auto [it, unique] = elimination_map.insert({hash_buffer[oid], oid});
 						if (!unique) {
 							const size_t other_oid = it->second;
+							const int other_node_id = node_id_buffer[other_oid];
 
-							/* if it exist add the probabilities */
-							mag_buffer[other_oid] += mag_buffer[oid];
-							mag_buffer[oid]        = 0;
+							if (work_steal(node_id, other_node_id)) {
+								/* swap objects */
+								it->second = oid;
+
+								/* add probabilities */
+								mag_buffer[oid]      += mag_buffer[other_oid];
+								mag_buffer[other_oid] = 0;
+							} else {
+								/* if it exist add the probabilities */
+								mag_buffer[other_oid] += mag_buffer[oid];
+								mag_buffer[oid]        = 0;
+							}
 						}
 					}
 				}
