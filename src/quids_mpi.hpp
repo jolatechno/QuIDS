@@ -755,6 +755,7 @@ namespace quids::mpi {
 			// work stealing oracle
 			std::vector<size_t> global_num_object_after_interferences(size, 0);
 			const auto work_steal = [&](int const node_id, int const other_node_id) {
+#ifndef SKIP_WORK_STEALING
 				bool steal = global_num_object_after_interferences[other_node_id] >= global_num_object_after_interferences[node_id];
 
 				// update counts
@@ -764,6 +765,9 @@ namespace quids::mpi {
 					--global_num_object_after_interferences[node_id];
 
 				return steal;
+#else
+				return false;
+#endif
 			};
 
 			int const thread_id = omp_get_thread_num();
