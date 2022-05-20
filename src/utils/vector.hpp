@@ -41,7 +41,8 @@ namespace quids::utils {
 	    mutable size_t size_ = 0;
 	 
 	public:
-	    explicit fast_vector(size_t n = 0) {
+		template<typename Int=size_t>
+	    explicit fast_vector(const Int n = 0) {
 	    	resize(n);
 		}
 
@@ -69,15 +70,18 @@ namespace quids::utils {
 	    	return size_;
 	    }
 
-	    T& operator[](size_t index) {
+		template<typename Int=size_t>
+	    T& operator[](Int index) {
 		    return *(ptr + index);
 		}
 
+		template<typename Int=size_t>
 		T operator[](size_t index) const {
 		    return *(ptr + index);
 		}
 
-		T& at(size_t index) {
+		template<typename Int=size_t>
+		T& at(const Int index) {
 			if (index > size_) {
 				std::cerr << "index out of bound in fast vector !\n";
 				throw;
@@ -86,7 +90,8 @@ namespace quids::utils {
 		    return *(ptr + index);
 		}
 
-		T at(size_t index) const {
+		template<typename Int=size_t>
+		T at(const Int index) const {
 			if (index > size_) {
 				std::cerr << "index out of bound in fast vector !\n";
 				throw;
@@ -102,8 +107,9 @@ namespace quids::utils {
 		"min_state_size" is the minimum size of a vector, to avoid small vectors which are bound to be resized frequently.
 		*/
 		/// align_byte_length_ should be used to reallign the buffer, which is not yet implemented as realloc doesn't allocate.
-	    void resize(size_t n, const uint align_byte_length_=std::alignment_of<T>()) const {
-	    	n = std::max(min_vector_size, n); // never resize under min_vector_size
+		template<typename Int=size_t>
+	    void resize(const Int n_, const uint align_byte_length_=std::alignment_of<T>()) const {
+	    	size_t n = std::max(min_vector_size, (size_t)n_); // never resize under min_vector_size
 
 	    	if (size_ < n || // resize if we absolutely have to because the state won't fit
 	    		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
