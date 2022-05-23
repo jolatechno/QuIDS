@@ -1,11 +1,5 @@
 # [QuIDS](https://github.com/jolatechno/QuIDS): Quantum Irregular Dynamic Simulator 
 
-_**For now the implementation of alignment align the first object using std::align via the resize function in [./src/utils/vector.hpp](./src/utils/vector.hpp).**_
-
-_**This means that alignment of the first object only hapens if align\_byte\_length is a power of two**_
-
-_**Alignemnt of the following objects is relative to the first object, so for now the alignment of all objects only happens if align\_byte\_length is a power of two**_
-
 ## Installation
 
 This library is header-only, so you can simply link files in [src](./src).
