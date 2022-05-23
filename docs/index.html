@@ -412,7 +412,7 @@ MPI global variables</h2>
 minimum equalize size, minimum equalize step and equalize imbalance.</h3>
 <p ><code>mpi::min_equalize_size</code> represents the minimum per node average size required to automaticly call <code>equalize(...)</code> after a call to <code>quids::mpi::simulate(...)</code>.</p>
 <p >If this first condition is met, <code>equalize(...)</code> if the maximum relative imbalance in the number of object accross the nodes is greater than <code>mpi::equalize_imablance</code>.</p>
-<p >This loop will also stop if the improvment of inbalance was less the <code>mpi::min_equalize_step</code>, for which the default is <code>0.3</code>.</p>
+<p >This loop will also stop if the improvment of inbalance was less the <code>mpi::min_equalize_step</code>, for which the default is <code>0.2</code>.</p>
 <p ><code>mpi::min_equalize_size</code> is equal to <code>1000</code> by default, and <code>mpi::equalize_imablance</code> has a default of <code>0.1</code>.</p>
 <h3><a class="anchor" id="autotoc_md29"></a>
 equalize children</h3>
