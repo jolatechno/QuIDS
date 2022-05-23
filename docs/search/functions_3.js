@@ -2,7 +2,7 @@ var searchData=
 [
   ['gather_5fobjects_0',['gather_objects',['../classquids_1_1mpi_1_1mpi__iteration.html#abfcdae7f899aef08f9f5081e850fd228',1,'quids::mpi::mpi_iteration']]],
   ['generalized_5fpartition_1',['generalized_partition',['../namespacequids_1_1utils.html#a04766ef14b0af35520ea9bf386c68a79',1,'quids::utils']]],
-  ['generalized_5fpartition_5ffrom_5fiota_2',['generalized_partition_from_iota',['../namespacequids_1_1utils.html#a7312c706cd76f90dab115b88ae62b76f',1,'quids::utils']]],
+  ['generalized_5fpartition_5ffrom_5fiota_2',['generalized_partition_from_iota',['../namespacequids_1_1utils.html#ab66ba300cd58d7e088a653ff6eb5244b',1,'quids::utils']]],
   ['get_5falignment_5foffset_3',['get_alignment_offset',['../namespacequids.html#aef550e60fc162ca9613e3bf2ec20b0f0',1,'quids']]],
   ['get_5ffree_5fmem_4',['get_free_mem',['../namespacequids_1_1utils.html#a594be390cd1aec6c1c991ee8242917b6',1,'quids::utils']]],
   ['get_5fmpi_5fdatatype_5',['get_mpi_datatype',['../namespacequids_1_1mpi_1_1utils.html#acb65382b618071f4807c93138ee174ee',1,'quids::mpi::utils']]],

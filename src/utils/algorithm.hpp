@@ -69,8 +69,8 @@ namespace quids::utils {
 	}
 
 	/// linear partitioning algorithm into n partitions without an initialized index list
-	template <class idIteratorType, class idType, class countIteratorType, class functionType>
-	void generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset,
+	template <class idIteratorType, class countIteratorType, class functionType>
+	void generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, long long int  const iotaOffset,
 		countIteratorType offset, countIteratorType offset_end,
 		functionType const partitioner) {
 
@@ -166,8 +166,8 @@ namespace quids::utils {
 	}
 
 	/// linear partitioning algorithm into n partitions without an initialized index list in parallel
-	template <class idIteratorType, class idType, class countIteratorType, class functionType>
-	void parallel_generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, idType const iotaOffset,
+	template <class idIteratorType, class countIteratorType, class functionType>
+	void parallel_generalized_partition_from_iota(idIteratorType idx_in, idIteratorType idx_in_end, long long int  const iotaOffset,
 		countIteratorType offset, countIteratorType offset_end,
 		functionType const partitioner) {
 
