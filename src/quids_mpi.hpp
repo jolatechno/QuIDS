@@ -389,18 +389,19 @@ namespace quids::mpi {
 			static const size_t symbolic_iteration_memory_size = SYMBOLIC_ITERATION_MEMORY_SIZE + MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE;
 
 			static const size_t mpi_symbolic_iteration_memory_size = MPI_SYMBOLIC_ITERATION_MEMORY_SIZE;
-			return (float)symbolic_iteration_memory_size + (float)mpi_symbolic_iteration_memory_size + hash_map_size;
+			float mem_size = (float)symbolic_iteration_memory_size + (float)mpi_symbolic_iteration_memory_size + hash_map_size;
+			return mem_size*quids::utils::upsize_policy;
 		}
 		size_t inline get_mem_size(MPI_Comm communicator) const {
 			static const size_t symbolic_iteration_memory_size = SYMBOLIC_ITERATION_MEMORY_SIZE + MPI_SPECIFIC_SYMBOLIC_ITERATION_MEMORY_SIZE;
-			size_t memory_size = magnitude.size()*symbolic_iteration_memory_size*quids::utils::upsize_policy;
+			size_t memory_size = magnitude.size()*symbolic_iteration_memory_size;
 
 			static const size_t mpi_symbolic_iteration_memory_size = MPI_SYMBOLIC_ITERATION_MEMORY_SIZE;
-			memory_size += mag_buffer.size()*mpi_symbolic_iteration_memory_size*quids::utils::upsize_policy;
+			memory_size += mag_buffer.size()*mpi_symbolic_iteration_memory_size;
 
 			size_t total_size = mpi_symbolic_iteration_memory_size*magnitude.size();
 			MPI_Allreduce(MPI_IN_PLACE, &total_size, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, communicator);
-			return total_size;
+			return total_size*quids::utils::upsize_policy;
 		}
 		size_t inline get_total_next_iteration_num_object(MPI_Comm communicator) const {
 			size_t total_next_iteration_num_object;
