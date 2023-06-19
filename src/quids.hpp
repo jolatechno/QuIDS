@@ -309,7 +309,7 @@ namespace quids {
 		*/
 		size_t get_mem_size() const {
 			static const size_t iteration_memory_size = ITERATION_MEMORY_SIZE;
-			return magnitude.size()*iteration_memory_size + objects.size();
+			return (magnitude.size()*iteration_memory_size + objects.size())*utils::upsize_policy;
 		}
 		size_t get_object_length() const {
 			return object_begin[num_object];
@@ -412,7 +412,7 @@ namespace quids {
 		*/
 		size_t get_mem_size() const {
 			static const size_t symbolic_iteration_memory_size = SYMBOLIC_ITERATION_MEMORY_SIZE;
-			return magnitude.size()*symbolic_iteration_memory_size;
+			return magnitude.size()*symbolic_iteration_memory_size*utils::upsize_policy;
 		}
 
 		void compute_collisions(debug_t mid_step_function=[](const char*){});
@@ -568,7 +568,7 @@ namespace quids {
 			mem_size += num_childs[oid]*(symbolic_iteration_memory_size + hash_map_size);
 		}
 
-		return mem_size;
+		return mem_size*utils::upsize_policy;
 	}
 
 	/*
@@ -927,7 +927,7 @@ namespace quids {
 		__gnu_parallel::partial_sum(&next_iteration.object_begin[1],
 			&next_iteration.object_begin[1] + next_iteration.num_object + 1,
 			&next_iteration.object_begin[1]);
-
+		
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
 		

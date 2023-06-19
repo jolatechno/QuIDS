@@ -603,7 +603,7 @@ namespace quids::mpi {
 			mem_size += num_childs[oid]*(symbolic_iteration_memory_size + mpi_symbolic_iteration_memory_size + hash_map_size);
 		}
 
-		return mem_size;
+		return mem_size*quids::utils::upsize_policy;
 	}
 
 	/*

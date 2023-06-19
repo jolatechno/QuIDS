@@ -38,7 +38,7 @@ namespace quids::utils {
 	private:
 	    mutable T* ptr = NULL;
 	    mutable T* unaligned_ptr = NULL;
-	    mutable size_t size_ = 0;
+	    mutable size_t size_ = 0, capacity_ = 0;
 	 
 	public:
 		template<typename Int=size_t>
@@ -51,6 +51,7 @@ namespace quids::utils {
 				free(ptr);
 				ptr = NULL;
 				size_ = 0;
+				capacity_ = 0;
 			}
 		}
 	 
@@ -111,17 +112,19 @@ namespace quids::utils {
 	    void resize(const Int n_, const uint align_byte_length_=std::alignment_of<T>()) const {
 	    	size_t n = std::max(min_vector_size, (size_t)n_); // never resize under min_vector_size
 
-	    	if (size_ < n || // resize if we absolutely have to because the state won't fit
-	    		n*upsize_policy < size_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
+	    	if (capacity_ < n || // resize if we absolutely have to because the state won't fit
+	    		n*upsize_policy < capacity_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
 	    		// for later allignment
 	    		size_t old_size_ = size_;
 
-	    		size_ = n*upsize_policy;
+	    		size_     = n;
+	    		capacity_ = n*upsize_policy;
+
 	    		int offset = std::distance(unaligned_ptr, ptr);
-	    		unaligned_ptr = (T*)realloc(unaligned_ptr, (size_ + align_byte_length_)*sizeof(T));
+	    		unaligned_ptr = (T*)realloc(unaligned_ptr, (capacity_ + align_byte_length_)*sizeof(T));
 
 	    		if (unaligned_ptr == NULL)
-	    			throw std::runtime_error("bad allocation in fast_vector !! size=" + std::to_string(size_) + "+" + std::to_string(align_byte_length_) + ", offset=" + std::to_string(offset));
+	    			throw std::runtime_error("bad allocation in fast_vector !! size=" + std::to_string(capacity_) + "+" + std::to_string(align_byte_length_) + ", offset=" + std::to_string(offset));
 
 	    		ptr = unaligned_ptr + offset;
 	    		if (align_byte_length_ > 1) {
@@ -140,6 +143,8 @@ namespace quids::utils {
 		    				ptr += allign_offset;
 		    			}
 	    		}
+	    	} else {
+	    		size_ = n;
 	    	}
 	    }
 	 
