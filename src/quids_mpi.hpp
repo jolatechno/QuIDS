@@ -746,9 +746,6 @@ namespace quids::mpi {
 					  &node_id_buffer[0] + receive_disp[node + 1],
 					  node);
 
-		if (rank == 0)
-			std::cerr << size << "=size\n";
-
 		mid_step_function("compute_collisions - insert");
 		#pragma omp parallel
 		{

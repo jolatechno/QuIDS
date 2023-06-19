@@ -121,7 +121,7 @@ namespace quids::utils {
 	    		unaligned_ptr = (T*)realloc(unaligned_ptr, (size_ + align_byte_length_)*sizeof(T));
 
 	    		if (unaligned_ptr == NULL)
-	    			throw std::runtime_error("bad allocation in fast_vector !!");
+	    			throw std::runtime_error("bad allocation in fast_vector !! size=" + std::to_string(size_) + "+" + std::to_string(align_byte_length_) + ", offset=" + std::to_string(offset));
 
 	    		ptr = unaligned_ptr + offset;
 	    		if (align_byte_length_ > 1) {
