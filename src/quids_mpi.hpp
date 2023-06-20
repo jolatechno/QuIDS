@@ -439,9 +439,6 @@ namespace quids::mpi {
 		if (size == 1)
 			return quids::simulate(iteration, rule, next_iteration, symbolic_iteration, max_num_object, mid_step_function);
 
-
-		std::cerr << "\titerating with " << size << " total nodes, " << local_size << " local nodes\n";
-
 		/* equalize objects */
 		if (!equalize_children) {
 			mid_step_function("equalize_object");
@@ -513,7 +510,8 @@ namespace quids::mpi {
 		if (max_num_object == 0) {
 			/* available memory */
 			size_t avail_memory = next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm) + quids::utils::get_free_mem();
-			size_t target_memory = avail_memory/local_size*(1 - quids::safety_margin);
+			size_t non_avail_memory = iteration.get_mem_size(localComm);
+			size_t target_memory = ((avail_memory + non_avail_memory)*(1 - quids::safety_margin) - non_avail_memory)/local_size;
 
 			/* actually truncate by binary search */
 			if (iteration.get_truncated_mem_size() > target_memory) {
@@ -560,7 +558,8 @@ namespace quids::mpi {
 		if (max_num_object == 0) {
 			/* available memory */
 			size_t avail_memory = next_iteration.get_mem_size(localComm) + quids::utils::get_free_mem();
-			size_t target_memory = avail_memory/local_size*(1 - quids::safety_margin);
+			size_t non_avail_memory = iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm);
+			size_t target_memory = ((avail_memory + non_avail_memory)*(1 - quids::safety_margin) - non_avail_memory)/local_size;
 
 			/* actually truncate by binary search */
 			if (symbolic_iteration.get_truncated_mem_size() > target_memory) {

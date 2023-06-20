@@ -454,8 +454,9 @@ namespace quids {
 		if (max_num_object == 0) {
 
 			/* available memory */
-			size_t avail_memory =  next_iteration.get_mem_size() + symbolic_iteration.get_mem_size() + utils::get_free_mem();
-			size_t target_memory = avail_memory*(1 - safety_margin);
+			size_t avail_memory = next_iteration.get_mem_size() + symbolic_iteration.get_mem_size() + quids::utils::get_free_mem();
+			size_t non_avail_memory = iteration.get_mem_size();
+			size_t target_memory = (avail_memory + non_avail_memory)*(1 - quids::safety_margin) - non_avail_memory;
 
 			/* actually truncate by binary search */
 			if (iteration.get_truncated_mem_size() > target_memory) {
@@ -499,8 +500,9 @@ namespace quids {
 		if (max_num_object == 0) {
 
 			/* available memory */
-			size_t avail_memory = next_iteration.get_mem_size() + utils::get_free_mem();
-			size_t target_memory = avail_memory*(1 - safety_margin);
+			size_t avail_memory = next_iteration.get_mem_size() + quids::utils::get_free_mem();
+			size_t non_avail_memory = iteration.get_mem_size() + symbolic_iteration.get_mem_size();
+			size_t target_memory = (avail_memory + non_avail_memory)*(1 - quids::safety_margin) - non_avail_memory;
 
 			/* actually truncate by binary search */
 			if (symbolic_iteration.get_truncated_mem_size() > target_memory) {
