@@ -440,6 +440,8 @@ namespace quids::mpi {
 			return quids::simulate(iteration, rule, next_iteration, symbolic_iteration, max_num_object, mid_step_function);
 
 
+		std::cerr << "\titerating with " << size << " total nodes, " << local_size << " local nodes\n";
+
 		/* equalize objects */
 		if (!equalize_children) {
 			mid_step_function("equalize_object");

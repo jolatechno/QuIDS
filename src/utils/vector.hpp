@@ -109,16 +109,16 @@ namespace quids::utils {
 		*/
 		/// align_byte_length_ should be used to reallign the buffer, which is not yet implemented as realloc doesn't allocate.
 		template<typename Int=size_t>
-	    void resize(const Int n_, const uint align_byte_length_=std::alignment_of<T>()) const {
-	    	size_t n = std::max(min_vector_size, (size_t)n_); // never resize under min_vector_size
+	    void resize(const Int n, const uint align_byte_length_=std::alignment_of<T>()) const {
+	    	size_t capped_size = std::max(min_vector_size, (size_t)n); // never resize under min_vector_size
 
-	    	if (capacity_ < n || // resize if we absolutely have to because the state won't fit
-	    		n*upsize_policy < capacity_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
+	    	if (capacity_ < capped_size || // resize if we absolutely have to because the state won't fit
+	    		capped_size*upsize_policy < capacity_*downsize_policy) { // resize if the size we resize to is small enough (to free memory)
 	    		// for later allignment
 	    		size_t old_size_ = size_;
 
 	    		size_     = n;
-	    		capacity_ = n*upsize_policy;
+	    		capacity_ = capped_size*upsize_policy;
 
 	    		int offset = std::distance(unaligned_ptr, ptr);
 	    		unaligned_ptr = (T*)realloc(unaligned_ptr, (capacity_ + align_byte_length_)*sizeof(T));

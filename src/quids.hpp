@@ -31,7 +31,7 @@ typedef unsigned uint;
 	#define TOLERANCE 1e-30;
 #endif
 #ifndef SAFETY_MARGIN
-	#define SAFETY_MARGIN 0.2
+	#define SAFETY_MARGIN 0.3
 #endif
 #ifndef LOAD_BALANCING_BUCKET_PER_THREAD
 	#define LOAD_BALANCING_BUCKET_PER_THREAD 32
@@ -927,7 +927,7 @@ namespace quids {
 		__gnu_parallel::partial_sum(&next_iteration.object_begin[1],
 			&next_iteration.object_begin[1] + next_iteration.num_object + 1,
 			&next_iteration.object_begin[1]);
-		
+
 		next_iteration.allocate(next_iteration.object_begin[next_iteration.num_object]);
 
 		
