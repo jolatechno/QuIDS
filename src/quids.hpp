@@ -31,10 +31,10 @@ typedef unsigned uint;
 	#define TOLERANCE 1e-30;
 #endif
 #ifndef SAFETY_MARGIN
-	#define SAFETY_MARGIN 0.3
+	#define SAFETY_MARGIN 0.2
 #endif
 #ifndef EQUALIZE_FACTOR
-	#define EQUALIZE_FACTOR 0.3
+	#define EQUALIZE_FACTOR 0.25
 #endif
 #ifndef LOAD_BALANCING_BUCKET_PER_THREAD
 	#define LOAD_BALANCING_BUCKET_PER_THREAD 32
