@@ -509,8 +509,13 @@ namespace quids::mpi {
 		mid_step_function("truncate_symbolic");
 		if (max_num_object == 0) {
 			/* available memory */
-			size_t avail_memory = next_iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm) + quids::utils::get_free_mem();
-			size_t non_avail_memory = iteration.get_mem_size(localComm);
+			size_t next_iteration_mem = next_iteration.get_mem_size(localComm);
+			size_t previous_iteration_mem = iteration.get_mem_size(localComm);
+			if (next_iteration_mem > previous_iteration_mem) {
+				next_iteration_mem = (1 - equalize_factor)*next_iteration_mem + equalize_factor*previous_iteration_mem;
+			}
+			size_t avail_memory = next_iteration_mem + symbolic_iteration.get_mem_size(localComm) + quids::utils::get_free_mem();
+			size_t non_avail_memory = previous_iteration_mem;
 			size_t target_memory = ((avail_memory + non_avail_memory)*(1 - quids::safety_margin) - non_avail_memory)/local_size;
 
 			/* actually truncate by binary search */
@@ -557,8 +562,13 @@ namespace quids::mpi {
 		mid_step_function("truncate");
 		if (max_num_object == 0) {
 			/* available memory */
-			size_t avail_memory = next_iteration.get_mem_size(localComm) + quids::utils::get_free_mem();
-			size_t non_avail_memory = iteration.get_mem_size(localComm) + symbolic_iteration.get_mem_size(localComm);
+			size_t next_iteration_mem = next_iteration.get_mem_size(localComm);
+			size_t previous_iteration_mem = iteration.get_mem_size(localComm);
+			if (next_iteration_mem > previous_iteration_mem) {
+				next_iteration_mem = (1 - equalize_factor)*next_iteration_mem + equalize_factor*previous_iteration_mem;
+			}
+			size_t avail_memory = next_iteration_mem + quids::utils::get_free_mem();
+			size_t non_avail_memory = previous_iteration_mem + symbolic_iteration.get_mem_size(localComm);
 			size_t target_memory = ((avail_memory + non_avail_memory)*(1 - quids::safety_margin) - non_avail_memory)/local_size;
 
 			/* actually truncate by binary search */

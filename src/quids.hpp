@@ -33,6 +33,9 @@ typedef unsigned uint;
 #ifndef SAFETY_MARGIN
 	#define SAFETY_MARGIN 0.3
 #endif
+#ifndef EQUALIZE_FACTOR
+	#define EQUALIZE_FACTOR 0.3
+#endif
 #ifndef LOAD_BALANCING_BUCKET_PER_THREAD
 	#define LOAD_BALANCING_BUCKET_PER_THREAD 32
 #endif
@@ -59,6 +62,8 @@ namespace quids {
 	PROBA_TYPE tolerance = TOLERANCE;
 	/// memory safety margin (0.2 = 80% memory usage target)
 	float safety_margin = SAFETY_MARGIN;
+	/// memory equalization factor between iteration 1 and next iteration
+	float equalize_factor = EQUALIZE_FACTOR;
 	/// number of load balancing buckets per thread
 	int load_balancing_bucket_per_thread = LOAD_BALANCING_BUCKET_PER_THREAD;
 	#ifdef SIMPLE_TRUNCATION
@@ -454,8 +459,13 @@ namespace quids {
 		if (max_num_object == 0) {
 
 			/* available memory */
-			size_t avail_memory = next_iteration.get_mem_size() + symbolic_iteration.get_mem_size() + quids::utils::get_free_mem();
-			size_t non_avail_memory = iteration.get_mem_size();
+			size_t next_iteration_mem = next_iteration.get_mem_size();
+			size_t previous_iteration_mem = iteration.get_mem_size();
+			if (next_iteration_mem > previous_iteration_mem) {
+				next_iteration_mem = (1 - equalize_factor)*next_iteration_mem + equalize_factor*previous_iteration_mem;
+			}
+			size_t avail_memory = next_iteration_mem + symbolic_iteration.get_mem_size() + quids::utils::get_free_mem();
+			size_t non_avail_memory = previous_iteration_mem;
 			size_t target_memory = (avail_memory + non_avail_memory)*(1 - quids::safety_margin) - non_avail_memory;
 
 			/* actually truncate by binary search */
@@ -500,8 +510,13 @@ namespace quids {
 		if (max_num_object == 0) {
 
 			/* available memory */
-			size_t avail_memory = next_iteration.get_mem_size() + quids::utils::get_free_mem();
-			size_t non_avail_memory = iteration.get_mem_size() + symbolic_iteration.get_mem_size();
+			size_t next_iteration_mem = next_iteration.get_mem_size();
+			size_t previous_iteration_mem = iteration.get_mem_size();
+			if (next_iteration_mem > previous_iteration_mem) {
+				next_iteration_mem = (1 - equalize_factor)*next_iteration_mem + equalize_factor*previous_iteration_mem;
+			}
+			size_t avail_memory = next_iteration_mem + quids::utils::get_free_mem();
+			size_t non_avail_memory = previous_iteration_mem + symbolic_iteration.get_mem_size();
 			size_t target_memory = (avail_memory + non_avail_memory)*(1 - quids::safety_margin) - non_avail_memory;
 
 			/* actually truncate by binary search */
